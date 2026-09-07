@@ -1,0 +1,71 @@
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500;600&family=Kanit:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --radius: 0.625rem;
+  --cream: oklch(0.968 0.014 92);
+  --ink: oklch(0.205 0.02 250);
+  --ink-soft: oklch(0.42 0.02 250);
+  --teal: oklch(0.55 0.095 205);
+  --pearl: oklch(0.36 0.03 25);
+  --warm: oklch(0.72 0.15 72);
+  --card: oklch(0.986 0.008 94);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--cream);
+  color: var(--ink);
+  font-family: 'Kanit', sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-thai {
+  font-family: 'Kanit', sans-serif;
+}
+
+.font-display {
+  font-family: 'Anton', sans-serif;
+}
+
+.font-mono {
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* Animations */
+@keyframes rise {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-rise {
+  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes badge-bounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.animate-badge {
+  animation: badge-bounce 3s ease-in-out infinite;
+}
