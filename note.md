@@ -1,0 +1,279 @@
+# รายละเอียดความต้องการระบบ (Requirements & Features)
+
+---
+
+## 1. ลูกค้า (Customer / Storefront)
+
+### 1.1 หน้าหลัก (Landing Page)
+- **Top Navbar:**
+  - โลโก้ / ชื่อร้าน
+  - หน้าหลัก
+  - เมนู (มี Dropdown / Sub-menu หมวดหมู่สินค้า หรือกดแล้ว Smooth Scroll ไปยังหมวดนั้น)
+  - โปรโมชั่น & สิทธิพิเศษ
+  - ตรวจสอบสถานะคิว / ติดตามออเดอร์
+- **ส่วนบนสุด (Top Banner & Hero Section):**
+  - **Banner Carousel / Slider:** ดึงข้อมูลรูปภาพและสไลด์จากระบบแบนเนอร์ (`banners`, `banner_items`) ที่เปิดใช้งานอยู่
+  - ข้อความต้อนรับ และปุ่ม Call-to-Action "สั่งเครื่องดื่มเลย!" (Smooth Scroll ไปยังหมวดหมู่เมนู)
+- **ส่วนรายการเมนู (Menu Section):**
+  - แสดงแท็บแบ่งตามหมวดหมู่สินค้า (`categories`) ที่เปิดใช้งาน (`is_active = true`)
+  - การ์ดสินค้า (`products`):
+    - รูปภาพสินค้า, ชื่อเมนู, รายละเอียด, ราคาเริ่มต้น
+    - ป้ายกำกับ **"เมนูแนะนำ" (Recommended)** สำหรับสินค้าที่ตั้ง `is_recommended = true`
+    - แสดงสถานะ **"สินค้าหมด" (Out of stock)** เมื่อ `is_available = false`
+    - ปุ่ม "เลือกเมนู / สั่งซื้อ" เพื่อเปิด Modal ปรับแต่งแก้ว
+  - **Modal ปรับแต่งแก้ว (Customization Modal):**
+    - เลือกระดับความหวาน (`sweetness_level` เช่น 0%, 25%, 50%, 100%)
+    - เลือกท็อปปิ้ง (`toppings`) ได้หลายรายการ (รองรับการเลือก 0 หรือมากกว่า 1 ท็อปปิ้ง ผ่าน `order_item_toppings`) พร้อมแสดงราคาบวกเพิ่มของแต่ละท็อปปิ้ง และปิดตัวเลือกที่ `is_available = false`
+    - ปุ่ม "เพิ่มลงรถเข็น"
+- **ส่วนโปรโมชั่น & ระบบสะสมแต้ม (Promotions & Loyalty Section):**
+  - แสดงรายการโปรโมชั่นที่เปิดใช้งาน (`promotions` ที่ `is_active = true` และอยู่ในช่วง `start_date` - `end_date`)
+  - ช่องสำหรับกรอก **เบอร์โทรศัพท์** เพื่อตรวจสอบแต้มสะสมปัจจุบัน (`customers.current_points`) และดูสิทธิ์โปรโมชั่นที่สามารถแลกได้
+- **รถเข็นลอย (Floating Cart Button & Drawer/Overlay):**
+  - ปุ่มไอคอนรถเข็นลอยอยู่มุมขวาล่าง พร้อม Badge แสดงจำนวนแก้วรวม
+  - เมื่อกดจะเปิด Cart Drawer แสดงรายการแก้วที่เลือก (เมนู, ความหวาน, ท็อปปิ้งที่เลือก, ราคารวม)
+  - จัดเก็บสถานะตะกร้าสินค้าไว้ใน `localStorage` ป้องกันข้อมูลหายเมื่อ Refresh หน้าเว็บ
+
+### 1.2 ระบบการสั่งซื้อออนไลน์และชำระเงิน (Online Order & Checkout Flow)
+- **ข้อมูลผู้สั่งซื้อ:**
+  - กรอก **เบอร์โทรศัพท์** (`customer_phone`) และ **ชื่อเล่น** (`customer_nickname`)
+  - เลือกระบุ **เวลาที่จะมารับสินค้าโดยประมาณ** (`estimated_pickup_time`)
+  - ระบุหมายเหตุเพิ่มเติม (`note` เช่น แยกน้ำแข็ง, ฝากวางไว้ที่โต๊ะ)
+- **การใช้แต้มแลกโปรโมชั่น (Promotion Redemption):**
+  - หากเบอร์โทรศัพท์มีแต้มเพียงพอและยังไม่เกินโควตาสิทธิ์ (`all_limit`, `person_limit`) ลูกค้าสามารถเลือกกดใช้โปรโมชั่นเพื่อรับส่วนลด/เครื่องดื่มฟรีได้ (บันทึกลง `promotion_redemptions`)
+- **การชำระเงิน (PromptPay QR Code & Slip Upload):**
+  - ระบบคำนวณยอดเงินรวมสุทธิ แล้วสร้าง **PromptPay QR Code** (Dynamic QR ตามยอดเงินจริง)
+  - ผู้ใช้สแกนชำระเงินผ่าน Mobile Banking
+  - ผู้ใช้ **แนบรูปสลิปหลักฐานการโอนเงิน** (`slip_url`) เพื่อส่งคำสั่งซื้อเข้าระบบ
+- **การออกคิวและติดตามสถานะ (Queue & Live Tracking):**
+  - เมื่อส่งออเดอร์เรียบร้อย ระบบจะสร้างรหัสคำสั่งซื้อ (`order_no`) และหมายเลขคิว (`queue_no`)
+  - บันทึกสถานะเริ่มต้นเป็น `new_order`
+  - หน้าติดตามสถานะออเดอร์แบบ Real-time แสดง Timeline สถานะ:
+    1. **รอตรวจสอบสลิป / รับออเดอร์ (`new_order`)**
+    2. **กำลังเตรียมเครื่องดื่ม (`preparing`)**
+    3. **เครื่องดื่มพร้อมรับแล้ว (`ready`)** (มีแจ้งเตือน Pop-up / เสียงเตือน ให้มารับที่เคาน์เตอร์)
+    4. **รับสินค้าเรียบร้อย (`completed`)**
+
+---
+
+## 2. ผู้ดูแลระบบ (Admin Portal - `/admin`)
+
+### 2.1 การเข้าถึงและความปลอดภัย (Authentication)
+- ล็อกอินด้วย **Username / Password** สำหรับผู้ดูแลระบบ (`admins`)
+- ระบบ Session / JWT และการบันทึก Admin ผู้ปฏิบัติงานในการอนุมัติสลิปและบันทึกค่าใช้จ่าย
+
+### 2.2 ระบบจัดการเมนูและหมวดหมู่ (Product & Category Management)
+- **จัดการหมวดหมู่ (`categories`):** เพิ่ม, แก้ไขชื่อ, เปิด/ปิดสถานะการใช้งาน
+- **จัดการสินค้า (`products`):**
+  - เพิ่ม/แก้ไข ชื่อ, รายละเอียด, ราคา, หมวดหมู่, อัปโหลดรูปภาพ (`image_url`)
+  - สวิตช์เปิด/ปิด: สินค้าพร้อมขาย (`is_available`), สินค้าแนะนำ (`is_recommended`)
+  - จัดเรียงลำดับการแสดงผล (`sort_order`)
+- **จัดการท็อปปิ้ง (`toppings`):**
+  - เพิ่ม/แก้ไข ชื่อท็อปปิ้ง, ราคาบวกเพิ่มต่อช็อต (`price`)
+  - สวิตช์เปิด/ปิด สถานะพร้อมขาย (`is_available`), จัดเรียงลำดับ (`sort_order`)
+
+### 2.3 ระบบจัดการแบนเนอร์ประชาสัมพันธ์ (Banner Management)
+- จัดการชุดแบนเนอร์ (`banners`): ตั้งชื่อแคมเปญ, เปิด/ปิดการแสดงผล (`is_active`)
+- จัดการรูปภาพในแบนเนอร์ (`banner_items`): อัปโหลดรูปภาพ (`image_url`), กำหนดลำดับก่อน-หลัง (`order`), เปิด/ปิดรูปภาพ
+
+### 2.4 ระบบโปรโมชั่นและสมาชิก (Promotions & Loyalty Management)
+- **จัดการโปรโมชั่น (`promotions`):**
+  - กำหนดชื่อโปรโมชั่น, รายละเอียด, จำนวนแต้มที่ต้องใช้ (`point_usage`)
+  - กำหนดโควตารวมทั้งหมด (`all_limit`) และจำกัดสิทธิ์ต่อคน (`person_limit`)
+  - กำหนดช่วงเวลาเริ่มต้น-สิ้นสุด (`start_date` - `end_date`), เปิด/ปิดโปรโมชั่น (`is_active`)
+- **ดูข้อมูลสมาชิกและประวัติการแลกสิทธิ์:**
+  - ดูรายชื่อลูกค้า (`customers`): เบอร์โทรศัพท์, แต้มสะสม (`current_points`), จำนวนแก้วสะสม (`total_cups_bought`)
+  - ตรวจสอบประวัติการแลกโปรโมชั่น (`promotion_redemptions`)
+
+### 2.5 ระบบจัดการออเดอร์และการเงิน (Orders & POS Walk-in)
+- **ระบบขายหน้าร้าน (POS Walk-in):**
+  - หน้าจอแตะเลือกเมนู ปรับระดับความหวาน และเลือกท็อปปิ้งได้รวดเร็ว
+  - ช่องทางชำระเงิน:
+    - **เงินสด (`cash`):** ใส่จำนวนเงินที่รับ คำนวณเงินทอนอัตโนมัติ
+    - **พร้อมเพย์ (`promptpay`):** แสดง QR Code ให้ลูกค้าสแกนจ่าย และแนบรูปสลิป
+  - ช่องกรอกเบอร์โทรลูกค้า (ไม่บังคับ / Optional) สำหรับสะสมแต้ม/ใช้แต้มแลกสิทธิ์
+  - สร้างออเดอร์พร้อมระบุ `method = 'walkin'` และออกหมายเลขคิวทันที
+- **ระบบตรวจสอบสลิปและอนุมัติออเดอร์ (Slip Verification):**
+  - แสดงรายการออเดอร์ที่แนบสลิปเข้ามา ตรวจสอบรูปภาพสลิป ยอดเงิน วันเวลา
+  - ปุ่มกด **"อนุมัติสลิป / ยืนยันยอดเงิน"** -> บันทึก `slip_verified_by` และ `slip_verified_at` พร้อมปรับสถานะออเดอร์เป็น `preparing`
+  - ปุ่มกด **"ปฏิเสธ / ยกเลิกออเดอร์"** (`order_status = 'cancelled'`) พร้อมระบุเหตุผล
+
+### 2.6 ระบบจัดการคิวและหน้าจอหลังบาร์ (Kitchen Display / Queue Board)
+- จัดการคิวตามลำดับ: แยกแท็บคิว Walk-in (ทำทันที) และ Online (จัดลำดับตาม `estimated_pickup_time`)
+- ปุ่มปรับสถานะคิวแบบ One-Click:
+  - `preparing` (กำลังทำ) -> `ready` (พร้อมรับ) -> `completed` (รับของแล้ว)
+- หน้าจอแสดงคิวหน้าร้าน (Customer Queue Board Screen) สำหรับเปิดบนจอทีวี แสดงคิวที่กำลังทำและคิวที่พร้อมรับ
+
+### 2.7 ระบบบันทึกรายจ่าย (Expense Management)
+- บันทึกค่าใช้จ่ายประจำวันของร้าน (`expenses`):
+  - รายการค่าใช้จ่าย (`title` เช่น น้ำแข็ง, วัตถุดิบถั่วเหลือง, แก้ว/หลอด, ค่าแรง)
+  - หมวดหมู่ (`category` เช่น วัตถุดิบ, บรรจุภัณฑ์, อุปกรณ์, ค่าแรง)
+  - จำนวนเงิน (`amount`), วันที่เกิดรายจ่าย (`expense_date`), บันทึกเพิ่มเติม (`note`)
+  - บันทึกชื่อ Admin ผู้ทำรายการอัตโนมัติ (`recorded_by`)
+
+### 2.8 แดชบอร์ดสรุปยอดขายและผลประกอบการ (Sales & Financial Dashboard)
+- **ตัวชี้วัดสำคัญ (Key Financial Metrics):**
+  - รายรับรวม (Total Revenue) คำนวณจากยอดขายออเดอร์ที่สำเร็จ
+  - รายจ่ายรวม (Total Expenses) คำนวณจากตาราง `expenses`
+  - กำไรสุทธิ (Net Profit = รายรับ - รายจ่าย)
+  - จำนวนออเดอร์ทั้งหมด และจำนวนแก้วรวม (Total Cups)
+- **การวิเคราะห์ยอดขาย:**
+  - สรุปเปรียบเทียบยอดขาย Online vs Walk-in
+  - อันดับเมนูขายดีประจำวัน / ขายดีตลอดกาล (Top Selling Products)
+  - สรุปแนวโน้มยอดขายและกำไรแยกรายวัน/รายช่วงเวลา
+
+---
+
+## 3. สถาปัตยกรรมฐานข้อมูล (Database Architecture: PostgreSQL - Pure Relational)
+
+> **เลือกใช้ PostgreSQL เป็นฐานข้อมูลหลัก (Pure Relational Tables):**
+> - โครงสร้างตารางแยกความสัมพันธ์ชัดเจน (1NF-3NF Normalized Tables)
+> - รองรับความสัมพันธ์แบบ 1-to-Many สำหรับ Toppings ต่อแก้ว (`order_item_toppings`) และ Banner Images (`banner_items`)
+> - บันทึกและคำนวณรายรับ-รายจ่าย (Orders & Expenses) แม่นยำตามหลัก ACID
+> - รองรับการออกคิว และการจัดอันดับยอดขาย/วิเคราะห์ข้อมูล Dashboard ได้อย่างมีประสิทธิภาพ
+
+---
+
+### 3.1 โครงสร้างตารางใน PostgreSQL (Relational & JSONB)
+
+#### 1. `admins` (ข้อมูลผู้ดูแลระบบ)
+| Column | Type | Attributes | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | SERIAL | PRIMARY KEY | รหัส Admin |
+| `username` | VARCHAR(50) | UNIQUE, NOT NULL | ชื่อผู้ใช้สำหรับล็อกอิน |
+| `password_hash` | VARCHAR(255) | NOT NULL | รหัสผ่านที่ผ่านการ Hash (Bcrypt) |
+| `name` | VARCHAR(100) | NOT NULL | ชื่อ-นามสกุล/ชื่อเรียก |
+| `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สร้าง |
+| `updated_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่แก้ไขล่าสุด |
+
+#### 2. `categories` (หมวดหมู่สินค้า)
+| Column | Type | Attributes | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | SERIAL | PRIMARY KEY | รหัสหมวดหมู่ |
+| `name` | VARCHAR(100) | NOT NULL | ชื่อหมวดหมู่ (เช่น เครื่องดื่ม) |
+| `is_active` | BOOLEAN | DEFAULT TRUE | สถานะเปิด/ปิดการใช้งาน |
+
+#### 3. `products` (รายการสินค้า)
+| Column | Type | Attributes | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | SERIAL | PRIMARY KEY | รหัสสินค้า |
+| `category_id` | INT | REFERENCES `categories(id)` | หมวดหมู่ |
+| `name` | VARCHAR(150) | NOT NULL | ชื่อสินค้า (เช่น น้ำเต้าหู้, น้ำเต้าหู้มัทฉะ) |
+| `description` | TEXT | NULL | รายละเอียดสินค้า |
+| `price` | INT | NOT NULL | ราคาเริ่มต้น (บาท) |
+| `image_url` | VARCHAR(255) | NULL | รูปภาพสินค้า |
+| `is_available` | BOOLEAN | DEFAULT TRUE | สถานะพร้อมขาย |
+| `is_recommended` | BOOLEAN | DEFAULT FALSE | สินค้าแนะนำ |
+| `sort_order` | INT | DEFAULT 0 | ลำดับการแสดงผล |
+| `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สร้าง |
+| `updated_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่แก้ไขล่าสุด |
+
+#### 4. `toppings` (รายการท็อปปิ้งเสริม)
+| Column | Type | Attributes | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | SERIAL | PRIMARY KEY | รหัสท็อปปิ้ง |
+| `name` | VARCHAR(100) | NOT NULL | ชื่อท็อปปิ้ง (เช่น ไข่มุก, เฉาก๊วย, เม็ดบุก) |
+| `price` | INT | NOT NULL DEFAULT 0 | ราคาบวกเพิ่มต่อช็อต (บาท) |
+| `is_available` | BOOLEAN | DEFAULT TRUE | สถานะพร้อมขาย |
+| `sort_order` | INT | DEFAULT 0 | ลำดับการแสดงผล |
+| `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สร้าง |
+
+#### 5. `orders` (ออเดอร์คำสั่งซื้อหลัก)
+| Column | Type | Attributes | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | SERIAL | PRIMARY KEY | รหัสออเดอร์ |
+| `order_no` | VARCHAR(30) | UNIQUE, NOT NULL; INDEX | รหัสคำสั่งซื้อ (เช่น `ORD-20260907-001`) |
+| `queue_no` | VARCHAR(10) | NOT NULL; INDEX | หมายเลขคิว (เช่น `A01`, `W02`) |
+| `method` | VARCHAR(20) | NOT NULL | ช่องทาง: `online` / `walkin` |
+| `customer_phone` | VARCHAR(20) | NULL | เบอร์โทรศัพท์ลูกค้า |
+| `customer_nickname`| VARCHAR(100) | NULL | ชื่อเล่นลูกค้า |
+| `estimated_pickup_time` | TIMESTAMPTZ | NULL | เวลาที่ลูกค้าระบุว่าจะมารับ (สำหรับ online) |
+| `payment_method` | VARCHAR(20) | NOT NULL | ช่องทางชำระเงิน: `promptpay` / `cash` |
+| `slip_url` | VARCHAR(255) | NULL | ลิงก์รูปสลิปที่แนบมา |
+| `slip_verified_by` | INT | NULL REFERENCES `admins(id)` | รหัส Admin ที่กดยืนยันสลิป |
+| `slip_verified_at` | TIMESTAMPTZ | NULL | วันเวลาที่ยืนยันสลิป |
+| `order_status` | VARCHAR(20) | NOT NULL; INDEX | สถานะคิว: `new_order`, `preparing`, `ready`, `completed`, `cancelled` |
+| `note` | TEXT | NULL | หมายเหตุเพิ่มเติม |
+| `created_at` | TIMESTAMPTZ | DEFAULT NOW() | เวลาสั่งซื้อ |
+| `updated_at` | TIMESTAMPTZ | DEFAULT NOW() | เวลาอัปเดตล่าสุด |
+
+#### 6. `order_items` (รายการแก้วในออเดอร์)
+| Column | Type | Attributes | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | SERIAL | PRIMARY KEY | รหัสไอเทมแก้ว |
+| `order_id` | INT | REFERENCES `orders(id)` ON DELETE CASCADE | รหัสออเดอร์หลัก (FK) |
+| `product_id` | INT | REFERENCES `products(id)` | รหัสสินค้า/เมนู (FK) |
+| `sweetness_level` | VARCHAR(50) | NULL | ระดับความหวาน (เช่น 0%, 25%, 50%, 100%) |
+
+#### 7. `order_item_toppings` (รายการท็อปปิ้งที่เลือกในแต่ละแก้ว - 1 แก้วมีได้หลายท็อปปิ้ง)
+| Column | Type | Attributes | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | SERIAL | PRIMARY KEY | รหัสรายการท็อปปิ้ง |
+| `order_item_id` | INT | REFERENCES `order_items(id)` ON DELETE CASCADE | รหัสแก้วในออเดอร์ (FK) |
+| `topping_id` | INT | REFERENCES `toppings(id)` | รหัสท็อปปิ้ง (FK) |
+
+#### 8. `expenses` (บันทึกรายจ่ายเท่านั้น)
+| Column | Type | Attributes | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | SERIAL | PRIMARY KEY | รหัสรายจ่าย |
+| `title` | VARCHAR(200) | NOT NULL | รายการค่าใช้จ่าย (เช่น ค่าน้ำแข็ง, ค่าแก้ว, ค่าถั่วเหลือง) |
+| `category` | VARCHAR(100) | NOT NULL | หมวดหมู่ (เช่น วัตถุดิบ, บรรจุภัณฑ์, ค่าแรง) |
+| `amount` | INT | NOT NULL | จำนวนเงิน (บาท) |
+| `expense_date` | DATE | NOT NULL; INDEX | วันที่เกิดรายจ่าย |
+| `recorded_by` | INT | REFERENCES `admins(id)` | Admin ผู้บันทึก |
+| `note` | TEXT | NULL | หมายเหตุเพิ่มเติม |
+| `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สร้าง |
+
+#### 9. `customers` (ข้อมูลสมาชิก/สะสมแต้ม)
+| Column | Type | Attributes | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | SERIAL | PRIMARY KEY | รหัสสมาชิก |
+| `phone_number` | VARCHAR(20) | UNIQUE, NOT NULL | เบอร์โทรศัพท์ |
+| `name` | VARCHAR(100) | NULL | ชื่อ/ชื่อเล่น |
+| `current_points` | INT | DEFAULT 0 | แต้มสะสมปัจจุบัน |
+| `total_cups_bought` | INT | DEFAULT 0 | จำนวนแก้วที่เคยสั่งซื้อทั้งหมด |
+| `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สมัคร |
+
+#### 10. `promotions` (โปรโมชั่น / การใช้แต้มแลก)
+| Column | Type | Attributes | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | SERIAL | PRIMARY KEY | รหัสโปรโมชั่น |
+| `name` | VARCHAR(150) | NOT NULL | ชื่อโปรโมชั่น (เช่น สะสมครบ 5 แต้ม ฟรี 1 แก้ว) |
+| `description` | TEXT | NULL | รายละเอียดและเงื่อนไข |
+| `point_usage` | INT | NOT NULL DEFAULT 0 | จำนวนแต้มที่ต้องใช้แลก |
+| `all_limit` | INT | NULL | สิทธิ์การแลกทั้งหมด (โควตารวม) |
+| `person_limit` | INT | NULL | สิทธิ์การแลกจำกัดต่อคน |
+| `start_date` | TIMESTAMPTZ | NULL | วันเวลาเริ่มต้นโปรโมชั่น |
+| `end_date` | TIMESTAMPTZ | NULL | วันเวลาสิ้นสุดโปรโมชั่น |
+| `is_active` | BOOLEAN | DEFAULT TRUE | สถานะเปิด/ปิดโปรโมชั่น |
+| `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สร้าง |
+
+#### 11. `promotion_redemptions` (ประวัติการแลกโปรโมชั่น)
+| Column | Type | Attributes | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | SERIAL | PRIMARY KEY | รหัสการแลก |
+| `promotion_id` | INT | REFERENCES `promotions(id)` ON DELETE CASCADE | รหัสโปรโมชั่น (FK) |
+| `customer_id` | INT | REFERENCES `customers(id)` ON DELETE CASCADE | รหัสลูกค้าสมาชิก (FK) |
+| `redeemed_at` | TIMESTAMPTZ | DEFAULT NOW() | วันเวลาที่กดแลกสิทธิ์ |
+
+#### 12. `banners` (กลุ่มแบนเนอร์ประชาสัมพันธ์)
+| Column | Type | Attributes | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | SERIAL | PRIMARY KEY | รหัสแบนเนอร์ |
+| `name` | VARCHAR(150) | NOT NULL | ชื่อแบนเนอร์ |
+| `description` | TEXT | NULL | รายละเอียดแบนเนอร์ |
+| `is_active` | BOOLEAN | DEFAULT TRUE | สถานะเปิด/ปิดการแสดงผล |
+| `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สร้าง |
+
+#### 13. `banner_items` (รูปภาพรายการย่อยในแบนเนอร์)
+| Column | Type | Attributes | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | SERIAL | PRIMARY KEY | รหัสไอเทมรูปภาพ |
+| `banner_id` | INT | REFERENCES `banners(id)` ON DELETE CASCADE | รหัสแบนเนอร์หลัก (FK) |
+| `image_url` | VARCHAR(255) | NOT NULL | ที่อยู่ URL รูปภาพ |
+| `order` | INT | DEFAULT 0 | ลำดับการแสดงผล (Sort Order) |
+| `is_active` | BOOLEAN | DEFAULT TRUE | สถานะเปิด/ปิดการแสดงผล |
+| `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สร้าง |
+
+---
+
+> **Note:** การกรอกเบอร์โทรศัพท์ ลูกค้าสามารถเลือกกรอกเฉพาะเมื่อต้องการสะสมแต้ม/ใช้สิทธิ์โปรโมชั่นได้ หากไม่ต้องการสะสมแต้มก็สามารถข้ามได้ (หน้าร้าน)
