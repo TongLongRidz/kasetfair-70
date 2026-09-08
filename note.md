@@ -173,6 +173,7 @@
 | `id` | SERIAL | PRIMARY KEY | รหัสท็อปปิ้ง |
 | `name` | VARCHAR(100) | NOT NULL | ชื่อท็อปปิ้ง (เช่น ไข่มุก, เฉาก๊วย, เม็ดบุก) |
 | `price` | INT | NOT NULL DEFAULT 0 | ราคาบวกเพิ่มต่อช็อต (บาท) |
+| `image_url` | VARCHAR(255) | NULL | รูปภาพท็อปปิ้ง |
 | `is_available` | BOOLEAN | DEFAULT TRUE | สถานะพร้อมขาย |
 | `sort_order` | INT | DEFAULT 0 | ลำดับการแสดงผล |
 | `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สร้าง |

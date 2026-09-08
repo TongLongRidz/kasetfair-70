@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ArrowLeft, User, Lock, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react";
 
 export default function AdminLoginPage() {
   const [username, setUsername] = useState("");
@@ -52,64 +53,18 @@ export default function AdminLoginPage() {
         position: "relative",
       }}
     >
-      {/* Top Header / Back Button */}
-      <header
-        style={{
-          maxWidth: "460px",
-          width: "100%",
-          margin: "0 auto",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0.5rem 0",
-        }}
-      >
-        <Link
-          href="/"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            fontSize: "0.875rem",
-            fontWeight: 500,
-            color: "var(--ink-soft)",
-            textDecoration: "none",
-            backgroundColor: "var(--card)",
-            padding: "0.5rem 0.875rem",
-            borderRadius: "9999px",
-            border: "1px solid rgba(50, 55, 65, 0.1)",
-            transition: "all 0.2s ease",
-          }}
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <line x1="19" y1="12" x2="5" y2="12"></line>
-            <polyline points="12 19 5 12 12 5"></polyline>
-          </svg>
-          กลับหน้าหลัก
-        </Link>
-
-      </header>
-
       {/* Main Login Card */}
       <main
         style={{
           maxWidth: "460px",
           width: "100%",
-          margin: "1.5rem auto",
+          margin: "auto",
         }}
       >
         <div
           className="animate-rise"
           style={{
+            position: "relative",
             backgroundColor: "var(--card)",
             borderRadius: "1.5rem",
             padding: "2.25rem 1.75rem",
@@ -117,6 +72,29 @@ export default function AdminLoginPage() {
             boxShadow: "0 12px 32px -4px rgba(0, 0, 0, 0.08)",
           }}
         >
+          {/* Back to Home Icon Button */}
+          <Link
+            href="/"
+            aria-label="กลับหน้าหลัก"
+            style={{
+              position: "absolute",
+              left: "1.25rem",
+              top: "1.25rem",
+              width: "2.25rem",
+              height: "2.25rem",
+              display: "grid",
+              placeItems: "center",
+              borderRadius: "9999px",
+              backgroundColor: "var(--cream)",
+              color: "var(--ink)",
+              border: "1px solid rgba(50, 55, 65, 0.12)",
+              textDecoration: "none",
+              transition: "all 0.2s ease",
+            }}
+          >
+            <ArrowLeft size={18} strokeWidth={2.5} />
+          </Link>
+
           {/* Brand Logo & Title */}
           <div style={{ textAlign: "center", marginBottom: "1.75rem" }}>
             <div
@@ -175,11 +153,7 @@ export default function AdminLoginPage() {
                 gap: "0.5rem",
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="8" x2="12" y2="12"></line>
-                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-              </svg>
+              <AlertCircle size={16} />
               <span>{errorMessage}</span>
             </div>
           )}
@@ -230,10 +204,7 @@ export default function AdminLoginPage() {
                     display: "flex",
                   }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="12" cy="7" r="4"></circle>
-                  </svg>
+                  <User size={16} />
                 </span>
               </div>
             </div>
@@ -282,10 +253,7 @@ export default function AdminLoginPage() {
                     display: "flex",
                   }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                  </svg>
+                  <Lock size={16} />
                 </span>
                 <button
                   type="button"
@@ -303,17 +271,7 @@ export default function AdminLoginPage() {
                     display: "flex",
                   }}
                 >
-                  {showPassword ? (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                      <line x1="1" y1="1" x2="23" y2="23"></line>
-                    </svg>
-                  ) : (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                      <circle cx="12" cy="12" r="3"></circle>
-                    </svg>
-                  )}
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
@@ -344,16 +302,7 @@ export default function AdminLoginPage() {
             >
               {isLoading ? (
                 <>
-                  <span
-                    style={{
-                      width: "1rem",
-                      height: "1rem",
-                      border: "2px solid var(--cream)",
-                      borderTopColor: "transparent",
-                      borderRadius: "50%",
-                      animation: "spin 0.8s linear infinite",
-                    }}
-                  />
+                  <Loader2 size={16} className="animate-spin" />
                   กำลังเข้าสู่ระบบ...
                 </>
               ) : (
@@ -373,7 +322,7 @@ export default function AdminLoginPage() {
           color: "var(--ink-soft)",
         }}
       >
-        <span className="font-mono">TAOTHONG ADMIN PORTAL · STAND 12</span>
+        <span className="font-mono">TAOTHONG ADMIN</span>
       </footer>
 
       {/* Spinner animation definition */}
@@ -382,6 +331,9 @@ export default function AdminLoginPage() {
           to {
             transform: rotate(360deg);
           }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
         }
       `}</style>
     </div>
