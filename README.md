@@ -50,27 +50,97 @@
 
 ---
 
+## 🛠️ ความต้องการของระบบ (Prerequisites)
+
+- [Git](https://git-scm.com/)
+- [Docker](https://www.docker.com/) & Docker Compose (สำหรับการรันผ่าน Docker)
+- [Node.js](https://nodejs.org/) v18+ และ npm (สำหรับการรัน Frontend แบบ Local)
+- [Go](https://golang.org/) 1.22+ (สำหรับการรัน Backend แบบ Local)
+- [PostgreSQL](https://www.postgresql.org/) 16+ (หากรันฐานข้อมูลแบบ Local)
+
+---
+
+## ⚙️ ขั้นตอนการติดตั้งและตั้งค่าเริ่มต้น (Setup Instructions)
+
+### 1. ตั้งค่าไฟล์ Environment Variables
+คัดลอกไฟล์ `.env.example` เป็น `.env` ที่ root directory:
+```bash
+cp .env.example .env
+```
+> สามารถปรับแต่งค่าคอนฟิกต่าง ๆ (เช่น พอร์ต หรือ รหัสผ่านฐานข้อมูล) ได้ในไฟล์ `.env`
+
+### 2. ติดตั้ง Dependencies
+สามารถติดตั้ง dependencies ของทั้ง Frontend และ Backend ได้ด้วยคำสั่งเดียว:
+```bash
+make setup
+```
+
+---
+
+## ⚡ คำสั่ง Makefile (แนะนำ สะดวกรวดเร็ว)
+
+โปรเจกต์มี Makefile เพื่อให้รันคำสั่งต่าง ๆ ได้สะดวกรวดเร็ว:
+
+```bash
+make setup      # ติดตั้ง dependencies ทั้งหมด (Frontend npm install + Backend go mod download)
+make db-up      # รัน PostgreSQL database container (พอร์ต 5488)
+make db-down    # หยุดการทำงานของ PostgreSQL database container
+make backend    # รัน Go Backend API (พอร์ต 8585)
+make frontend   # รัน Next.js Frontend dev server (พอร์ต 3050)
+make build      # Build ทั้ง backend binary และ frontend
+make lint       # ตรวจสอบ code style และ linting ของ frontend
+```
+
+---
+
 ## 🚀 วิธีการรันระบบ (How to Run)
 
-### รันทุกอย่างด้วย Docker Compose (แนะนำ)
+### วิธีที่ 1: รันด้วย Makefile สำหรับ Local Development (แนะนำ)
 
-สั่งรันทั้ง 3 services (PostgreSQL, Go Backend, Next.js Frontend) พร้อมกัน:
+1. **เปิด Database:**
+   ```bash
+   make db-up
+   ```
+   *(ฐานข้อมูลจะเปิดใช้งานที่พอร์ต `5488` ตามที่ตั้งไว้ใน `.env`)*
+
+2. **เปิด Go Backend API (Terminal ที่ 1):**
+   ```bash
+   make backend
+   ```
+   - API จะรันที่ [http://localhost:8585](http://localhost:8585)
+   - Health Check: [http://localhost:8585/health](http://localhost:8585/health)
+
+3. **เปิด Next.js Frontend (Terminal ที่ 2):**
+   ```bash
+   make frontend
+   ```
+   - Frontend จะรันที่ [http://localhost:3050](http://localhost:3050)
+
+4. **เมื่อต้องการหยุด Database:**
+   ```bash
+   make db-down
+   ```
+
+---
+
+### วิธีที่ 2: รันทุก Service ด้วย Docker Compose (Full Stack)
+
+สั่งรันทั้ง 3 services (PostgreSQL, Go Backend, Next.js Frontend) พร้อมกันใน background:
 
 ```bash
 docker compose up -d --build
 ```
 
 - **Frontend**: [http://localhost:3050](http://localhost:3050)
-- **Backend Health API**: [http://localhost:8585/health](http://localhost:8585/health) หรือ [http://localhost:8585/api/v1/health](http://localhost:8585/api/v1/health)
+- **Backend API**: [http://localhost:8585](http://localhost:8585)
+- **Health Check API**: [http://localhost:8585/health](http://localhost:8585/health)
 
-ตรวจสอบสถานะ:
+**คำสั่งจัดการ Docker:**
 ```bash
-docker compose ps
-```
-
-หยุดการทำงาน:
-```bash
-docker compose down
+docker compose ps       # ตรวจสอบสถานะการทำงาน
+docker compose logs -f  # ดู logs รวมแบบ real-time
+docker compose down     # หยุดการทำงานทั้งหมด
+docker compose down -v  # หยุดการทำงานและ reset ข้อมูล database
 ```
 
 ---
@@ -89,4 +159,5 @@ docker compose down
 - `DB_SSLMODE=disable`
 - `FRONTEND_PORT=3050`
 - `NEXT_PUBLIC_API_URL=http://localhost:8585`
+
 
