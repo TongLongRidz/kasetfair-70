@@ -76,16 +76,17 @@ docker compose down
 ---
 
 ## 🔑 Environment Variables
-
-### Backend (`backend/.env`)
-- `PORT=8585`
-- `DB_HOST=localhost` (หรือ `postgres` เมื่อรันบน Docker)
-- `DB_PORT=5488` (หรือ `5432` เมื่อรันบน Docker)
+ 
+### Root Level (`.env` / `.env.example`)
+กำหนดค่าคอนฟิกกลางสำหรับทั้งระบบ:
+- `BACKEND_PORT=8585`
+- `APP_ENV=development`
+- `DB_HOST=localhost` (หรือ `postgres` ใน Docker)
+- `DB_PORT=5488` (หรือ `5432` ใน Docker)
 - `DB_USER=kaset_user`
 - `DB_PASSWORD=kaset_secret_pass`
 - `DB_NAME=kaset_db`
 - `DB_SSLMODE=disable`
-
-### Frontend (`frontend/.env.local`)
-- `PORT=3050`
+- `FRONTEND_PORT=3050`
 - `NEXT_PUBLIC_API_URL=http://localhost:8585`
+

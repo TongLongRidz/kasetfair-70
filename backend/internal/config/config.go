@@ -20,8 +20,11 @@ type Config struct {
 }
 
 func LoadConfig() *Config {
+	// Try loading .env from current directory first, or root directory
 	if err := godotenv.Load(); err != nil {
-		log.Println("Note: .env file not found or could not be loaded, reading from environment")
+		if errRoot := godotenv.Load("../.env"); errRoot != nil {
+			log.Println("Note: .env file not found or could not be loaded, reading from environment")
+		}
 	}
 
 	return &Config{
