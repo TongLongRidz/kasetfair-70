@@ -17,9 +17,14 @@
   padding: 0;
 }
 
+button, input, select, textarea {
+  font-family: inherit;
+}
+
 html {
   scroll-behavior: smooth;
 }
+
 
 body {
   background-color: var(--cream);
@@ -69,3 +74,132 @@ body {
 .animate-badge {
   animation: badge-bounce 3s ease-in-out infinite;
 }
+
+@keyframes slide-up {
+  0% {
+    transform: translateY(100%);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.25s ease forwards;
+}
+
+@keyframes modal-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.94) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-pop {
+  animation: modal-pop 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slide-right {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-right {
+  animation: slide-right 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slide-out-right {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-slide-out-right {
+  animation: slide-out-right 0.3s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+}
+
+@keyframes fade-out {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-fade-out {
+  animation: fade-out 0.28s ease forwards;
+}
+
+/* Responsive Navbar & Hero Banner utilities */
+@media (max-width: 480px) {
+  .nav-menu-link {
+    display: none !important;
+  }
+  .nav-queue-btn {
+    padding: 0.3rem 0.6rem !important;
+    font-size: 0.7rem !important;
+  }
+  .hero-banner-card {
+    padding: 1rem 1rem !important;
+    min-height: 155px !important;
+    border-radius: 18px !important;
+  }
+  .hero-banner-content {
+    max-width: 62% !important;
+  }
+  .hero-banner-title {
+    font-size: 1.35rem !important;
+    line-height: 1.15 !important;
+  }
+  .hero-banner-desc {
+    font-size: 0.725rem !important;
+    line-height: 1.35 !important;
+    margin-top: 0.25rem !important;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .hero-banner-cta {
+    padding: 0.35rem 0.85rem !important;
+    font-size: 0.75rem !important;
+    margin-top: 0.65rem !important;
+  }
+  .hero-banner-image-wrapper {
+    width: 8.5rem !important;
+    height: 8.5rem !important;
+    right: -1rem !important;
+    bottom: -1rem !important;
+  }
+}
+
+
+
+

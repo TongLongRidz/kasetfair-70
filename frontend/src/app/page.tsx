@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/layouts/Navbar";
+import Footer from "@/components/layouts/Footer";
+import CartDrawer from "@/components/layouts/CartDrawer";
 import { ShoppingCart } from "lucide-react";
 
 // Types
@@ -179,6 +183,7 @@ const TOPPINGS: Topping[] = [
   { id: "chia_seeds", name: "เมล็ดเจีย", price: 10 },
   { id: "sago", name: "สาคู", price: 5 },
   { id: "grass_jelly", name: "เฉาก๊วย", price: 10 },
+  { id: "red_bean", name: "ถั่วแดง", price: 10 },
 ];
 
 const SWEETNESS_OPTIONS: Sweetness[] = ["0%", "25%", "50%", "75%", "100%"];
@@ -196,10 +201,10 @@ interface BannerSlide {
 
 const BANNERS: BannerSlide[] = [
   {
-    tag: "KASET FAIR 70 · STAND 12",
+    tag: "",
     title: "น้ำเต้าหู้",
     highlight: "5 รสชาติ",
-    desc: "น้ำเต้าหู้ต้มสดใหม่ทุกวัน พร้อมท็อปปิ้งแน่นแก้ว ให้จิบระหว่างเดินงาน",
+    desc: "น้ำเต้าหู้สดใหม่ทุกวัน พร้อมท็อปปิ้งแน่นแก้ว ให้จิบระหว่างเดินงาน",
     ctaText: "เลือกซื้อเลย!",
     ctaLink: "#menu",
     image: "/images/hero-soy.jpg",
@@ -220,17 +225,29 @@ const BANNERS: BannerSlide[] = [
     title: "สะสมแต้มถั่วทอง",
     highlight: "ซื้อ 10 แต้มแลกฟรี",
     desc: "กรอกเบอร์โทรศัพท์เพื่อสะสมแต้มทุกแก้ว และแลกรับส่วนลดสุดพิเศษในงาน",
-    ctaText: "เช็คแต้ม",
-    ctaLink: "#points",
+    ctaText: "ดูโปรโมชั่น & แลกแต้ม",
+    ctaLink: "/promotion",
     image: "/images/drink-pearl.jpg",
     bgColor: "#634832",
   },
 ];
 
 export default function Home() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"all" | "flavours" | "combos">("all");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
+
+  const handleBannerCtaClick = (e: React.MouseEvent<HTMLAnchorElement>, ctaLink: string) => {
+    if (ctaLink.startsWith("#")) {
+      e.preventDefault();
+      const sectionId = ctaLink.replace("#", "");
+      const element = document.getElementById(sectionId);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  };
   
   // Customization modal states
   const [temperature, setTemperature] = useState<Temperature>("iced");
@@ -241,10 +258,6 @@ export default function Home() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
-  // Phone points check
-  const [phoneInput, setPhoneInput] = useState("");
-  const [pointsChecked, setPointsChecked] = useState(false);
-  const [pointsResult, setPointsResult] = useState<{ name: string; points: number } | null>(null);
 
   // Open modal
   const handleOpenCustomize = (product: Product) => {
@@ -349,15 +362,6 @@ export default function Home() {
       ? FLAVOURS
       : COMBOS;
 
-  const handleCheckPoints = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phoneInput.trim()) return;
-    setPointsChecked(true);
-    setPointsResult({
-      name: "คุณลูกค้า",
-      points: 25,
-    });
-  };
 
   return (
     <div
@@ -372,10 +376,11 @@ export default function Home() {
       <Navbar />
 
       {/* Main Container */}
-      <main style={{ maxWidth: "640px", margin: "0 auto", padding: "0 1rem 8rem 1rem" }}>
+      <main style={{ maxWidth: "640px", margin: "0 auto", padding: "0 1rem 3rem 1rem" }}>
         {/* Hero Banner Carousel */}
         <section className="animate-rise" style={{ marginTop: "1rem" }}>
           <div
+            className="hero-banner-card"
             style={{
               position: "relative",
               overflow: "hidden",
@@ -388,7 +393,7 @@ export default function Home() {
               minHeight: "190px",
             }}
           >
-            <div style={{ position: "relative", zIndex: 10, maxWidth: "68%" }}>
+            <div className="hero-banner-content" style={{ position: "relative", zIndex: 10, maxWidth: "68%" }}>
               <p
                 className="font-mono"
                 style={{
@@ -402,6 +407,7 @@ export default function Home() {
                 {BANNERS[currentSlide].tag}
               </p>
               <h1
+                className="hero-banner-title"
                 style={{
                   marginTop: "0.4rem",
                   fontSize: "1.875rem",
@@ -415,6 +421,7 @@ export default function Home() {
                 {BANNERS[currentSlide].highlight}
               </h1>
               <p
+                className="hero-banner-desc"
                 style={{
                   marginTop: "0.4rem",
                   fontSize: "0.825rem",
@@ -427,6 +434,8 @@ export default function Home() {
               <div style={{ marginTop: "1.1rem", display: "flex", gap: "0.6rem" }}>
                 <a
                   href={BANNERS[currentSlide].ctaLink}
+                  onClick={(e) => handleBannerCtaClick(e, BANNERS[currentSlide].ctaLink)}
+                  className="hero-banner-cta"
                   style={{
                     borderRadius: "9999px",
                     backgroundColor: "var(--warm)",
@@ -435,6 +444,7 @@ export default function Home() {
                     fontWeight: 700,
                     color: "var(--ink)",
                     textDecoration: "none",
+                    cursor: "pointer",
                   }}
                 >
                   {BANNERS[currentSlide].ctaText}
@@ -443,22 +453,24 @@ export default function Home() {
             </div>
 
             <div
+              className="hero-banner-image-wrapper"
               style={{
                 position: "absolute",
-                right: "-2rem",
-                top: "-2rem",
-                width: "13.5rem",
-                height: "13.5rem",
+                right: "-1.5rem",
+                bottom: "-1.5rem",
+                width: "13rem",
+                height: "13rem",
                 borderRadius: "9999px",
                 overflow: "hidden",
                 border: "4px solid rgba(247, 246, 240, 0.25)",
+                boxShadow: "0 8px 25px rgba(0,0,0,0.2)",
               }}
             >
               <Image
                 src={BANNERS[currentSlide].image}
                 alt={BANNERS[currentSlide].title}
                 fill
-                sizes="220px"
+                sizes="(max-width: 480px) 140px, 220px"
                 style={{ objectFit: "cover" }}
                 priority
               />
@@ -474,23 +486,12 @@ export default function Home() {
         </section>
 
         {/* Menu Section */}
-        <section id="menu" style={{ marginTop: "1.75rem" }}>
+        <section id="menu" style={{ marginTop: "1.75rem", scrollMarginTop: "4.5rem" }}>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
             <div>
               <h2 style={{ fontSize: "1.35rem", fontWeight: 800 }}>รายการเมนูเครื่องดื่ม</h2>
               <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>กดเลือกเมนูเพื่อปรับความหวาน, อุณหภูมิ และท็อปปิ้ง</p>
             </div>
-            <p
-              className="font-mono"
-              style={{
-                fontSize: "11px",
-                textTransform: "uppercase",
-                letterSpacing: "0.15em",
-                color: "var(--ink-soft)",
-              }}
-            >
-              Menu
-            </p>
           </div>
 
           {/* Category Tabs */}
@@ -505,8 +506,8 @@ export default function Home() {
           >
             {[
               { id: "all", label: "ทั้งหมด" },
-              { id: "flavours", label: "5 รสชาติหลัก" },
-              { id: "combos", label: "เซ็ตคู่คอมโบ" },
+              { id: "flavours", label: "รสชาติหลัก" },
+              { id: "combos", label: "เมนูคอมโบ" },
             ].map((tab) => {
               const isSelected = activeTab === tab.id;
               return (
@@ -647,31 +648,20 @@ export default function Home() {
         </section>
 
         {/* Toppings Showcase Section */}
-        <section id="toppings" style={{ marginTop: "2.25rem" }}>
+        <section id="toppings" style={{ marginTop: "2.25rem", scrollMarginTop: "4.5rem" }}>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
             <div>
               <h2 style={{ fontSize: "1.35rem", fontWeight: 800 }}>ท็อปปิ้ง (Toppings)</h2>
               <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>เพิ่มความอร่อยให้เครื่องดื่มแก้วโปรด</p>
             </div>
-            <p
-              className="font-mono"
-              style={{
-                fontSize: "11px",
-                textTransform: "uppercase",
-                letterSpacing: "0.15em",
-                color: "var(--ink-soft)",
-              }}
-            >
-              Toppings
-            </p>
           </div>
 
           <div
             style={{
               marginTop: "0.85rem",
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-              gap: "0.6rem",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: "0.65rem",
             }}
           >
             {TOPPINGS.map((topping) => (
@@ -681,19 +671,22 @@ export default function Home() {
                   borderRadius: "1rem",
                   backgroundColor: "var(--card)",
                   border: "1px solid rgba(50, 55, 65, 0.1)",
-                  padding: "0.75rem",
+                  padding: "0.85rem 0.75rem",
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
+                  minHeight: "85px",
                 }}
               >
                 <div>
-                  <p style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)" }}>{topping.name}</p>
+                  <p style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)", lineHeight: 1.25 }}>
+                    {topping.name}
+                  </p>
                   {topping.icedOnly && (
                     <span
                       style={{
                         display: "inline-block",
-                        marginTop: "0.2rem",
+                        marginTop: "0.25rem",
                         fontSize: "9px",
                         color: "var(--teal)",
                         fontWeight: 600,
@@ -706,98 +699,20 @@ export default function Home() {
                     </span>
                   )}
                 </div>
-                <p className="font-display" style={{ marginTop: "0.5rem", fontSize: "1.1rem", color: "var(--teal)" }}>
+                <p className="font-display" style={{ marginTop: "0.4rem", fontSize: "1.15rem", color: "var(--teal)", lineHeight: 1 }}>
                   +{topping.price}฿
                 </p>
               </div>
             ))}
           </div>
         </section>
-
-        {/* Check Points Section */}
-        <section id="points" style={{ marginTop: "2.25rem" }}>
-          <div
-            className="animate-rise"
-            style={{
-              borderRadius: "1.25rem",
-              backgroundColor: "var(--card)",
-              padding: "1.25rem",
-              border: "1px solid rgba(50, 55, 65, 0.1)",
-            }}
-          >
-            <h2 style={{ fontSize: "1.15rem", fontWeight: 800 }}>ตรวจสอบแต้มสะสมสมาชิก</h2>
-            <p style={{ marginTop: "0.2rem", fontSize: "0.825rem", color: "var(--ink-soft)" }}>
-              กรอกเบอร์โทรศัพท์เพื่อตรวจเช็คแต้มสะสมและรับสิทธิพิเศษ
-            </p>
-            <form onSubmit={handleCheckPoints} style={{ marginTop: "0.85rem", display: "flex", gap: "0.5rem" }}>
-              <input
-                type="tel"
-                value={phoneInput}
-                onChange={(e) => setPhoneInput(e.target.value)}
-                placeholder="08X-XXX-XXXX"
-                style={{
-                  minWidth: 0,
-                  flex: 1,
-                  borderRadius: "0.75rem",
-                  backgroundColor: "var(--cream)",
-                  padding: "0.75rem 1rem",
-                  fontSize: "0.875rem",
-                  border: "1px solid rgba(50, 55, 65, 0.15)",
-                  outline: "none",
-                  color: "var(--ink)",
-                  fontFamily: "inherit",
-                }}
-              />
-              <button
-                type="submit"
-                style={{
-                  whiteSpace: "nowrap",
-                  borderRadius: "0.75rem",
-                  backgroundColor: "var(--ink)",
-                  padding: "0.75rem 1.25rem",
-                  fontSize: "0.875rem",
-                  fontWeight: 700,
-                  color: "var(--cream)",
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
-                ตรวจสอบ
-              </button>
-            </form>
-
-            {pointsChecked && pointsResult && (
-              <div
-                style={{
-                  marginTop: "1rem",
-                  padding: "0.85rem 1rem",
-                  borderRadius: "0.85rem",
-                  backgroundColor: "rgba(75, 155, 140, 0.1)",
-                  border: "1px solid rgba(75, 155, 140, 0.25)",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <div>
-                  <span style={{ fontSize: "0.9rem", fontWeight: 700 }}>{phoneInput}</span>
-                  <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>สมาชิกประจำร้านถั่วทอง</p>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <span className="font-display" style={{ fontSize: "1.4rem", color: "var(--teal)" }}>
-                    {pointsResult.points}
-                  </span>
-                  <span style={{ fontSize: "0.8rem", marginLeft: "0.25rem", fontWeight: 600 }}>แต้ม</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
       </main>
 
-      {/* Customization Modal */}
+
+      {/* Customization Modal (Centered) */}
       {selectedProduct && (
         <div
+          className="animate-fade-in"
           style={{
             position: "fixed",
             inset: 0,
@@ -805,23 +720,24 @@ export default function Home() {
             backgroundColor: "rgba(0, 0, 0, 0.6)",
             backdropFilter: "blur(4px)",
             display: "flex",
-            alignItems: "flex-end",
+            alignItems: "center",
             justifyContent: "center",
+            padding: "1rem",
           }}
           onClick={handleCloseModal}
         >
           <div
+            className="animate-modal-pop"
             onClick={(e) => e.stopPropagation()}
             style={{
               width: "100%",
-              maxWidth: "600px",
+              maxWidth: "540px",
               maxHeight: "90vh",
               overflowY: "auto",
               backgroundColor: "var(--cream)",
-              borderTopLeftRadius: "24px",
-              borderTopRightRadius: "24px",
+              borderRadius: "1.5rem",
               padding: "1.5rem",
-              boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.2)",
+              boxShadow: "0 20px 40px rgba(0, 0, 0, 0.25)",
             }}
           >
             {/* Modal Header */}
@@ -1008,165 +924,28 @@ export default function Home() {
         </div>
       )}
 
-      {/* Cart Drawer / Bottom Sheet */}
-      {isCartOpen && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 60,
-            backgroundColor: "rgba(0, 0, 0, 0.6)",
-            backdropFilter: "blur(4px)",
-            display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "center",
-          }}
-          onClick={() => setIsCartOpen(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "100%",
-              maxWidth: "600px",
-              maxHeight: "85vh",
-              overflowY: "auto",
-              backgroundColor: "var(--cream)",
-              borderTopLeftRadius: "24px",
-              borderTopRightRadius: "24px",
-              padding: "1.5rem",
-              boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.25)",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <h3 style={{ fontSize: "1.25rem", fontWeight: 800 }}>ตะกร้าเครื่องดื่มของคุณ</h3>
-                <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>ทั้งหมด {totalCartCount} แก้ว</p>
-              </div>
-              <button
-                onClick={() => setIsCartOpen(false)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: "1.5rem",
-                  cursor: "pointer",
-                  color: "var(--ink-soft)",
-                }}
-              >
-                ✕
-              </button>
-            </div>
+      {/* Cart Drawer (Slide In From Right) */}
+      <CartDrawer
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        cart={cart.map((c) => ({
+          cartId: c.cartId,
+          productId: c.productId,
+          productName: c.productName,
+          temperature: c.temperature,
+          sweetness: c.sweetness,
+          toppings: c.toppings,
+          unitPrice: c.unitPrice,
+          quantity: c.quantity,
+        }))}
+        onUpdateQty={updateCartQty}
+        onCheckout={() => alert(`สั่งซื้อสำเร็จ! ยอดรวม ${totalCartPrice} บาท`)}
+        title="ตะกร้าเครื่องดื่มของคุณ"
+        checkoutButtonText="ดำเนินการสั่งซื้อ & ชำระเงิน (PromptPay)"
+      />
 
-            <hr style={{ margin: "1rem 0", borderColor: "rgba(50, 55, 65, 0.1)" }} />
-
-            {cart.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "2rem 0", color: "var(--ink-soft)" }}>
-                <p style={{ fontSize: "1.1rem" }}>ตะกร้ายังว่างอยู่</p>
-                <p style={{ fontSize: "0.85rem", marginTop: "0.25rem" }}>เลือกเครื่องดื่มแสนอร่อยได้เลย!</p>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                {cart.map((item) => (
-                  <div
-                    key={item.cartId}
-                    style={{
-                      borderRadius: "1rem",
-                      backgroundColor: "var(--card)",
-                      padding: "0.85rem",
-                      border: "1px solid rgba(50, 55, 65, 0.1)",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <div style={{ flex: 1 }}>
-                      <h4 style={{ fontSize: "0.95rem", fontWeight: 700 }}>{item.productName}</h4>
-                      <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "0.15rem" }}>
-                        {item.temperature === "iced" ? "เย็น" : "ร้อน"} · หวาน {item.sweetness}
-                      </p>
-                      {item.toppings.length > 0 && (
-                        <p style={{ fontSize: "0.75rem", color: "var(--teal)", marginTop: "0.1rem" }}>
-                          + {item.toppings.map((t) => t.name).join(", ")}
-                        </p>
-                      )}
-                      <p className="font-display" style={{ marginTop: "0.25rem", fontSize: "1rem", color: "var(--ink)" }}>
-                        {item.unitPrice * item.quantity}฿{" "}
-                        <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 400 }}>
-                          (@{item.unitPrice}฿)
-                        </span>
-                      </p>
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                      <button
-                        onClick={() => updateCartQty(item.cartId, -1)}
-                        style={{
-                          width: "1.75rem",
-                          height: "1.75rem",
-                          borderRadius: "9999px",
-                          border: "1px solid rgba(50, 55, 65, 0.2)",
-                          backgroundColor: "var(--cream)",
-                          color: "var(--ink)",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                        }}
-                      >
-                        -
-                      </button>
-                      <span style={{ fontSize: "0.9rem", fontWeight: 700, minWidth: "1.2rem", textAlign: "center" }}>
-                        {item.quantity}
-                      </span>
-                      <button
-                        onClick={() => updateCartQty(item.cartId, 1)}
-                        style={{
-                          width: "1.75rem",
-                          height: "1.75rem",
-                          borderRadius: "9999px",
-                          border: "none",
-                          backgroundColor: "var(--ink)",
-                          color: "var(--cream)",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                        }}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {cart.length > 0 && (
-              <div style={{ marginTop: "1.5rem", borderTop: "1px solid rgba(50, 55, 65, 0.1)", paddingTop: "1rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                  <span style={{ fontSize: "1rem", fontWeight: 600 }}>ยอดรวมทั้งหมด</span>
-                  <span className="font-display" style={{ fontSize: "1.75rem", color: "var(--teal)" }}>
-                    {totalCartPrice}฿
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => alert(`สั่งซื้อสำเร็จ! ยอดรวม ${totalCartPrice} บาท`)}
-                  style={{
-                    width: "100%",
-                    borderRadius: "9999px",
-                    backgroundColor: "var(--teal)",
-                    padding: "0.9rem",
-                    fontSize: "1rem",
-                    fontWeight: 700,
-                    color: "var(--cream)",
-                    border: "none",
-                    cursor: "pointer",
-                    boxShadow: "0 4px 15px rgba(75, 155, 140, 0.35)",
-                  }}
-                >
-                  ดำเนินการสั่งซื้อ & ชำระเงิน (PromptPay)
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Footer */}
+      <Footer />
 
       {/* Floating Cart Button */}
       <button

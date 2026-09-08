@@ -12,14 +12,16 @@ import (
 )
 
 type AppHandler struct {
-	Cfg *config.Config
-	DB  *database.PostgresDB
+	Cfg   *config.Config
+	DB    *database.PostgresDB
+	Redis *database.RedisClient
 }
 
-func NewAppHandler(cfg *config.Config, db *database.PostgresDB) *AppHandler {
+func NewAppHandler(cfg *config.Config, db *database.PostgresDB, rdb *database.RedisClient) *AppHandler {
 	return &AppHandler{
-		Cfg: cfg,
-		DB:  db,
+		Cfg:   cfg,
+		DB:    db,
+		Redis: rdb,
 	}
 }
 
@@ -47,6 +49,17 @@ func (h *AppHandler) HealthCheck(c *gin.Context) {
 	} else {
 		services["postgres"] = "disconnected"
 		overallStatus = "degraded"
+	}
+
+	if h.Redis != nil {
+		if err := h.Redis.Ping(ctx); err != nil {
+			services["redis"] = "error: " + err.Error()
+			overallStatus = "degraded"
+		} else {
+			services["redis"] = "connected (port " + h.Cfg.RedisPort + ")"
+		}
+	} else {
+		services["redis"] = "disconnected"
 	}
 
 	c.JSON(http.StatusOK, HealthResponse{

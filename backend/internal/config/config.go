@@ -16,7 +16,11 @@ type Config struct {
 	DBUser     string
 	DBPassword string
 	DBName     string
-	DBSSLMode  string
+	DBSSLMode     string
+	JWTSecret     string
+	RedisHost     string
+	RedisPort     string
+	RedisPassword string
 }
 
 func LoadConfig() *Config {
@@ -28,14 +32,18 @@ func LoadConfig() *Config {
 	}
 
 	return &Config{
-		Port:       getEnv("PORT", "8585"),
-		AppEnv:     getEnv("APP_ENV", "development"),
-		DBHost:     getEnv("DB_HOST", "localhost"),
-		DBPort:     getEnv("DB_PORT", "5488"),
-		DBUser:     getEnv("DB_USER", "kaset_user"),
-		DBPassword: getEnv("DB_PASSWORD", "kaset_secret_pass"),
-		DBName:     getEnv("DB_NAME", "kaset_db"),
-		DBSSLMode:  getEnv("DB_SSLMODE", "disable"),
+		Port:          getEnv("PORT", "8585"),
+		AppEnv:        getEnv("APP_ENV", "development"),
+		DBHost:        getEnv("DB_HOST", "localhost"),
+		DBPort:        getEnv("DB_PORT", "5488"),
+		DBUser:        getEnv("DB_USER", "kaset_user"),
+		DBPassword:    getEnv("DB_PASSWORD", "kaset_secret_pass"),
+		DBName:        getEnv("DB_NAME", "kaset_db"),
+		DBSSLMode:     getEnv("DB_SSLMODE", "disable"),
+		JWTSecret:     getEnv("JWT_SECRET", "kaset_fair_super_secret_jwt_key_2570"),
+		RedisHost:     getEnv("REDIS_HOST", "localhost"),
+		RedisPort:     getEnv("REDIS_PORT", "6389"),
+		RedisPassword: getEnv("REDIS_PASSWORD", ""),
 	}
 }
 

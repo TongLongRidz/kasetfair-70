@@ -11,10 +11,10 @@ backend:
 	cd backend && go run ./cmd/api
 
 db-up:
-	docker compose up -d postgres
+	docker compose up -d postgres redis
 
 db-down:
-	docker compose stop postgres
+	docker compose stop postgres redis
 
 build:
 	cd backend && CGO_ENABLED=0 go build -o bin/server ./cmd/api

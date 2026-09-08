@@ -20,6 +20,23 @@ services:
     networks:
       - kaset_network
 
+  # Redis In-Memory Store Service
+  redis:
+    image: redis:7-alpine
+    container_name: kaset_redis
+    restart: unless-stopped
+    ports:
+      - "6389:6379" # Custom non-default host port shifted to 6389
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - kaset_network
+
   # Go Backend API Service
   backend:
     build:
@@ -36,10 +53,15 @@ services:
       DB_PASSWORD: kaset_secret_pass
       DB_NAME: kaset_db
       DB_SSLMODE: disable
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ""
     ports:
       - "8585:8585" # Custom backend port shifted to 8585
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - kaset_network
@@ -63,6 +85,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
     driver: local
 
 networks:
