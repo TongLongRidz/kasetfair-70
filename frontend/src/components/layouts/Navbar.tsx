@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { CupSoda, Coins, TicketPercent, Layers } from "lucide-react";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -12,13 +13,17 @@ export default function Navbar() {
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
   }, []);
 
   const handleLogoClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -30,6 +35,7 @@ export default function Navbar() {
 
   const handleScrollTo = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
     e.preventDefault();
+    setIsOpen(false);
     if (pathname === "/") {
       const element = document.getElementById(sectionId);
       if (element) {
@@ -122,54 +128,46 @@ export default function Navbar() {
             fontWeight: 500,
           }}
         >
-          <a
-            href="#menu"
-            className="nav-menu-link"
-            onClick={(e) => handleScrollTo(e, "menu")}
-            style={{ color: "var(--ink)", textDecoration: "none", cursor: "pointer" }}
-          >
-            {lang === "th" ? "เมนู" : "Menu"}
-          </a>
-          <a
-            href="#toppings"
-            className="nav-menu-link"
-            onClick={(e) => handleScrollTo(e, "toppings")}
-            style={{ color: "var(--ink-soft)", textDecoration: "none", cursor: "pointer" }}
-          >
-            {lang === "th" ? "ท็อปปิ้ง" : "Toppings"}
-          </a>
-          <Link href="/promotion" className="nav-menu-link" style={{ color: "var(--ink-soft)", textDecoration: "none" }}>
-            {lang === "th" ? "โปรโมชั่น" : "Promos"}
-          </Link>
+          {/* Quick link for Queue Check (always in navbar) */}
           <Link
             href="/queue"
             className="nav-queue-btn"
             style={{
               borderRadius: "9999px",
               backgroundColor: "var(--teal)",
-              padding: "0.35rem 0.85rem",
+              padding: "0.4rem 0.9rem",
               fontSize: "0.75rem",
               fontWeight: 700,
               color: "var(--cream)",
               textDecoration: "none",
               whiteSpace: "nowrap",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.35rem",
+              boxShadow: "0 2px 6px rgba(0, 77, 64, 0.2)",
+              transition: "transform 0.15s ease, opacity 0.15s ease",
             }}
           >
-            {lang === "th" ? "ตรวจสอบคิว" : "Queue"}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <span>{lang === "th" ? "ตรวจสอบคิว" : "Queue"}</span>
           </Link>
 
-          {/* Language Dropdown */}
+          {/* Menu Dropdown Container */}
           <div ref={dropdownRef} style={{ position: "relative", flexShrink: 0 }}>
             <button
               type="button"
               onClick={() => setIsOpen(!isOpen)}
+              aria-label="Toggle Navigation Menu"
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "6px",
-                padding: "0.3rem 0.6rem 0.3rem 0.4rem",
+                gap: "5px",
+                padding: "0.38rem 0.65rem 0.38rem 0.5rem",
                 borderRadius: "9999px",
-                backgroundColor: isOpen ? "rgba(225, 222, 210, 0.9)" : "rgba(235, 233, 222, 0.8)",
+                backgroundColor: isOpen ? "rgba(225, 222, 210, 0.95)" : "rgba(235, 233, 222, 0.85)",
                 border: "1px solid rgba(50, 55, 65, 0.12)",
                 fontSize: "0.75rem",
                 fontWeight: 700,
@@ -178,12 +176,13 @@ export default function Navbar() {
                 transition: "all 0.2s ease",
               }}
             >
-              <span className="relative flex items-center justify-center size-5 bg-white rounded-full shadow-sm overflow-hidden select-none border border-zinc-200/50">
-                <span className="absolute text-[22px] scale-[1.5] leading-none translate-y-[1.75px]">
-                  {lang === "th" ? "🇹🇭" : "🇺🇸"}
-                </span>
-              </span>
-              <span>{lang === "th" ? "TH" : "EN"}</span>
+              {/* Hamburger icon */}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="4" y1="6" x2="20" y2="6" />
+                <line x1="4" y1="12" x2="20" y2="12" />
+                <line x1="4" y1="18" x2="20" y2="18" />
+              </svg>
+              <span>{lang === "th" ? "เมนู" : "Menu"}</span>
               <svg
                 width="10"
                 height="6"
@@ -199,99 +198,165 @@ export default function Navbar() {
               </svg>
             </button>
 
-            {/* Dropdown Menu */}
+            {/* Dropdown Menu Content */}
             {isOpen && (
               <div
                 style={{
                   position: "absolute",
-                  top: "calc(100% + 6px)",
+                  top: "calc(100% + 8px)",
                   right: 0,
-                  width: "120px",
+                  width: "185px",
                   backgroundColor: "#ffffff",
-                  borderRadius: "12px",
-                  boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+                  borderRadius: "14px",
+                  boxShadow: "0 12px 30px -5px rgba(0, 0, 0, 0.15), 0 8px 12px -6px rgba(0, 0, 0, 0.08)",
                   border: "1px solid rgba(50, 55, 65, 0.1)",
-                  padding: "4px",
+                  padding: "6px",
                   zIndex: 50,
                   display: "flex",
                   flexDirection: "column",
-                  gap: "2px",
+                  gap: "3px",
                   animation: "fadeIn 0.15s ease",
                 }}
               >
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLang("th");
-                    setIsOpen(false);
-                  }}
+                {/* Navigation links */}
+                <a
+                  href="#menu"
+                  onClick={(e) => handleScrollTo(e, "menu")}
                   style={{
                     display: "flex",
                     alignItems: "center",
                     gap: "8px",
-                    width: "100%",
-                    padding: "6px 8px",
-                    border: "none",
+                    padding: "8px 10px",
                     borderRadius: "8px",
-                    backgroundColor: lang === "th" ? "rgba(100, 194, 121, 0.12)" : "transparent",
-                    color: lang === "th" ? "#2e7d32" : "var(--ink)",
-                    fontSize: "0.75rem",
-                    fontWeight: lang === "th" ? 700 : 500,
+                    color: "var(--ink)",
+                    textDecoration: "none",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
                     cursor: "pointer",
-                    textAlign: "left",
                     transition: "background-color 0.15s ease",
                   }}
                   onMouseEnter={(e) => {
-                    if (lang !== "th") e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.04)";
+                    e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.04)";
                   }}
                   onMouseLeave={(e) => {
-                    if (lang !== "th") e.currentTarget.style.backgroundColor = "transparent";
+                    e.currentTarget.style.backgroundColor = "transparent";
                   }}
                 >
-                  <span className="relative flex items-center justify-center size-5 bg-white rounded-full shadow-sm overflow-hidden select-none border border-zinc-200/50">
-                    <span className="absolute text-[22px] scale-[1.5] leading-none translate-y-[1.75px]">
-                      🇹🇭
-                    </span>
-                  </span>
-                  <span>ภาษาไทย</span>
-                </button>
+                  <span>{lang === "th" ? "เมนูเครื่องดื่ม" : "Drinks Menu"}</span>
+                </a>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLang("en");
-                    setIsOpen(false);
-                  }}
+                <a
+                  href="#toppings"
+                  onClick={(e) => handleScrollTo(e, "toppings")}
                   style={{
                     display: "flex",
                     alignItems: "center",
                     gap: "8px",
-                    width: "100%",
-                    padding: "6px 8px",
-                    border: "none",
+                    padding: "8px 10px",
                     borderRadius: "8px",
-                    backgroundColor: lang === "en" ? "rgba(100, 194, 121, 0.12)" : "transparent",
-                    color: lang === "en" ? "#2e7d32" : "var(--ink)",
-                    fontSize: "0.75rem",
-                    fontWeight: lang === "en" ? 700 : 500,
+                    color: "var(--ink)",
+                    textDecoration: "none",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
                     cursor: "pointer",
-                    textAlign: "left",
                     transition: "background-color 0.15s ease",
                   }}
                   onMouseEnter={(e) => {
-                    if (lang !== "en") e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.04)";
+                    e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.04)";
                   }}
                   onMouseLeave={(e) => {
-                    if (lang !== "en") e.currentTarget.style.backgroundColor = "transparent";
+                    e.currentTarget.style.backgroundColor = "transparent";
                   }}
                 >
-                  <span className="relative flex items-center justify-center size-5 bg-white rounded-full shadow-sm overflow-hidden select-none border border-zinc-200/50">
-                    <span className="absolute text-[22px] scale-[1.5] leading-none translate-y-[1.75px]">
-                      🇺🇸
-                    </span>
-                  </span>
-                  <span>English</span>
-                </button>
+                  <span>{lang === "th" ? "ท็อปปิ้ง" : "Toppings"}</span>
+                </a>
+
+                <Link
+                  href="/promotion"
+                  onClick={() => setIsOpen(false)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "8px 10px",
+                    borderRadius: "8px",
+                    color: "var(--ink)",
+                    textDecoration: "none",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    transition: "background-color 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.04)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                >
+                  <span>{lang === "th" ? "โปรโมชั่น" : "Promotions"}</span>
+                </Link>
+
+                {/* Divider */}
+                <div style={{ height: "1px", backgroundColor: "rgba(50, 55, 65, 0.08)", margin: "4px 2px" }} />
+
+                {/* Language Switch Section */}
+                <div style={{ padding: "4px 8px 2px 8px", fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  {lang === "th" ? "เลือกภาษา / Language" : "Language"}
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px", padding: "2px" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLang("th");
+                      setIsOpen(false);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "5px",
+                      padding: "6px 8px",
+                      border: "none",
+                      borderRadius: "8px",
+                      backgroundColor: lang === "th" ? "rgba(46, 125, 50, 0.12)" : "rgba(0,0,0,0.03)",
+                      color: lang === "th" ? "#2e7d32" : "var(--ink)",
+                      fontSize: "0.72rem",
+                      fontWeight: lang === "th" ? 700 : 500,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <span>🇹🇭</span>
+                    <span>ไทย</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLang("en");
+                      setIsOpen(false);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "5px",
+                      padding: "6px 8px",
+                      border: "none",
+                      borderRadius: "8px",
+                      backgroundColor: lang === "en" ? "rgba(46, 125, 50, 0.12)" : "rgba(0,0,0,0.03)",
+                      color: lang === "en" ? "#2e7d32" : "var(--ink)",
+                      fontSize: "0.72rem",
+                      fontWeight: lang === "en" ? 700 : 500,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <span>🇺🇸</span>
+                    <span>EN</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import AdminSidebar from "@/components/layouts/AdminSidebar";
 import {
@@ -18,7 +18,15 @@ import {
   Filter,
   X,
   Flame,
+  Trash2,
+  Loader2,
+  AlertTriangle,
+  Upload,
+  ImageIcon,
 } from "lucide-react";
+import { getStoredToken } from "@/lib/auth";
+import { useToast } from "@/components/ui/toast";
+import AddEditMenuModal from "./components/AddEditMenuModal";
 
 interface MenuItem {
   id: number;
@@ -32,244 +40,410 @@ interface MenuItem {
   isAvailable: boolean; // is_available (ซ่อน / แสดง)
   isSoldOut: boolean;   // is_sold_out (ขายหมด / มีของ)
   isRecommended: boolean; // is_recommended (แนะนำ)
+  sortOrder: number;    // sort_order (ลำดับการแสดงผล)
   orderCount?: number;
 }
-
-const INITIAL_MENUS: MenuItem[] = [
-  {
-    id: 1,
-    name: "น้ำเต้าหู้ดั้งเดิม",
-    nameEn: "Original Soy Milk",
-    category: "flavours",
-    categoryName: "รสชาติดั้งเดิม",
-    price: 35,
-    description: "น้ำเต้าหู้เข้มข้น หอมถั่วเหลืองแท้ 100% ต้มสดใหม่ทุกวัน ไม่ผสมนมผง",
-    image: "/images/hero-soy.jpg",
-    isAvailable: true,
-    isSoldOut: false,
-    isRecommended: true,
-    orderCount: 168,
-  },
-  {
-    id: 2,
-    name: "น้ำเต้าหู้มัทฉะ",
-    nameEn: "Matcha Soy",
-    category: "flavours",
-    categoryName: "รสชาติพิเศษ",
-    price: 50,
-    description: "มัทฉะเกรดพรีเมียมจากญี่ปุ่น ชงสดผสมน้ำเต้าหู้หอมละมุนเข้มข้น",
-    image: "/images/drink-matcha.jpg",
-    isAvailable: true,
-    isSoldOut: false,
-    isRecommended: true,
-    orderCount: 121,
-  },
-  {
-    id: 3,
-    name: "น้ำเต้าหู้ชาไทย",
-    nameEn: "Thai Tea Soy",
-    category: "flavours",
-    categoryName: "รสชาติพิเศษ",
-    price: 45,
-    description: "ชาไทยใบชาคัดพิเศษ หอมเข้มมันนัว กลมกล่อมลงตัวแบบไทยแท้",
-    image: "/images/drink-mango.jpg",
-    isAvailable: true,
-    isSoldOut: false,
-    isRecommended: false,
-    orderCount: 96,
-  },
-  {
-    id: 4,
-    name: "น้ำเต้าหู้นมเย็น",
-    nameEn: "Nom Yen Soy",
-    category: "flavours",
-    categoryName: "รสชาติพิเศษ",
-    price: 40,
-    description: "สละนมเย็นสีชมพูหวานละมุน หอมสดชื่น ดื่มง่าย สดชื่นคลายร้อน",
-    image: "/images/drink-lychee.jpg",
-    isAvailable: true,
-    isSoldOut: true,
-    isRecommended: false,
-    orderCount: 62,
-  },
-  {
-    id: 5,
-    name: "น้ำเต้าหู้ช็อกโกแลต",
-    nameEn: "Choco Soy",
-    category: "flavours",
-    categoryName: "รสชาติพิเศษ",
-    price: 45,
-    description: "โกโก้เข้มข้นสูตรพิเศษ เข้ากันได้ดีเยี่ยมกับน้ำเต้าหู้เข้มข้น",
-    image: "/images/drink-pearl.jpg",
-    isAvailable: true,
-    isSoldOut: false,
-    isRecommended: false,
-    orderCount: 74,
-  },
-  {
-    id: 6,
-    name: "Matcha + Red Bean / Boba",
-    nameEn: "Combo Matcha Lover",
-    category: "combos",
-    categoryName: "ชุดเซ็ตยอดนิยม",
-    price: 65,
-    description: "มัทฉะเข้มข้นจับคู่กับไข่มุกหนึบหนับและถั่วแดงหวานมัน ฟินทุกคำ",
-    image: "/images/drink-matcha.jpg",
-    isAvailable: true,
-    isSoldOut: false,
-    isRecommended: true,
-    orderCount: 88,
-  },
-  {
-    id: 7,
-    name: "Thai Tea + Grass Jelly",
-    nameEn: "Combo Thai Tea Joy",
-    category: "combos",
-    categoryName: "ชุดเซ็ตยอดนิยม",
-    price: 60,
-    description: "ชาไทยหอมเข้มตัดรสชาติด้วยเฉาก๊วยหนึบหนับเคี้ยวเพลินดับร้อน",
-    image: "/images/drink-mango.jpg",
-    isAvailable: true,
-    isSoldOut: false,
-    isRecommended: false,
-    orderCount: 54,
-  },
-  {
-    id: 8,
-    name: "Soy Duo Special",
-    nameEn: "Original + Herbal Trio",
-    category: "combos",
-    categoryName: "ชุดเซ็ตยอดนิยม",
-    price: 55,
-    description: "น้ำเต้าหู้ดั้งเดิมพร้อมลูกชิด แปะก๊วย และถั่วแดง รวมคุณประโยชน์ล้นแก้ว",
-    image: "/images/hero-soy.jpg",
-    isAvailable: false,
-    isSoldOut: false,
-    isRecommended: false,
-    orderCount: 30,
-  },
-];
 
 const ITEMS_PER_PAGE = 6;
 
 export default function MenuManagementPage() {
-  const [menus, setMenus] = useState<MenuItem[]>(INITIAL_MENUS);
+  const { success, error: toastError, info } = useToast();
+
+  const [menus, setMenus] = useState<MenuItem[]>([]);
+  const [total, setTotal] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "available" | "hidden" | "soldout">("all");
   const [activeKebabId, setActiveKebabId] = useState<number | null>(null);
-  const [currentPage, setCurrentPage] = useState<1 | number>(1);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Edit Modal State
-  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
-  const [editForm, setEditForm] = useState<{
-    name: string;
-    nameEn: string;
-    category: string;
-    price: number;
-    description: string;
-    isRecommended: boolean;
-  }>({
-    name: "",
-    nameEn: "",
-    category: "flavours",
-    price: 0,
-    description: "",
-    isRecommended: false,
-  });
+  // Upload image state
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Add / Edit Modal State
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [modalMode, setModalMode] = useState<"create" | "edit">("create");
+  const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const [formNameTh, setFormNameTh] = useState("");
+  const [formNameEn, setFormNameEn] = useState("");
+  const [formCategory, setFormCategory] = useState<"flavours" | "combos">("flavours");
+  const [formPrice, setFormPrice] = useState<number>(35);
+  const [formDescription, setFormDescription] = useState("");
+  const [formImageUrl, setFormImageUrl] = useState("/images/hero-soy.jpg");
+  const [formIsRecommended, setFormIsRecommended] = useState(false);
+  const [formSortOrder, setFormSortOrder] = useState<number>(1);
+
+  // Delete Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
+  const [deleteItem, setDeleteItem] = useState<MenuItem | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Helper to format image URL (handle relative /uploads from backend)
+  const getFullImageUrl = (url: string) => {
+    if (!url) return "/images/hero-soy.jpg";
+    if (url.startsWith("/uploads/")) {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      return `${apiUrl}${url}`;
+    }
+    return url;
+  };
+
+  // Fetch Products from API
+  const fetchProducts = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        page_size: ITEMS_PER_PAGE.toString(),
+      });
+      if (searchQuery.trim()) params.append("q", searchQuery.trim());
+      if (selectedCategory !== "all") params.append("category", selectedCategory);
+      if (statusFilter !== "all") params.append("status", statusFilter);
+
+      const res = await fetch(`${apiUrl}/api/v1/products?${params.toString()}`);
+      if (res.ok) {
+        const result = await res.json();
+        const mapped: MenuItem[] = (result.data || []).map((p: any) => ({
+          id: p.id,
+          name: p.name_th,
+          nameEn: p.name_en || "",
+          category: p.is_combo ? "combos" : "flavours",
+          categoryName: p.is_combo ? "เซ็ตคอมโบ" : "น้ำเต้าหู้รสชาติต่างๆ",
+          price: p.price,
+          description: p.desc_th || p.desc_en || "",
+          image: p.image_url || "/images/hero-soy.jpg",
+          isAvailable: p.is_available,
+          isSoldOut: p.is_sold_out,
+          isRecommended: p.is_recommended,
+          sortOrder: p.sort_order || 0,
+          orderCount: p.order_count || 0,
+        }));
+        setMenus(mapped);
+        setTotal(result.total || 0);
+        setTotalPages(result.total_pages || 1);
+      } else {
+        setMenus([]);
+        setTotal(0);
+        setTotalPages(1);
+      }
+    } catch {
+      setMenus([]);
+      setTotal(0);
+      setTotalPages(1);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentPage, searchQuery, selectedCategory, statusFilter]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  // Close kebab menu when clicking outside
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".menu-kebab-container")) {
+        setActiveKebabId(null);
+      }
+    };
+    document.addEventListener("click", handleDocumentClick);
+    return () => document.removeEventListener("click", handleDocumentClick);
+  }, []);
+
+  // Handle File Upload
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toastError("ขนาดไฟล์เกิน 5MB กรุณาเลือกไฟล์ที่เล็กลง", "อัปโหลดล้มเหลว");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const token = getStoredToken();
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`${apiUrl}/api/v1/upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setFormImageUrl(data.url);
+        success("อัปโหลดรูปภาพสำเร็จเรียบร้อย", "สำเร็จ");
+      } else {
+        toastError(data.error || "อัปโหลดรูปภาพไม่สำเร็จ", "เกิดข้อผิดพลาด");
+      }
+    } catch {
+      toastError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่ออัปโหลดได้", "เกิดข้อผิดพลาด");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
 
   // Toggle Visibility (Icon ตา: ซ่อน / แสดง)
-  const toggleVisibility = (id: number) => {
-    setMenus((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, isAvailable: !item.isAvailable } : item
-      )
-    );
+  const toggleVisibility = async (item: MenuItem) => {
     setActiveKebabId(null);
+    const newStatus = !item.isAvailable;
+    // Optimistic update
+    setMenus((prev) =>
+      prev.map((m) => (m.id === item.id ? { ...m, isAvailable: newStatus } : m))
+    );
+
+    try {
+      const token = getStoredToken();
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const res = await fetch(`${apiUrl}/api/v1/products/${item.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ is_available: newStatus }),
+      });
+
+      if (res.ok) {
+        if (newStatus) {
+          success(`เปิดแสดงเมนู "${item.name}" บนหน้าร้านแล้ว`, "เปิดแสดงเมนู");
+        } else {
+          info(`ซ่อนเมนู "${item.name}" จากหน้าร้านแล้ว`, "ซ่อนเมนู");
+        }
+      } else {
+        toastError("ไม่สามารถเปลี่ยนสถานะเมนูได้", "เกิดข้อผิดพลาด");
+        fetchProducts();
+      }
+    } catch {
+      toastError("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์", "เกิดข้อผิดพลาด");
+      fetchProducts();
+    }
   };
 
   // Toggle Sold Out (เปิด / ปิด ขายหมด)
-  const toggleSoldOut = (id: number) => {
-    setMenus((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, isSoldOut: !item.isSoldOut } : item
-      )
-    );
+  const toggleSoldOut = async (item: MenuItem) => {
     setActiveKebabId(null);
+    const newStatus = !item.isSoldOut;
+    // Optimistic update
+    setMenus((prev) =>
+      prev.map((m) => (m.id === item.id ? { ...m, isSoldOut: newStatus } : m))
+    );
+
+    try {
+      const token = getStoredToken();
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const res = await fetch(`${apiUrl}/api/v1/products/${item.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ is_sold_out: newStatus }),
+      });
+
+      if (res.ok) {
+        if (newStatus) {
+          info(`ตั้งค่าเมนู "${item.name}" เป็นสินค้าหมด (Sold Out)`, "สินค้าหมด");
+        } else {
+          success(`ตั้งค่าเมนู "${item.name}" เป็นพร้อมขาย (In Stock)`, "พร้อมขาย");
+        }
+      } else {
+        toastError("ไม่สามารถเปลี่ยนสถานะสินค้าได้", "เกิดข้อผิดพลาด");
+        fetchProducts();
+      }
+    } catch {
+      toastError("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์", "เกิดข้อผิดพลาด");
+      fetchProducts();
+    }
+  };
+
+  // Open Create Modal
+  const openCreateModal = () => {
+    setSelectedItem(null);
+    setModalMode("create");
+    setFormNameTh("");
+    setFormNameEn("");
+    setFormCategory("flavours");
+    setFormPrice(35);
+    setFormDescription("");
+    setFormImageUrl("/images/hero-soy.jpg");
+    setFormIsRecommended(false);
+    setFormSortOrder(menus.length > 0 ? Math.max(...menus.map((m) => m.sortOrder || 0)) + 1 : 1);
+    setFormError(null);
+    setIsModalOpen(true);
   };
 
   // Open Edit Modal
   const openEditModal = (item: MenuItem) => {
-    setEditingItem(item);
-    setEditForm({
-      name: item.name,
-      nameEn: item.nameEn,
-      category: item.category,
-      price: item.price,
-      description: item.description,
-      isRecommended: item.isRecommended,
-    });
+    setSelectedItem(item);
+    setModalMode("edit");
+    setFormNameTh(item.name);
+    setFormNameEn(item.nameEn);
+    setFormCategory(item.category === "combos" ? "combos" : "flavours");
+    setFormPrice(item.price);
+    setFormDescription(item.description);
+    setFormImageUrl(item.image);
+    setFormIsRecommended(item.isRecommended);
+    setFormSortOrder(item.sortOrder || 1);
+    setFormError(null);
+    setIsModalOpen(true);
     setActiveKebabId(null);
   };
 
-  // Save Edit Modal
-  const handleSaveEdit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingItem) return;
-    setMenus((prev) =>
-      prev.map((item) =>
-        item.id === editingItem.id
-          ? {
-              ...item,
-              name: editForm.name,
-              nameEn: editForm.nameEn,
-              category: editForm.category,
-              categoryName: editForm.category === "combos" ? "ชุดเซ็ตยอดนิยม" : "รสชาติดั้งเดิม",
-              price: Number(editForm.price),
-              description: editForm.description,
-              isRecommended: editForm.isRecommended,
-            }
-          : item
-      )
-    );
-    setEditingItem(null);
+  // Open Delete Modal
+  const openDeleteModal = (item: MenuItem) => {
+    setDeleteItem(item);
+    setDeleteConfirmText("");
+    setDeleteError(null);
+    setIsDeleteModalOpen(true);
+    setActiveKebabId(null);
   };
 
-  // Filter Menus
-  const filteredMenus = menus.filter((item) => {
-    const matchSearch =
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.nameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchQuery.toLowerCase());
+  // Save Modal Form (Create / Edit)
+  const handleSaveModal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
 
-    const matchCategory =
-      selectedCategory === "all" || item.category === selectedCategory;
+    if (!formNameTh.trim()) {
+      setFormError("กรุณากรอกชื่อเมนูภาษาไทย");
+      return;
+    }
 
-    const matchStatus =
-      statusFilter === "all" ||
-      (statusFilter === "available" && item.isAvailable && !item.isSoldOut) ||
-      (statusFilter === "hidden" && !item.isAvailable) ||
-      (statusFilter === "soldout" && item.isSoldOut);
+    setIsSubmitting(true);
+    try {
+      const token = getStoredToken();
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
 
-    return matchSearch && matchCategory && matchStatus;
-  });
+      if (modalMode === "create") {
+        const res = await fetch(`${apiUrl}/api/v1/products`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            name_th: formNameTh.trim(),
+            name_en: formNameEn.trim(),
+            desc_th: formDescription.trim(),
+            price: Number(formPrice),
+            image_url: formImageUrl.trim() || "/images/hero-soy.jpg",
+            is_combo: formCategory === "combos",
+            is_available: true,
+            is_sold_out: false,
+            is_recommended: formIsRecommended,
+            sort_order: Number(formSortOrder) || 1,
+          }),
+        });
 
-  // Pagination Calculation
-  const totalPages = Math.ceil(filteredMenus.length / ITEMS_PER_PAGE) || 1;
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-  const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
-  const currentItems = filteredMenus.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+        const data = await res.json();
+        if (!res.ok) {
+          setFormError(data.error || "เกิดข้อผิดพลาดในการสร้างเมนู");
+          toastError(data.error || "เกิดข้อผิดพลาดในการสร้างเมนู", "สร้างไม่สำเร็จ");
+          return;
+        }
 
-  // Close kebab when clicked outside
-  const handleContainerClick = () => {
-    if (activeKebabId !== null) {
-      setActiveKebabId(null);
+        success(`เพิ่มเมนู "${formNameTh.trim()}" สำเร็จเรียบร้อย`, "สร้างเมนูสำเร็จ");
+      } else if (selectedItem) {
+        const res = await fetch(`${apiUrl}/api/v1/products/${selectedItem.id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            name_th: formNameTh.trim(),
+            name_en: formNameEn.trim(),
+            desc_th: formDescription.trim(),
+            price: Number(formPrice),
+            image_url: formImageUrl.trim(),
+            is_combo: formCategory === "combos",
+            is_recommended: formIsRecommended,
+            sort_order: Number(formSortOrder) || 1,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          setFormError(data.error || "เกิดข้อผิดพลาดในการแก้ไขเมนู");
+          toastError(data.error || "เกิดข้อผิดพลาดในการแก้ไขเมนู", "แก้ไขไม่สำเร็จ");
+          return;
+        }
+
+        success(`อัปเดตข้อมูลเมนู "${formNameTh.trim()}" เรียบร้อยแล้ว`, "บันทึกสำเร็จ");
+      }
+
+      setIsModalOpen(false);
+      fetchProducts();
+    } catch {
+      setFormError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
+      toastError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้", "เกิดข้อผิดพลาด");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  // Delete Product
+  const handleDeleteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deleteItem) return;
+    setDeleteError(null);
+
+    if (deleteConfirmText.trim().toLowerCase() !== "delete this menu") {
+      setDeleteError('กรุณาพิมพ์ "delete this menu" เพื่อยืนยันการลบ');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const token = getStoredToken();
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const res = await fetch(`${apiUrl}/api/v1/products/${deleteItem.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setDeleteError(data.error || "เกิดข้อผิดพลาดในการลบเมนู");
+        toastError(data.error || "เกิดข้อผิดพลาดในการลบเมนู", "ลบไม่สำเร็จ");
+        return;
+      }
+
+      success(`ลบเมนู "${deleteItem.name}" ออกจากระบบแล้ว`, "ลบเมนูสำเร็จ");
+      setIsDeleteModalOpen(false);
+      fetchProducts();
+    } catch {
+      setDeleteError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
+      toastError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้", "เกิดข้อผิดพลาด");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+
   return (
     <div
-      onClick={handleContainerClick}
       style={{
         display: "flex",
         minHeight: "100vh",
@@ -292,6 +466,7 @@ export default function MenuManagementPage() {
           {/* Add Menu Button */}
           <button
             type="button"
+            onClick={openCreateModal}
             style={{
               display: "flex",
               alignItems: "center",
@@ -409,8 +584,7 @@ export default function MenuManagementPage() {
             </div>
 
             {/* Status Dropdown / Select */}
-            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-              <Filter size={15} color="var(--ink-soft)" />
+            <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
               <select
                 value={statusFilter}
                 onChange={(e) => {
@@ -418,9 +592,10 @@ export default function MenuManagementPage() {
                   setCurrentPage(1);
                 }}
                 style={{
-                  padding: "0.4rem 0.75rem",
+                  padding: "0.45rem 0.85rem",
+                  minWidth: "150px",
                   borderRadius: "0.6rem",
-                  fontSize: "0.8rem",
+                  fontSize: "0.85rem",
                   fontFamily: "'Kanit', sans-serif",
                   backgroundColor: "var(--cream)",
                   border: "1px solid rgba(50, 55, 65, 0.1)",
@@ -438,356 +613,411 @@ export default function MenuManagementPage() {
           </div>
         </div>
 
+        {/* Loading State */}
+        {isLoading && (
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "4rem 0", gap: "0.5rem", color: "var(--teal)" }}>
+            <Loader2 size={24} className="animate-spin" />
+            <span style={{ fontSize: "0.95rem", fontWeight: 500 }}>กำลังโหลดรายการเมนู...</span>
+          </div>
+        )}
+
         {/* Menu Cards Grid */}
-        <div
-          style={{
-            marginTop: "1.5rem",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-            gap: "1.25rem",
-          }}
-        >
-          {currentItems.map((item) => {
-            const isKebabOpen = activeKebabId === item.id;
+        {!isLoading && (
+          <div
+            style={{
+              marginTop: "1.5rem",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+              gap: "1.25rem",
+            }}
+          >
+            {menus.map((item) => {
+              const isKebabOpen = activeKebabId === item.id;
+              const displayImg = getFullImageUrl(item.image);
 
-            return (
-              <div
-                key={item.id}
-                style={{
-                  backgroundColor: "var(--card)",
-                  borderRadius: "1.25rem",
-                  border: "1px solid rgba(50, 55, 65, 0.1)",
-                  boxShadow: "0 4px 16px -2px rgba(0,0,0,0.03)",
-                  overflow: "hidden",
-                  display: "flex",
-                  flexDirection: "column",
-                  position: "relative",
-                  opacity: !item.isAvailable ? 0.6 : 1,
-                  transition: "all 0.2s ease",
-                }}
-              >
-                {/* Image & Top Badges */}
-                <div style={{ position: "relative", width: "100%", height: "180px", backgroundColor: "#f0ece1" }}>
-                  <Image
-                    src={item.image}
-                    alt={item.name}
-                    fill
-                    style={{
-                      objectFit: "cover",
-                      filter: item.isSoldOut ? "grayscale(80%)" : "none",
-                    }}
-                  />
-
-                  {/* Dimmed Overlay if Sold Out or Hidden */}
-                  {item.isSoldOut && (
-                    <div
+              return (
+                <div
+                  key={item.id}
+                  style={{
+                    backgroundColor: "var(--card)",
+                    borderRadius: "1.25rem",
+                    border: "1px solid rgba(50, 55, 65, 0.1)",
+                    boxShadow: "0 4px 16px -2px rgba(0,0,0,0.03)",
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column",
+                    position: "relative",
+                    opacity: !item.isAvailable ? 0.6 : 1,
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  {/* Image & Top Badges */}
+                  <div style={{ position: "relative", width: "100%", height: "180px", backgroundColor: "#f0ece1" }}>
+                    <Image
+                      src={displayImg}
+                      alt={item.name}
+                      fill
+                      unoptimized={displayImg.startsWith("http")}
                       style={{
-                        position: "absolute",
-                        inset: 0,
-                        backgroundColor: "rgba(0, 0, 0, 0.45)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
+                        objectFit: "cover",
+                        filter: item.isSoldOut ? "grayscale(80%)" : "none",
                       }}
-                    >
-                      <span
-                        style={{
-                          backgroundColor: "#e05353",
-                          color: "#fff",
-                          padding: "0.35rem 1rem",
-                          borderRadius: "9999px",
-                          fontWeight: 700,
-                          fontSize: "0.85rem",
-                          boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-                        }}
-                      >
-                        สินค้าหมด (Sold Out)
-                      </span>
-                    </div>
-                  )}
+                    />
 
-                  {/* Hidden Badge */}
-                  {!item.isAvailable && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "0.75rem",
-                        left: "0.75rem",
-                        backgroundColor: "rgba(30, 30, 30, 0.75)",
-                        color: "#fff",
-                        padding: "0.2rem 0.6rem",
-                        borderRadius: "9999px",
-                        fontSize: "0.75rem",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.25rem",
-                        backdropFilter: "blur(4px)",
-                      }}
-                    >
-                      <EyeOff size={13} />
-                      <span>ซ่อนจากหน้าร้าน</span>
-                    </div>
-                  )}
-
-                  {/* Recommended Badge */}
-                  {item.isRecommended && item.isAvailable && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "0.75rem",
-                        left: "0.75rem",
-                        backgroundColor: "var(--teal)",
-                        color: "#fff",
-                        padding: "0.2rem 0.65rem",
-                        borderRadius: "9999px",
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.25rem",
-                        boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
-                      }}
-                    >
-                      <Sparkles size={13} />
-                      <span>เมนูแนะนำ</span>
-                    </div>
-                  )}
-
-                  {/* Kebab Menu Button (Top Right) */}
-                  <div style={{ position: "absolute", top: "0.75rem", right: "0.75rem", zIndex: 10 }}>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveKebabId(isKebabOpen ? null : item.id);
-                      }}
-                      style={{
-                        width: "32px",
-                        height: "32px",
-                        borderRadius: "50%",
-                        backgroundColor: "rgba(255, 255, 255, 0.9)",
-                        border: "1px solid rgba(0,0,0,0.1)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "pointer",
-                        boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
-                        transition: "all 0.15s ease",
-                      }}
-                      title="ตัวเลือกเพิ่มเติม"
-                    >
-                      <MoreVertical size={16} color="var(--ink)" />
-                    </button>
-
-                    {/* Kebab Popover Dropdown */}
-                    {isKebabOpen && (
+                    {/* Dimmed Overlay if Sold Out or Hidden */}
+                    {item.isSoldOut && (
                       <div
-                        onClick={(e) => e.stopPropagation()}
                         style={{
                           position: "absolute",
-                          top: "38px",
-                          right: 0,
-                          width: "180px",
-                          backgroundColor: "var(--card)",
-                          borderRadius: "0.75rem",
-                          border: "1px solid rgba(50, 55, 65, 0.15)",
-                          boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                          padding: "0.35rem",
+                          inset: 0,
+                          backgroundColor: "rgba(0, 0, 0, 0.45)",
                           display: "flex",
-                          flexDirection: "column",
-                          gap: "0.2rem",
-                          zIndex: 50,
+                          alignItems: "center",
+                          justifyContent: "center",
                         }}
                       >
-                        {/* Option 1: Edit (Icon Edit) */}
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(item)}
+                        <span
                           style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.6rem",
-                            width: "100%",
-                            padding: "0.5rem 0.75rem",
+                            backgroundColor: "#e05353",
+                            color: "#fff",
+                            padding: "0.35rem 1rem",
+                            borderRadius: "9999px",
+                            fontWeight: 700,
                             fontSize: "0.85rem",
-                            border: "none",
-                            borderRadius: "0.5rem",
-                            backgroundColor: "transparent",
-                            color: "var(--ink)",
-                            cursor: "pointer",
-                            textAlign: "left",
-                            fontFamily: "'Kanit', sans-serif",
-                            transition: "background-color 0.15s ease",
+                            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
                           }}
-                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--cream)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                         >
-                          <Edit3 size={15} color="var(--teal)" />
-                          <span>แก้ไขข้อมูลเมนู</span>
-                        </button>
-
-                        {/* Option 2: Sold Out Toggle (ขายหมด / มีของ) */}
-                        <button
-                          type="button"
-                          onClick={() => toggleSoldOut(item.id)}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.6rem",
-                            width: "100%",
-                            padding: "0.5rem 0.75rem",
-                            fontSize: "0.85rem",
-                            border: "none",
-                            borderRadius: "0.5rem",
-                            backgroundColor: "transparent",
-                            color: item.isSoldOut ? "var(--teal)" : "#e05353",
-                            cursor: "pointer",
-                            textAlign: "left",
-                            fontFamily: "'Kanit', sans-serif",
-                            transition: "background-color 0.15s ease",
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--cream)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                        >
-                          {item.isSoldOut ? (
-                            <>
-                              <CheckCircle2 size={15} color="var(--teal)" />
-                              <span>ตั้งเป็น "มีสินค้า"</span>
-                            </>
-                          ) : (
-                            <>
-                              <XCircle size={15} color="#e05353" />
-                              <span>ตั้งเป็น "ขายหมด"</span>
-                            </>
-                          )}
-                        </button>
-
-                        <div style={{ height: "1px", backgroundColor: "rgba(50, 55, 65, 0.08)", margin: "0.2rem 0" }} />
-
-                        {/* Option 3: Eye / EyeOff Toggle (ซ่อน / ยกเลิกซ่อน) */}
-                        <button
-                          type="button"
-                          onClick={() => toggleVisibility(item.id)}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.6rem",
-                            width: "100%",
-                            padding: "0.5rem 0.75rem",
-                            fontSize: "0.85rem",
-                            border: "none",
-                            borderRadius: "0.5rem",
-                            backgroundColor: "transparent",
-                            color: item.isAvailable ? "var(--ink-soft)" : "var(--teal)",
-                            cursor: "pointer",
-                            textAlign: "left",
-                            fontFamily: "'Kanit', sans-serif",
-                            transition: "background-color 0.15s ease",
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--cream)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                        >
-                          {item.isAvailable ? (
-                            <>
-                              <EyeOff size={15} color="var(--ink-soft)" />
-                              <span>ซ่อนเมนูนี้</span>
-                            </>
-                          ) : (
-                            <>
-                              <Eye size={15} color="var(--teal)" />
-                              <span>เปิดแสดงเมนู</span>
-                            </>
-                          )}
-                        </button>
+                          สินค้าหมด (Sold Out)
+                        </span>
                       </div>
                     )}
-                  </div>
-                </div>
 
-                {/* Content Details */}
-                <div style={{ padding: "1.1rem 1.25rem", flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem" }}>
-                      <div>
-                        <span style={{ fontSize: "0.75rem", color: "var(--teal)", fontWeight: 600 }}>
-                          {item.categoryName}
-                        </span>
-                        <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginTop: "0.15rem", lineHeight: 1.3 }}>
-                          {item.name}
-                        </h3>
-                        <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "1px" }}>
-                          {item.nameEn}
-                        </p>
+                    {/* Hidden Badge */}
+                    {!item.isAvailable && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "0.75rem",
+                          left: "0.75rem",
+                          backgroundColor: "rgba(30, 30, 30, 0.75)",
+                          color: "#fff",
+                          padding: "0.2rem 0.6rem",
+                          borderRadius: "9999px",
+                          fontSize: "0.75rem",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.25rem",
+                          backdropFilter: "blur(4px)",
+                        }}
+                      >
+                        <EyeOff size={13} />
+                        <span>ซ่อนจากหน้าร้าน</span>
                       </div>
+                    )}
 
-                      {/* Price Badge */}
-                      <div style={{ textAlign: "right" }}>
-                        <span style={{ fontSize: "1.35rem", fontWeight: 800, color: "var(--ink)", fontFamily: "'Kanit', sans-serif" }}>
-                          ฿{item.price}
-                        </span>
+                    {/* Recommended Badge */}
+                    {item.isRecommended && item.isAvailable && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "0.75rem",
+                          left: "0.75rem",
+                          backgroundColor: "var(--teal)",
+                          color: "#fff",
+                          padding: "0.2rem 0.65rem",
+                          borderRadius: "9999px",
+                          fontSize: "0.75rem",
+                          fontWeight: 600,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.25rem",
+                          boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+                        }}
+                      >
+                        <Sparkles size={13} />
+                        <span>เมนูแนะนำ</span>
                       </div>
-                    </div>
+                    )}
 
-                    <p
-                      style={{
-                        fontSize: "0.8rem",
-                        color: "var(--ink-soft)",
-                        marginTop: "0.6rem",
-                        lineHeight: 1.4,
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {item.description}
-                    </p>
-                  </div>
+                    {/* Kebab Menu Button (Top Right) */}
+                    <div className="menu-kebab-container" style={{ position: "absolute", top: "0.75rem", right: "0.75rem", zIndex: 10 }}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveKebabId(isKebabOpen ? null : item.id);
+                        }}
+                        style={{
+                          width: "32px",
+                          height: "32px",
+                          borderRadius: "50%",
+                          backgroundColor: "rgba(255, 255, 255, 0.9)",
+                          border: "1px solid rgba(0,0,0,0.1)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+                          transition: "all 0.15s ease",
+                        }}
+                        title="ตัวเลือกเพิ่มเติม"
+                      >
+                        <MoreVertical size={16} color="var(--ink)" />
+                      </button>
 
-                  {/* Quick Bottom Status Bar */}
-                  <div
-                    style={{
-                      marginTop: "1rem",
-                      paddingTop: "0.75rem",
-                      borderTop: "1px solid rgba(50, 55, 65, 0.08)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      fontSize: "0.75rem",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                      {/* Status Tag */}
-                      {item.isSoldOut ? (
-                        <span style={{ color: "#e05353", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                          <XCircle size={13} /> ขายหมด
-                        </span>
-                      ) : !item.isAvailable ? (
-                        <span style={{ color: "var(--ink-soft)", fontWeight: 500, display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                          <EyeOff size={13} /> ซ่อนอยู่
-                        </span>
-                      ) : (
-                        <span style={{ color: "var(--teal)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                          <CheckCircle2 size={13} /> พร้อมขาย
-                        </span>
+                      {/* Kebab Popover Dropdown */}
+                      {isKebabOpen && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            position: "absolute",
+                            top: "38px",
+                            right: 0,
+                            width: "185px",
+                            backgroundColor: "var(--card)",
+                            borderRadius: "0.75rem",
+                            border: "1px solid rgba(50, 55, 65, 0.15)",
+                            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                            padding: "0.35rem",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "0.2rem",
+                            zIndex: 50,
+                          }}
+                        >
+                          {/* Option 1: Edit */}
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(item)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.6rem",
+                              width: "100%",
+                              padding: "0.5rem 0.75rem",
+                              fontSize: "0.85rem",
+                              border: "none",
+                              borderRadius: "0.5rem",
+                              backgroundColor: "transparent",
+                              color: "var(--ink)",
+                              cursor: "pointer",
+                              textAlign: "left",
+                              fontFamily: "'Kanit', sans-serif",
+                              transition: "background-color 0.15s ease",
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--cream)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                          >
+                            <Edit3 size={15} color="var(--teal)" />
+                            <span>แก้ไขข้อมูลเมนู</span>
+                          </button>
+
+                          {/* Option 2: Sold Out Toggle */}
+                          <button
+                            type="button"
+                            onClick={() => toggleSoldOut(item)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.6rem",
+                              width: "100%",
+                              padding: "0.5rem 0.75rem",
+                              fontSize: "0.85rem",
+                              border: "none",
+                              borderRadius: "0.5rem",
+                              backgroundColor: "transparent",
+                              color: item.isSoldOut ? "var(--teal)" : "#e05353",
+                              cursor: "pointer",
+                              textAlign: "left",
+                              fontFamily: "'Kanit', sans-serif",
+                              transition: "background-color 0.15s ease",
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--cream)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                          >
+                            {item.isSoldOut ? (
+                              <>
+                                <CheckCircle2 size={15} color="var(--teal)" />
+                                <span>ตั้งเป็น "มีสินค้า"</span>
+                              </>
+                            ) : (
+                              <>
+                                <XCircle size={15} color="#e05353" />
+                                <span>ตั้งเป็น "ขายหมด"</span>
+                              </>
+                            )}
+                          </button>
+
+                          {/* Option 3: Eye / EyeOff Toggle */}
+                          <button
+                            type="button"
+                            onClick={() => toggleVisibility(item)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.6rem",
+                              width: "100%",
+                              padding: "0.5rem 0.75rem",
+                              fontSize: "0.85rem",
+                              border: "none",
+                              borderRadius: "0.5rem",
+                              backgroundColor: "transparent",
+                              color: item.isAvailable ? "var(--ink-soft)" : "var(--teal)",
+                              cursor: "pointer",
+                              textAlign: "left",
+                              fontFamily: "'Kanit', sans-serif",
+                              transition: "background-color 0.15s ease",
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--cream)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                          >
+                            {item.isAvailable ? (
+                              <>
+                                <EyeOff size={15} color="var(--ink-soft)" />
+                                <span>ซ่อนเมนูนี้</span>
+                              </>
+                            ) : (
+                              <>
+                                <Eye size={15} color="var(--teal)" />
+                                <span>เปิดแสดงเมนู</span>
+                              </>
+                            )}
+                          </button>
+
+                          <div style={{ height: "1px", backgroundColor: "rgba(50, 55, 65, 0.08)", margin: "0.2rem 0" }} />
+
+                          {/* Option 4: Delete */}
+                          <button
+                            type="button"
+                            onClick={() => openDeleteModal(item)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.6rem",
+                              width: "100%",
+                              padding: "0.5rem 0.75rem",
+                              fontSize: "0.85rem",
+                              border: "none",
+                              borderRadius: "0.5rem",
+                              backgroundColor: "transparent",
+                              color: "#dc2626",
+                              cursor: "pointer",
+                              textAlign: "left",
+                              fontFamily: "'Kanit', sans-serif",
+                              transition: "background-color 0.15s ease",
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(220, 38, 38, 0.08)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                          >
+                            <Trash2 size={15} color="#dc2626" />
+                            <span>ลบรายการเมนู</span>
+                          </button>
+                        </div>
                       )}
                     </div>
+                  </div>
 
-                    {item.orderCount && (
-                      <span style={{ color: "var(--ink-soft)", fontWeight: 500, display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                        <Flame size={13} color="var(--teal)" />
-                        ขายแล้ว {item.orderCount} แก้ว
-                      </span>
-                    )}
+                  {/* Content Details */}
+                  <div style={{ padding: "1.1rem 1.25rem", flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem" }}>
+                        <div>
+                          <span style={{ fontSize: "0.75rem", color: "var(--teal)", fontWeight: 600 }}>
+                            {item.categoryName}
+                          </span>
+                          <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginTop: "0.15rem", lineHeight: 1.3 }}>
+                            {item.name}
+                          </h3>
+                          <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "1px" }}>
+                            {item.nameEn}
+                          </p>
+                        </div>
+
+                        {/* Price Badge */}
+                        <div style={{ textAlign: "right" }}>
+                          <span style={{ fontSize: "1.35rem", fontWeight: 800, color: "var(--ink)", fontFamily: "'Kanit', sans-serif" }}>
+                            ฿{item.price}
+                          </span>
+                        </div>
+                      </div>
+
+                      <p
+                        style={{
+                          fontSize: "0.8rem",
+                          color: "var(--ink-soft)",
+                          marginTop: "0.6rem",
+                          lineHeight: 1.4,
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {item.description}
+                      </p>
+                    </div>
+
+                    {/* Quick Bottom Status Bar */}
+                    <div
+                      style={{
+                        marginTop: "1rem",
+                        paddingTop: "0.75rem",
+                        borderTop: "1px solid rgba(50, 55, 65, 0.08)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        fontSize: "0.75rem",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        {/* Status Tag */}
+                        {item.isSoldOut ? (
+                          <span style={{ color: "#e05353", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                            <XCircle size={13} /> ขายหมด
+                          </span>
+                        ) : !item.isAvailable ? (
+                          <span style={{ color: "var(--ink-soft)", fontWeight: 500, display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                            <EyeOff size={13} /> ซ่อนอยู่
+                          </span>
+                        ) : (
+                          <span style={{ color: "var(--teal)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                            <CheckCircle2 size={13} /> พร้อมขาย
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                        <span
+                          style={{
+                            padding: "0.15rem 0.45rem",
+                            borderRadius: "0.35rem",
+                            backgroundColor: "var(--cream)",
+                            border: "1px solid rgba(50, 55, 65, 0.12)",
+                            color: "var(--ink-soft)",
+                            fontSize: "0.7rem",
+                            fontWeight: 600,
+                          }}
+                        >
+                          ลำดับ: #{item.sortOrder || 0}
+                        </span>
+
+                        {item.orderCount !== undefined && item.orderCount > 0 && (
+                          <span style={{ color: "var(--ink-soft)", fontWeight: 500, display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                            <Flame size={13} color="var(--teal)" />
+                            ขายแล้ว {item.orderCount} แก้ว
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Empty State */}
-        {filteredMenus.length === 0 && (
+        {!isLoading && menus.length === 0 && (
           <div
             style={{
               marginTop: "2.5rem",
@@ -798,15 +1028,15 @@ export default function MenuManagementPage() {
               border: "1px dashed rgba(50, 55, 65, 0.15)",
             }}
           >
-            <p style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--ink)" }}>ไม่พบรายการเมนูที่ค้นหา</p>
+            <p style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--ink)" }}>ไม่พบรายการเมนู</p>
             <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", marginTop: "0.35rem" }}>
-              ลองเปลี่ยนคำค้นหา หรือรีเซ็ตตัวกรองสถานะ/หมวดหมู่
+              ลองเปลี่ยนคำค้นหา หรือกดปุ่ม "เพิ่มเมนูใหม่" เพื่อสร้างรายการแรก
             </p>
           </div>
         )}
 
         {/* Pagination Section */}
-        {filteredMenus.length > 0 && (
+        {!isLoading && total > 0 && (
           <div
             style={{
               marginTop: "2rem",
@@ -820,7 +1050,7 @@ export default function MenuManagementPage() {
             }}
           >
             <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>
-              แสดงรายการที่ {startIndex + 1} - {Math.min(startIndex + ITEMS_PER_PAGE, filteredMenus.length)} จากทั้งหมด {filteredMenus.length} รายการ
+              แสดงรายการที่ {startIndex + 1} - {Math.min(startIndex + ITEMS_PER_PAGE, total)} จากทั้งหมด {total} รายการ
             </p>
 
             {/* Pagination Controls */}
@@ -828,7 +1058,7 @@ export default function MenuManagementPage() {
               <button
                 type="button"
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={safeCurrentPage === 1}
+                disabled={currentPage === 1}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -838,8 +1068,8 @@ export default function MenuManagementPage() {
                   borderRadius: "0.5rem",
                   border: "1px solid rgba(50, 55, 65, 0.1)",
                   backgroundColor: "var(--card)",
-                  color: safeCurrentPage === 1 ? "rgba(50,55,65,0.3)" : "var(--ink)",
-                  cursor: safeCurrentPage === 1 ? "not-allowed" : "pointer",
+                  color: currentPage === 1 ? "rgba(50,55,65,0.3)" : "var(--ink)",
+                  cursor: currentPage === 1 ? "not-allowed" : "pointer",
                 }}
               >
                 <ChevronLeft size={18} />
@@ -847,7 +1077,7 @@ export default function MenuManagementPage() {
 
               {Array.from({ length: totalPages }).map((_, idx) => {
                 const pageNum = idx + 1;
-                const isActive = pageNum === safeCurrentPage;
+                const isActive = pageNum === currentPage;
                 return (
                   <button
                     key={pageNum}
@@ -874,7 +1104,7 @@ export default function MenuManagementPage() {
               <button
                 type="button"
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={safeCurrentPage === totalPages}
+                disabled={currentPage === totalPages}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -884,8 +1114,8 @@ export default function MenuManagementPage() {
                   borderRadius: "0.5rem",
                   border: "1px solid rgba(50, 55, 65, 0.1)",
                   backgroundColor: "var(--card)",
-                  color: safeCurrentPage === totalPages ? "rgba(50,55,65,0.3)" : "var(--ink)",
-                  cursor: safeCurrentPage === totalPages ? "not-allowed" : "pointer",
+                  color: currentPage === totalPages ? "rgba(50,55,65,0.3)" : "var(--ink)",
+                  cursor: currentPage === totalPages ? "not-allowed" : "pointer",
                 }}
               >
                 <ChevronRight size={18} />
@@ -894,18 +1124,45 @@ export default function MenuManagementPage() {
           </div>
         )}
 
-        {/* Edit Modal */}
-        {editingItem && (
+        {/* Create / Edit Modal */}
+        <AddEditMenuModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSubmit={handleSaveModal}
+          mode={modalMode}
+          formNameTh={formNameTh}
+          setFormNameTh={setFormNameTh}
+          formNameEn={formNameEn}
+          setFormNameEn={setFormNameEn}
+          formCategory={formCategory}
+          setFormCategory={setFormCategory}
+          formPrice={formPrice}
+          setFormPrice={setFormPrice}
+          formSortOrder={formSortOrder}
+          setFormSortOrder={setFormSortOrder}
+          formDescription={formDescription}
+          setFormDescription={setFormDescription}
+          formImageUrl={formImageUrl}
+          setFormImageUrl={setFormImageUrl}
+          formIsRecommended={formIsRecommended}
+          setFormIsRecommended={setFormIsRecommended}
+          formError={formError}
+          isSubmitting={isSubmitting}
+          isUploading={isUploading}
+          onFileUpload={handleFileUpload}
+        />
+
+        {/* Delete Confirm Modal */}
+        {isDeleteModalOpen && deleteItem && (
           <div
             className="animate-fade-in"
             style={{
               position: "fixed",
               inset: 0,
-              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              backgroundColor: "rgba(0,0,0,0.5)",
               backdropFilter: "blur(4px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              display: "grid",
+              placeItems: "center",
               zIndex: 100,
               padding: "1rem",
             }}
@@ -915,202 +1172,109 @@ export default function MenuManagementPage() {
               style={{
                 backgroundColor: "var(--card)",
                 borderRadius: "1.25rem",
+                maxWidth: "440px",
                 width: "100%",
-                maxWidth: "520px",
                 padding: "1.75rem",
                 boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
-                border: "1px solid rgba(50, 55, 65, 0.1)",
-                maxHeight: "90vh",
-                overflowY: "auto",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <h3 style={{ fontSize: "1.25rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <Edit3 size={20} color="var(--teal)" />
-                  แก้ไขข้อมูลเมนู
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setEditingItem(null)}
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", color: "#dc2626", marginBottom: "1rem" }}>
+                <div
                   style={{
-                    border: "none",
-                    background: "transparent",
-                    cursor: "pointer",
-                    padding: "0.25rem",
-                    borderRadius: "0.5rem",
-                    color: "var(--ink-soft)",
+                    width: "2.5rem",
+                    height: "2.5rem",
+                    borderRadius: "0.75rem",
+                    backgroundColor: "rgba(220, 38, 38, 0.12)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
                   }}
                 >
-                  <X size={20} />
-                </button>
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--ink)" }}>
+                    ยืนยันการลบเมนู
+                  </h3>
+                  <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)", margin: 0 }}>
+                    การดำเนินการนี้ไม่สามารถย้อนกลับได้
+                  </p>
+                </div>
               </div>
 
-              <form onSubmit={handleSaveEdit} style={{ marginTop: "1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
-                {/* Product Name (TH) */}
-                <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-                    ชื่อเมนู (ภาษาไทย)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editForm.name}
-                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    style={{
-                      width: "100%",
-                      padding: "0.6rem 0.85rem",
-                      borderRadius: "0.6rem",
-                      border: "1px solid rgba(50, 55, 65, 0.15)",
-                      backgroundColor: "var(--cream)",
-                      fontFamily: "'Kanit', sans-serif",
-                      fontSize: "0.9rem",
-                      outline: "none",
-                    }}
-                  />
-                </div>
+              <p style={{ fontSize: "0.85rem", color: "var(--ink)", lineHeight: 1.5, marginBottom: "1rem" }}>
+                คุณแน่ใจหรือไม่ว่าต้องการลบเมนู <strong>"{deleteItem.name}"</strong> ออกจากระบบ?
+              </p>
 
-                {/* Product Name (EN) */}
-                <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-                    ชื่อเมนู (English)
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.nameEn}
-                    onChange={(e) => setEditForm({ ...editForm, nameEn: e.target.value })}
-                    style={{
-                      width: "100%",
-                      padding: "0.6rem 0.85rem",
-                      borderRadius: "0.6rem",
-                      border: "1px solid rgba(50, 55, 65, 0.15)",
-                      backgroundColor: "var(--cream)",
-                      fontFamily: "'Kanit', sans-serif",
-                      fontSize: "0.9rem",
-                      outline: "none",
-                    }}
-                  />
-                </div>
-
-                {/* Price & Category */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-                  <div>
-                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-                      ราคาเริ่มต้น (บาท)
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min={0}
-                      value={editForm.price}
-                      onChange={(e) => setEditForm({ ...editForm, price: Number(e.target.value) })}
-                      style={{
-                        width: "100%",
-                        padding: "0.6rem 0.85rem",
-                        borderRadius: "0.6rem",
-                        border: "1px solid rgba(50, 55, 65, 0.15)",
-                        backgroundColor: "var(--cream)",
-                        fontFamily: "'Kanit', sans-serif",
-                        fontSize: "0.9rem",
-                        outline: "none",
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-                      หมวดหมู่
-                    </label>
-                    <select
-                      value={editForm.category}
-                      onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                      style={{
-                        width: "100%",
-                        padding: "0.6rem 0.85rem",
-                        borderRadius: "0.6rem",
-                        border: "1px solid rgba(50, 55, 65, 0.15)",
-                        backgroundColor: "var(--cream)",
-                        fontFamily: "'Kanit', sans-serif",
-                        fontSize: "0.9rem",
-                        outline: "none",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <option value="flavours">น้ำเต้าหู้รสชาติต่างๆ</option>
-                      <option value="combos">เซ็ตคอมโบ</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Description */}
-                <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-                    คำอธิบายสินค้า
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={editForm.description}
-                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                    style={{
-                      width: "100%",
-                      padding: "0.6rem 0.85rem",
-                      borderRadius: "0.6rem",
-                      border: "1px solid rgba(50, 55, 65, 0.15)",
-                      backgroundColor: "var(--cream)",
-                      fontFamily: "'Kanit', sans-serif",
-                      fontSize: "0.85rem",
-                      outline: "none",
-                      resize: "vertical",
-                    }}
-                  />
-                </div>
-
-                {/* Recommended Checkbox */}
-                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.85rem", fontWeight: 500 }}>
-                  <input
-                    type="checkbox"
-                    checked={editForm.isRecommended}
-                    onChange={(e) => setEditForm({ ...editForm, isRecommended: e.target.checked })}
-                    style={{ width: "16px", height: "16px", accentColor: "var(--teal)" }}
-                  />
-                  <span>ตั้งเป็นสินค้าแนะนำ (Recommended)</span>
+              <div style={{ marginBottom: "1.25rem" }}>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.35rem" }}>
+                  พิมพ์คำว่า <code style={{ backgroundColor: "rgba(220, 38, 38, 0.1)", color: "#dc2626", padding: "0.1rem 0.35rem", borderRadius: "0.25rem" }}>delete this menu</code> เพื่อยืนยัน:
                 </label>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="delete this menu"
+                  style={{
+                    width: "100%",
+                    padding: "0.6rem 0.85rem",
+                    borderRadius: "0.6rem",
+                    border: "1px solid rgba(50, 55, 65, 0.15)",
+                    backgroundColor: "var(--cream)",
+                    fontFamily: "'Kanit', sans-serif",
+                    fontSize: "0.9rem",
+                    outline: "none",
+                  }}
+                />
+              </div>
 
-                {/* Action Buttons */}
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
-                  <button
-                    type="button"
-                    onClick={() => setEditingItem(null)}
-                    style={{
-                      padding: "0.6rem 1.25rem",
-                      borderRadius: "0.6rem",
-                      border: "1px solid rgba(50, 55, 65, 0.15)",
-                      backgroundColor: "transparent",
-                      color: "var(--ink)",
-                      cursor: "pointer",
-                      fontFamily: "'Kanit', sans-serif",
-                      fontWeight: 500,
-                    }}
-                  >
-                    ยกเลิก
-                  </button>
-                  <button
-                    type="submit"
-                    style={{
-                      padding: "0.6rem 1.5rem",
-                      borderRadius: "0.6rem",
-                      border: "none",
-                      backgroundColor: "var(--teal)",
-                      color: "#fff",
-                      cursor: "pointer",
-                      fontFamily: "'Kanit', sans-serif",
-                      fontWeight: 600,
-                      boxShadow: "0 2px 8px rgba(75, 155, 140, 0.25)",
-                    }}
-                  >
-                    บันทึกข้อมูล
-                  </button>
+              {deleteError && (
+                <div style={{ marginBottom: "1rem", padding: "0.6rem", backgroundColor: "rgba(220, 38, 38, 0.1)", borderRadius: "0.5rem", color: "#dc2626", fontSize: "0.8rem" }}>
+                  {deleteError}
                 </div>
-              </form>
+              )}
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  style={{
+                    padding: "0.6rem 1.25rem",
+                    borderRadius: "0.6rem",
+                    border: "1px solid rgba(50, 55, 65, 0.15)",
+                    backgroundColor: "transparent",
+                    color: "var(--ink)",
+                    cursor: "pointer",
+                    fontFamily: "'Kanit', sans-serif",
+                    fontWeight: 500,
+                  }}
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteSubmit}
+                  disabled={isSubmitting || deleteConfirmText.trim().toLowerCase() !== "delete this menu"}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    padding: "0.6rem 1.5rem",
+                    borderRadius: "0.6rem",
+                    border: "none",
+                    backgroundColor: "#dc2626",
+                    color: "#fff",
+                    cursor: (isSubmitting || deleteConfirmText.trim().toLowerCase() !== "delete this menu") ? "not-allowed" : "pointer",
+                    opacity: (deleteConfirmText.trim().toLowerCase() !== "delete this menu") ? 0.6 : 1,
+                    fontFamily: "'Kanit', sans-serif",
+                    fontWeight: 600,
+                  }}
+                >
+                  {isSubmitting && <Loader2 size={16} className="animate-spin" />}
+                  <span>ลบเมนูทันที</span>
+                </button>
+              </div>
             </div>
           </div>
         )}

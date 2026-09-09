@@ -171,11 +171,9 @@ export default function POSKitchenPage() {
         {/* Header Bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <h1 style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--ink)", lineHeight: 1.2 }}>
-                ระบบจอครัว & จัดการคิว (Kitchen Queue Display)
-              </h1>
-            </div>
+            <h1 style={{ fontSize: "1.75rem", fontWeight: 800, lineHeight: 1.2 }}>
+              ระบบจอครัว & จัดการคิว (Kitchen Queue Display)
+            </h1>
           </div>
 
           {/* Quick Stats Banner */}
@@ -195,7 +193,7 @@ export default function POSKitchenPage() {
         {/* Filter Navigation Bar */}
         <div
           style={{
-            marginTop: "1.25rem",
+            marginTop: "1.5rem",
             backgroundColor: "var(--card)",
             padding: "0.85rem 1.25rem",
             borderRadius: "1rem",

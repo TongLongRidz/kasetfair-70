@@ -6,8 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/layouts/Navbar";
 import Footer from "@/components/layouts/Footer";
-import CartDrawer from "@/components/layouts/CartDrawer";
-import { ShoppingCart } from "lucide-react";
+import { Search } from "lucide-react";
 
 // Types
 type Temperature = "iced" | "hot";
@@ -205,8 +204,8 @@ const BANNERS: BannerSlide[] = [
     title: "น้ำเต้าหู้",
     highlight: "5 รสชาติ",
     desc: "น้ำเต้าหู้สดใหม่ทุกวัน พร้อมท็อปปิ้งแน่นแก้ว ให้จิบระหว่างเดินงาน",
-    ctaText: "เลือกซื้อเลย!",
-    ctaLink: "#menu",
+    ctaText: "สั่งเลย!",
+    ctaLink: "/order",
     image: "/images/hero-soy.jpg",
     bgColor: "var(--teal)",
   },
@@ -235,7 +234,7 @@ const BANNERS: BannerSlide[] = [
 export default function Home() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"all" | "flavours" | "combos">("all");
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [currentSlide, setCurrentSlide] = useState(0);
 
   const handleBannerCtaClick = (e: React.MouseEvent<HTMLAnchorElement>, ctaLink: string) => {
@@ -248,119 +247,24 @@ export default function Home() {
       }
     }
   };
-  
-  // Customization modal states
-  const [temperature, setTemperature] = useState<Temperature>("iced");
-  const [sweetness, setSweetness] = useState<Sweetness>("50%");
-  const [selectedToppings, setSelectedToppings] = useState<string[]>([]);
-  
-  // Cart state
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-
-
-  // Open modal
-  const handleOpenCustomize = (product: Product) => {
-    setSelectedProduct(product);
-    setTemperature("iced");
-    setSweetness("50%");
-    setSelectedToppings(product.defaultToppings || []);
-  };
-
-  // Close modal
-  const handleCloseModal = () => {
-    setSelectedProduct(null);
-  };
-
-  // Toggle topping in modal
-  const toggleTopping = (toppingId: string) => {
-    setSelectedToppings((prev) =>
-      prev.includes(toppingId)
-        ? prev.filter((id) => id !== toppingId)
-        : [...prev, toppingId]
-    );
-  };
-
-  // Auto remove boba if temperature changed to hot
-  const handleTemperatureChange = (temp: Temperature) => {
-    setTemperature(temp);
-    if (temp === "hot") {
-      setSelectedToppings((prev) => prev.filter((id) => id !== "boba"));
-    }
-  };
-
-  // Calculate modal item price
-  const calculateModalPrice = () => {
-    if (!selectedProduct) return 0;
-    const toppingsCost = selectedToppings.reduce((acc, topId) => {
-      const topping = TOPPINGS.find((t) => t.id === topId);
-      return acc + (topping?.price || 0);
-    }, 0);
-    return selectedProduct.price + toppingsCost;
-  };
-
-  // Add customized item to cart
-  const handleAddToCart = () => {
-    if (!selectedProduct) return;
-
-    const toppingsList = selectedToppings
-      .map((id) => TOPPINGS.find((t) => t.id === id))
-      .filter((t): t is Topping => !!t);
-
-    const unitPrice = calculateModalPrice();
-    const cartId = `${selectedProduct.id}-${temperature}-${sweetness}-${selectedToppings.sort().join(",")}`;
-
-    setCart((prev) => {
-      const existing = prev.find((item) => item.cartId === cartId);
-      if (existing) {
-        return prev.map((item) =>
-          item.cartId === cartId ? { ...item, quantity: item.quantity + 1 } : item
-        );
-      }
-      return [
-        ...prev,
-        {
-          cartId,
-          productId: selectedProduct.id,
-          productName: selectedProduct.name,
-          temperature,
-          sweetness,
-          toppings: toppingsList,
-          unitPrice,
-          quantity: 1,
-        },
-      ];
-    });
-
-    handleCloseModal();
-    setIsCartOpen(true);
-  };
-
-  // Update cart item quantity
-  const updateCartQty = (cartId: string, delta: number) => {
-    setCart((prev) =>
-      prev
-        .map((item) => {
-          if (item.cartId === cartId) {
-            const newQty = item.quantity + delta;
-            return newQty > 0 ? { ...item, quantity: newQty } : null;
-          }
-          return item;
-        })
-        .filter((item): item is CartItem => item !== null)
-    );
-  };
-
-  const totalCartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
-  const totalCartPrice = cart.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
 
   // Filter display products
-  const displayProducts =
+  const baseProducts =
     activeTab === "all"
       ? [...FLAVOURS, ...COMBOS]
       : activeTab === "flavours"
       ? FLAVOURS
       : COMBOS;
+
+  const displayProducts = baseProducts.filter((p) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.trim().toLowerCase();
+    return (
+      p.name.toLowerCase().includes(q) ||
+      p.nameEn.toLowerCase().includes(q) ||
+      p.desc.toLowerCase().includes(q)
+    );
+  });
 
 
   return (
@@ -487,10 +391,22 @@ export default function Home() {
 
         {/* Menu Section */}
         <section id="menu" style={{ marginTop: "1.75rem", scrollMarginTop: "4.5rem" }}>
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "0.75rem" }}>
             <div>
-              <h2 style={{ fontSize: "1.35rem", fontWeight: 800 }}>รายการเมนูเครื่องดื่ม</h2>
+              <h2 style={{ fontSize: "1.35rem", fontWeight: 600 }}>รายการเมนูเครื่องดื่ม</h2>
               <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>กดเลือกเมนูเพื่อปรับความหวาน, อุณหภูมิ และท็อปปิ้ง</p>
+            </div>
+
+            {/* Search Input (Matched with POS walk-in) */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", backgroundColor: "var(--card)", padding: "0.45rem 0.85rem", borderRadius: "9999px", border: "1px solid rgba(50,55,65,0.1)", width: "100%", maxWidth: "240px" }}>
+              <Search size={16} color="var(--ink-soft)" />
+              <input
+                type="text"
+                placeholder="ค้นหาเมนู..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ border: "none", background: "transparent", outline: "none", fontSize: "0.825rem", width: "100%", fontFamily: "'Kanit', sans-serif" }}
+              />
             </div>
           </div>
 
@@ -545,7 +461,6 @@ export default function Home() {
               <article
                 key={p.id}
                 className="animate-rise"
-                onClick={() => handleOpenCustomize(p)}
                 style={{
                   animationDelay: `${50 + i * 40}ms`,
                   overflow: "hidden",
@@ -554,7 +469,6 @@ export default function Home() {
                   border: "1px solid rgba(50, 55, 65, 0.1)",
                   display: "flex",
                   flexDirection: "column",
-                  cursor: "pointer",
                   transition: "transform 0.15s ease, box-shadow 0.15s ease",
                 }}
               >
@@ -622,24 +536,6 @@ export default function Home() {
                         {p.price}฿
                       </span>
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenCustomize(p);
-                      }}
-                      style={{
-                        borderRadius: "9999px",
-                        backgroundColor: "var(--ink)",
-                        padding: "0.4rem 0.85rem",
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                        color: "var(--cream)",
-                        border: "none",
-                        cursor: "pointer",
-                      }}
-                    >
-                      เลือก +
-                    </button>
                   </div>
                 </div>
               </article>
@@ -651,7 +547,7 @@ export default function Home() {
         <section id="toppings" style={{ marginTop: "2.25rem", scrollMarginTop: "4.5rem" }}>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
             <div>
-              <h2 style={{ fontSize: "1.35rem", fontWeight: 800 }}>ท็อปปิ้ง (Toppings)</h2>
+              <h2 style={{ fontSize: "1.35rem", fontWeight: 600 }}>ท็อปปิ้ง (Toppings)</h2>
               <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>เพิ่มความอร่อยให้เครื่องดื่มแก้วโปรด</p>
             </div>
           </div>
@@ -708,291 +604,8 @@ export default function Home() {
         </section>
       </main>
 
-
-      {/* Customization Modal (Centered) */}
-      {selectedProduct && (
-        <div
-          className="animate-fade-in"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 50,
-            backgroundColor: "rgba(0, 0, 0, 0.6)",
-            backdropFilter: "blur(4px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1rem",
-          }}
-          onClick={handleCloseModal}
-        >
-          <div
-            className="animate-modal-pop"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "100%",
-              maxWidth: "540px",
-              maxHeight: "90vh",
-              overflowY: "auto",
-              backgroundColor: "var(--cream)",
-              borderRadius: "1.5rem",
-              padding: "1.5rem",
-              boxShadow: "0 20px 40px rgba(0, 0, 0, 0.25)",
-            }}
-          >
-            {/* Modal Header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div>
-                <h3 style={{ fontSize: "1.25rem", fontWeight: 800 }}>{selectedProduct.name}</h3>
-                <p className="font-mono" style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-                  {selectedProduct.nameEn}
-                </p>
-                <p style={{ marginTop: "0.25rem", fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-                  {selectedProduct.desc}
-                </p>
-              </div>
-              <button
-                onClick={handleCloseModal}
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: "1.5rem",
-                  cursor: "pointer",
-                  color: "var(--ink-soft)",
-                  padding: "0 0.5rem",
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <hr style={{ margin: "1rem 0", borderColor: "rgba(50, 55, 65, 0.1)" }} />
-
-            {/* 1. Temperature Selection */}
-            <div>
-              <label style={{ display: "block", fontSize: "0.9rem", fontWeight: 700, marginBottom: "0.5rem" }}>
-                1. เลือกอุณหภูมิ (Temperature)
-              </label>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
-                <button
-                  type="button"
-                  onClick={() => handleTemperatureChange("iced")}
-                  style={{
-                    padding: "0.75rem",
-                    borderRadius: "0.85rem",
-                    border: temperature === "iced" ? "2px solid var(--teal)" : "1px solid rgba(50, 55, 65, 0.15)",
-                    backgroundColor: temperature === "iced" ? "rgba(75, 155, 140, 0.12)" : "var(--card)",
-                    color: temperature === "iced" ? "var(--teal)" : "var(--ink)",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    fontSize: "0.875rem",
-                  }}
-                >
-                  เย็น (Iced)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleTemperatureChange("hot")}
-                  style={{
-                    padding: "0.75rem",
-                    borderRadius: "0.85rem",
-                    border: temperature === "hot" ? "2px solid var(--warm)" : "1px solid rgba(50, 55, 65, 0.15)",
-                    backgroundColor: temperature === "hot" ? "rgba(220, 160, 50, 0.12)" : "var(--card)",
-                    color: temperature === "hot" ? "var(--warm)" : "var(--ink)",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    fontSize: "0.875rem",
-                  }}
-                >
-                  ร้อน (Hot)
-                </button>
-              </div>
-            </div>
-
-            {/* 2. Sweetness Selection */}
-            <div style={{ marginTop: "1.25rem" }}>
-              <label style={{ display: "block", fontSize: "0.9rem", fontWeight: 700, marginBottom: "0.5rem" }}>
-                2. ระดับความหวาน (Sweetness)
-              </label>
-              <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
-                {SWEETNESS_OPTIONS.map((level) => {
-                  const isSelected = sweetness === level;
-                  return (
-                    <button
-                      key={level}
-                      type="button"
-                      onClick={() => setSweetness(level)}
-                      style={{
-                        flex: 1,
-                        minWidth: "60px",
-                        padding: "0.6rem 0.2rem",
-                        borderRadius: "0.75rem",
-                        border: isSelected ? "2px solid var(--ink)" : "1px solid rgba(50, 55, 65, 0.15)",
-                        backgroundColor: isSelected ? "var(--ink)" : "var(--card)",
-                        color: isSelected ? "var(--cream)" : "var(--ink)",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        fontSize: "0.8rem",
-                      }}
-                    >
-                      {level}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 3. Toppings Selection */}
-            <div style={{ marginTop: "1.25rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-                <label style={{ fontSize: "0.9rem", fontWeight: 700 }}>3. เลือกท็อปปิ้ง (Toppings)</label>
-                <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>เลือกได้หลายอย่าง</span>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.45rem" }}>
-                {TOPPINGS.map((topping) => {
-                  const isBobaDisabled = temperature === "hot" && topping.icedOnly;
-                  const isSelected = selectedToppings.includes(topping.id);
-
-                  return (
-                    <button
-                      key={topping.id}
-                      type="button"
-                      disabled={isBobaDisabled}
-                      onClick={() => toggleTopping(topping.id)}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        padding: "0.65rem 0.9rem",
-                        borderRadius: "0.85rem",
-                        border: isSelected ? "2px solid var(--teal)" : "1px solid rgba(50, 55, 65, 0.12)",
-                        backgroundColor: isSelected
-                          ? "rgba(75, 155, 140, 0.12)"
-                          : isBobaDisabled
-                          ? "rgba(50, 55, 65, 0.05)"
-                          : "var(--card)",
-                        color: isBobaDisabled ? "var(--ink-soft)" : "var(--ink)",
-                        cursor: isBobaDisabled ? "not-allowed" : "pointer",
-                        opacity: isBobaDisabled ? 0.6 : 1,
-                      }}
-                    >
-                      <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>
-                        {isSelected ? "✓ " : "+ "} {topping.name}
-                        {topping.icedOnly && (
-                          <span style={{ fontSize: "0.7rem", color: "var(--teal)", marginLeft: "0.4rem" }}>
-                            (เฉพาะเย็น)
-                          </span>
-                        )}
-                      </span>
-                      <span className="font-display" style={{ fontSize: "0.95rem", color: "var(--teal)" }}>
-                        +{topping.price}฿
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Modal Bottom CTA */}
-            <div style={{ marginTop: "1.5rem", display: "flex", alignItems: "center", gap: "1rem" }}>
-              <div>
-                <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>ราคารวมแก้วนี้</span>
-                <p className="font-display" style={{ fontSize: "1.6rem", color: "var(--ink)", lineHeight: 1 }}>
-                  {calculateModalPrice()}฿
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleAddToCart}
-                style={{
-                  flex: 1,
-                  borderRadius: "9999px",
-                  backgroundColor: "var(--teal)",
-                  padding: "0.85rem 1rem",
-                  fontSize: "0.95rem",
-                  fontWeight: 700,
-                  color: "var(--cream)",
-                  border: "none",
-                  cursor: "pointer",
-                  boxShadow: "0 4px 15px rgba(75, 155, 140, 0.3)",
-                }}
-              >
-                เพิ่มลงตะกร้า +
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Cart Drawer (Slide In From Right) */}
-      <CartDrawer
-        isOpen={isCartOpen}
-        onClose={() => setIsCartOpen(false)}
-        cart={cart.map((c) => ({
-          cartId: c.cartId,
-          productId: c.productId,
-          productName: c.productName,
-          temperature: c.temperature,
-          sweetness: c.sweetness,
-          toppings: c.toppings,
-          unitPrice: c.unitPrice,
-          quantity: c.quantity,
-        }))}
-        onUpdateQty={updateCartQty}
-        onCheckout={() => alert(`สั่งซื้อสำเร็จ! ยอดรวม ${totalCartPrice} บาท`)}
-        title="ตะกร้าเครื่องดื่มของคุณ"
-        checkoutButtonText="ดำเนินการสั่งซื้อ & ชำระเงิน (PromptPay)"
-      />
-
       {/* Footer */}
       <Footer />
-
-      {/* Floating Cart Button */}
-      <button
-        onClick={() => setIsCartOpen(true)}
-        className="animate-badge"
-        aria-label="ตะกร้าสินค้า"
-        style={{
-          position: "fixed",
-          bottom: "1.25rem",
-          right: "1.25rem",
-          zIndex: 40,
-          width: "3.75rem",
-          height: "3.75rem",
-          display: "grid",
-          placeItems: "center",
-          borderRadius: "9999px",
-          backgroundColor: "var(--ink)",
-          color: "var(--cream)",
-          boxShadow: "0 10px 30px -5px rgba(0, 0, 0, 0.4)",
-          border: "none",
-          cursor: "pointer",
-        }}
-      >
-        <ShoppingCart size={22} />
-        {totalCartCount > 0 && (
-          <span
-            style={{
-              position: "absolute",
-              right: "-0.25rem",
-              top: "-0.25rem",
-              minWidth: "1.5rem",
-              height: "1.5rem",
-              padding: "0 0.25rem",
-              display: "grid",
-              placeItems: "center",
-              borderRadius: "9999px",
-              backgroundColor: "var(--warm)",
-              fontSize: "0.75rem",
-              fontWeight: 800,
-              color: "var(--ink)",
-              border: "2px solid var(--cream)",
-            }}
-          >
-            {totalCartCount}
-          </span>
-        )}
-      </button>
     </div>
   );
 }

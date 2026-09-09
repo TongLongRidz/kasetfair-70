@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500;600&family=Kanit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500;600&family=Kanit:wght@300;400;500;600;700&family=Mitr:wght@300;400;500;600;700&display=swap');
 
 :root {
   --radius: 0.625rem;
@@ -23,8 +23,8 @@ button, input, select, textarea {
 
 html {
   scroll-behavior: smooth;
+  scrollbar-gutter: stable;
 }
-
 
 body {
   background-color: var(--cream);
@@ -32,10 +32,114 @@ body {
   font-family: 'Kanit', sans-serif;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  overflow-y: scroll;
+}
+
+/* Custom Sleek Scrollbar for all scrollable containers and viewport */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(50, 55, 65, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(50, 55, 65, 0.2);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(50, 55, 65, 0.35);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(50, 55, 65, 0.2) rgba(50, 55, 65, 0.05);
 }
 
 .font-thai {
   font-family: 'Kanit', sans-serif;
+}
+
+.font-mitr {
+  font-family: 'Mitr', sans-serif;
+}
+
+/* Admin area font class */
+.admin-theme,
+.admin-theme *,
+.admin-theme button,
+.admin-theme input,
+.admin-theme select,
+.admin-theme textarea {
+  font-family: 'Mitr', sans-serif;
+}
+
+/* Specific Kanit theme for POS front desk */
+.kanit-theme,
+.kanit-theme *,
+.kanit-theme button,
+.kanit-theme input,
+.kanit-theme select,
+.kanit-theme textarea {
+  font-family: 'Kanit', sans-serif !important;
+}
+
+.kanit-theme .font-mono,
+.kanit-theme .font-mono * {
+  font-family: 'IBM Plex Mono', monospace !important;
+}
+
+.kanit-theme .font-display,
+.kanit-theme .font-display * {
+  font-family: 'Anton', sans-serif !important;
+}
+
+/* Mitr font weight normalization for crisp readability */
+.admin-theme [style*="font-weight: 800"],
+.admin-theme [style*="font-weight:800"],
+.admin-theme [style*="fontWeight: 800"],
+.admin-theme [style*="fontWeight:800"],
+.admin-theme [style*="font-weight: 700"],
+.admin-theme [style*="font-weight:700"],
+.admin-theme [style*="fontWeight: 700"],
+.admin-theme [style*="fontWeight:700"],
+.admin-theme h1,
+.admin-theme h2,
+.admin-theme h3,
+.admin-theme th,
+.admin-theme b,
+.admin-theme strong {
+  font-weight: 600 !important;
+}
+
+.admin-theme [style*="font-weight: 600"],
+.admin-theme [style*="font-weight:600"],
+.admin-theme [style*="fontWeight: 600"],
+.admin-theme [style*="fontWeight:600"],
+.admin-theme label {
+  font-weight: 500 !important;
+}
+
+.admin-theme p,
+.admin-theme span,
+.admin-theme td,
+.admin-theme input,
+.admin-theme select,
+.admin-theme button {
+  font-weight: 400;
+}
+
+.admin-theme .font-mono,
+.admin-theme .font-mono * {
+  font-family: 'IBM Plex Mono', monospace !important;
+}
+
+.admin-theme .font-display,
+.admin-theme .font-display * {
+  font-family: 'Anton', sans-serif !important;
 }
 
 .font-display {
@@ -157,6 +261,40 @@ body {
   animation: fade-out 0.28s ease forwards;
 }
 
+@keyframes accordion-down {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+    max-height: 0;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 80vh;
+  }
+}
+
+.animate-accordion-down {
+  animation: accordion-down 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes accordion-up {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 80vh;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+    max-height: 0;
+  }
+}
+
+.animate-accordion-up {
+  animation: accordion-up 0.24s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+}
+
 /* Responsive Navbar & Hero Banner utilities */
 @media (max-width: 480px) {
   .nav-menu-link {
@@ -187,18 +325,221 @@ body {
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-  .hero-banner-cta {
-    padding: 0.35rem 0.85rem !important;
-    font-size: 0.75rem !important;
-    margin-top: 0.65rem !important;
+}
+
+/* Admin Responsive Table / Card View */
+.admin-table-view {
+  display: block;
+}
+
+.admin-cards-view {
+  display: none;
+}
+
+.admin-controls-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.admin-filter-tabs {
+  display: flex;
+  gap: 0.35rem;
+  background-color: var(--cream);
+  padding: 3px;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(50, 55, 65, 0.1);
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: none;
+}
+
+.admin-filter-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.admin-search-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.admin-search-box {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background-color: var(--cream);
+  padding: 0.45rem 0.75rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(50, 55, 65, 0.12);
+  flex: 1;
+  min-width: 160px;
+}
+
+.admin-search-box input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.825rem;
+  width: 100%;
+  color: var(--ink);
+}
+
+@media (max-width: 768px) {
+  .admin-table-view {
+    display: none !important;
   }
-  .hero-banner-image-wrapper {
-    width: 8.5rem !important;
-    height: 8.5rem !important;
-    right: -1rem !important;
-    bottom: -1rem !important;
+  .admin-cards-view {
+    display: flex !important;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .admin-controls-bar {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 0.75rem;
+  }
+  .admin-filter-tabs {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .admin-search-wrapper {
+    width: 100%;
+  }
+  .admin-search-box {
+    width: 100%;
   }
 }
+
+/* Admin Responsive Layout (Desktop Sidebar vs Mobile Top Navbar) */
+.admin-sidebar-desktop {
+  display: flex !important;
+}
+
+.admin-topbar-mobile {
+  display: none !important;
+}
+
+/* Butter-smooth accordion overlay transition using pure CSS Grid height (No opacity) */
+.admin-mobile-drawer-wrapper {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.26s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.26s ease;
+  visibility: hidden;
+  pointer-events: none;
+  overflow: hidden;
+  background-color: var(--card);
+  border-bottom: 0px solid transparent;
+  box-shadow: none;
+  z-index: 100;
+}
+
+.admin-mobile-drawer-wrapper.is-open {
+  grid-template-rows: 1fr;
+  visibility: visible;
+  border-bottom: 1px solid rgba(50, 55, 65, 0.12);
+  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.12);
+  pointer-events: auto;
+}
+
+.admin-mobile-drawer-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.admin-mobile-drawer-content {
+  padding: 0.85rem 1rem 1rem 1rem;
+}
+
+@media (max-width: 768px) {
+  .admin-sidebar-desktop {
+    display: none !important;
+  }
+  .admin-topbar-mobile {
+    display: flex !important;
+  }
+  
+  /* Make main admin wrappers adapt to topbar */
+  div:has(> aside.admin-sidebar-desktop),
+  div:has(> header.admin-topbar-mobile) {
+    flex-direction: column !important;
+  }
+
+  main:has(~ aside.admin-sidebar-desktop),
+  aside.admin-sidebar-desktop + main,
+  header.admin-topbar-mobile + main {
+    padding: 1rem 1rem 4rem 1rem !important;
+    width: 100% !important;
+  }
+
+  main:has(~ aside.admin-sidebar-desktop) h1,
+  aside.admin-sidebar-desktop + main h1,
+  header.admin-topbar-mobile + main h1 {
+    font-size: 1.35rem !important;
+    line-height: 1.25 !important;
+  }
+
+  /* Responsive KPI Cards on Mobile */
+  .admin-kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+    gap: 0.75rem !important;
+  }
+
+  .admin-kpi-card {
+    padding: 1rem 1.15rem !important;
+  }
+}
+
+/* Dashboard Charts Grid Responsive Layout */
+.admin-dashboard-middle-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+}
+
+.admin-dashboard-trend-col {
+  order: 1;
+}
+
+.admin-dashboard-channel-col {
+  order: 2;
+}
+
+.admin-dashboard-bottom-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 1100px) {
+  .admin-dashboard-middle-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* When stacked / not enough width, place Channels on top */
+  .admin-dashboard-channel-col {
+    order: 1 !important;
+  }
+  
+  .admin-dashboard-trend-col {
+    order: 2 !important;
+  }
+
+  .admin-dashboard-bottom-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+
 
 
 

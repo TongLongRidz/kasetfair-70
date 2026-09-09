@@ -68,11 +68,11 @@ export default function AdminLoginPage() {
 
   return (
     <div
+      className="admin-theme"
       style={{
         minHeight: "100vh",
         backgroundColor: "var(--cream)",
         color: "var(--ink)",
-        fontFamily: "'Kanit', sans-serif",
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",

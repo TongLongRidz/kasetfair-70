@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import AdminSidebar from "@/components/layouts/AdminSidebar";
 import {
@@ -17,8 +17,16 @@ import {
   Filter,
   X,
   Candy,
-  Sparkles,
+  Flame,
+  Trash2,
+  Loader2,
+  AlertTriangle,
+  Upload,
+  ImageIcon,
 } from "lucide-react";
+import { getStoredToken } from "@/lib/auth";
+import { useToast } from "@/components/ui/toast";
+import AddEditToppingModal from "./components/AddEditToppingModal";
 
 interface ToppingItem {
   id: number;
@@ -33,239 +41,385 @@ interface ToppingItem {
   orderCount?: number;
 }
 
-const INITIAL_TOPPINGS: ToppingItem[] = [
-  {
-    id: 1,
-    nameTh: "ไข่มุกบราวน์ชูการ์",
-    nameEn: "Brown Sugar Boba",
-    price: 10,
-    image: "/images/drink-pearl.jpg",
-    isAvailable: true,
-    isSoldOut: false,
-    sortOrder: 1,
-    icedOnly: true,
-    orderCount: 342,
-  },
-  {
-    id: 2,
-    nameTh: "เฉาก๊วยหนึบ",
-    nameEn: "Grass Jelly",
-    price: 10,
-    image: "/images/drink-mango.jpg",
-    isAvailable: true,
-    isSoldOut: false,
-    sortOrder: 2,
-    orderCount: 285,
-  },
-  {
-    id: 3,
-    nameTh: "เม็ดแมงลัก",
-    nameEn: "Basil Seeds",
-    price: 5,
-    image: "/images/hero-soy.jpg",
-    isAvailable: true,
-    isSoldOut: false,
-    sortOrder: 3,
-    orderCount: 198,
-  },
-  {
-    id: 4,
-    nameTh: "เมล็ดเจีย",
-    nameEn: "Chia Seeds",
-    price: 10,
-    image: "/images/drink-matcha.jpg",
-    isAvailable: true,
-    isSoldOut: false,
-    sortOrder: 4,
-    orderCount: 145,
-  },
-  {
-    id: 5,
-    nameTh: "สาคูใบเตย",
-    nameEn: "Pandan Sago",
-    price: 5,
-    image: "/images/drink-lychee.jpg",
-    isAvailable: true,
-    isSoldOut: true,
-    sortOrder: 5,
-    orderCount: 160,
-  },
-  {
-    id: 6,
-    nameTh: "ถั่วแดงกวนหวานมัน",
-    nameEn: "Sweet Red Bean",
-    price: 10,
-    image: "/images/drink-matcha.jpg",
-    isAvailable: true,
-    isSoldOut: false,
-    sortOrder: 6,
-    orderCount: 210,
-  },
-  {
-    id: 7,
-    nameTh: "แปะก๊วยเชื่อม",
-    nameEn: "Sweet Ginkgo",
-    price: 15,
-    image: "/images/hero-soy.jpg",
-    isAvailable: false,
-    isSoldOut: false,
-    sortOrder: 7,
-    orderCount: 88,
-  },
-  {
-    id: 8,
-    nameTh: "ลูกชิดนุ่ม",
-    nameEn: "Palm Seeds",
-    price: 10,
-    image: "/images/drink-lychee.jpg",
-    isAvailable: true,
-    isSoldOut: false,
-    sortOrder: 8,
-    orderCount: 95,
-  },
-];
-
 const ITEMS_PER_PAGE = 6;
 
 export default function ToppingsManagementPage() {
-  const [toppings, setToppings] = useState<ToppingItem[]>(INITIAL_TOPPINGS);
+  const { success, error: toastError, info } = useToast();
+
+  const [toppings, setToppings] = useState<ToppingItem[]>([]);
+  const [total, setTotal] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "available" | "hidden" | "soldout">("all");
   const [activeKebabId, setActiveKebabId] = useState<number | null>(null);
-  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  // Upload image state
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Edit/Add Modal State
-  const [editingItem, setEditingItem] = useState<ToppingItem | null>(null);
-  const [isAddingNew, setIsAddingNew] = useState<boolean>(false);
-  const [editForm, setEditForm] = useState<{
-    nameTh: string;
-    nameEn: string;
-    price: number;
-    icedOnly: boolean;
-    sortOrder: number;
-  }>({
-    nameTh: "",
-    nameEn: "",
-    price: 10,
-    icedOnly: false,
-    sortOrder: 1,
-  });
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [modalMode, setModalMode] = useState<"create" | "edit">("create");
+  const [selectedItem, setSelectedItem] = useState<ToppingItem | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const [formNameTh, setFormNameTh] = useState("");
+  const [formNameEn, setFormNameEn] = useState("");
+  const [formPrice, setFormPrice] = useState<number>(10);
+  const [formImageUrl, setFormImageUrl] = useState("/images/drink-pearl.jpg");
+  const [formSortOrder, setFormSortOrder] = useState<number>(1);
+
+  // Delete Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
+  const [deleteItem, setDeleteItem] = useState<ToppingItem | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Helper to format image URL (handle relative /uploads from backend)
+  const getFullImageUrl = (url: string) => {
+    if (!url) return "/images/drink-pearl.jpg";
+    if (url.startsWith("/uploads/")) {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      return `${apiUrl}${url}`;
+    }
+    return url;
+  };
+
+  // Fetch Toppings from API
+  const fetchToppings = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        page_size: ITEMS_PER_PAGE.toString(),
+      });
+      if (searchQuery.trim()) params.append("q", searchQuery.trim());
+      if (statusFilter !== "all") params.append("status", statusFilter);
+
+      const res = await fetch(`${apiUrl}/api/v1/toppings?${params.toString()}`);
+      if (res.ok) {
+        const result = await res.json();
+        const mapped: ToppingItem[] = (result.data || []).map((t: any) => ({
+          id: t.id,
+          nameTh: t.name_th,
+          nameEn: t.name_en || "",
+          price: t.price,
+          image: t.image_url || "/images/drink-pearl.jpg",
+          isAvailable: t.is_available,
+          isSoldOut: t.is_sold_out,
+          sortOrder: t.sort_order || 0,
+          orderCount: t.order_count || 0,
+        }));
+        setToppings(mapped);
+        setTotal(result.total || 0);
+        setTotalPages(result.total_pages || 1);
+      } else {
+        setToppings([]);
+        setTotal(0);
+        setTotalPages(1);
+      }
+    } catch {
+      setToppings([]);
+      setTotal(0);
+      setTotalPages(1);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentPage, searchQuery, statusFilter]);
+
+  useEffect(() => {
+    fetchToppings();
+  }, [fetchToppings]);
+
+  // Close kebab when clicked outside
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".topping-kebab-container")) {
+        setActiveKebabId(null);
+      }
+    };
+    document.addEventListener("click", handleDocumentClick);
+    return () => document.removeEventListener("click", handleDocumentClick);
+  }, []);
+
+  // Handle File Upload
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toastError("ขนาดไฟล์เกิน 5MB กรุณาเลือกไฟล์ที่เล็กลง", "อัปโหลดล้มเหลว");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const token = getStoredToken();
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`${apiUrl}/api/v1/upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setFormImageUrl(data.url);
+        success("อัปโหลดรูปภาพสำเร็จเรียบร้อย", "สำเร็จ");
+      } else {
+        toastError(data.error || "อัปโหลดรูปภาพไม่สำเร็จ", "เกิดข้อผิดพลาด");
+      }
+    } catch {
+      toastError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่ออัปโหลดได้", "เกิดข้อผิดพลาด");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
 
   // Toggle Visibility (Icon ตา: ซ่อน / แสดง)
-  const toggleVisibility = (id: number) => {
-    setToppings((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, isAvailable: !item.isAvailable } : item
-      )
-    );
+  const toggleVisibility = async (item: ToppingItem) => {
     setActiveKebabId(null);
+    const newStatus = !item.isAvailable;
+    // Optimistic update
+    setToppings((prev) =>
+      prev.map((t) => (t.id === item.id ? { ...t, isAvailable: newStatus } : t))
+    );
+
+    try {
+      const token = getStoredToken();
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const res = await fetch(`${apiUrl}/api/v1/toppings/${item.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ is_available: newStatus }),
+      });
+
+      if (res.ok) {
+        if (newStatus) {
+          success(`เปิดแสดงท็อปปิ้ง "${item.nameTh}" บนหน้าร้านแล้ว`, "เปิดแสดงท็อปปิ้ง");
+        } else {
+          info(`ซ่อนท็อปปิ้ง "${item.nameTh}" จากหน้าร้านแล้ว`, "ซ่อนท็อปปิ้ง");
+        }
+      } else {
+        toastError("ไม่สามารถเปลี่ยนสถานะท็อปปิ้งได้", "เกิดข้อผิดพลาด");
+        fetchToppings();
+      }
+    } catch {
+      toastError("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์", "เกิดข้อผิดพลาด");
+      fetchToppings();
+    }
   };
 
   // Toggle Sold Out (เปิด / ปิด ขายหมด)
-  const toggleSoldOut = (id: number) => {
-    setToppings((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, isSoldOut: !item.isSoldOut } : item
-      )
-    );
+  const toggleSoldOut = async (item: ToppingItem) => {
     setActiveKebabId(null);
+    const newStatus = !item.isSoldOut;
+    // Optimistic update
+    setToppings((prev) =>
+      prev.map((t) => (t.id === item.id ? { ...t, isSoldOut: newStatus } : t))
+    );
+
+    try {
+      const token = getStoredToken();
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const res = await fetch(`${apiUrl}/api/v1/toppings/${item.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ is_sold_out: newStatus }),
+      });
+
+      if (res.ok) {
+        if (newStatus) {
+          info(`ตั้งค่าท็อปปิ้ง "${item.nameTh}" เป็นสินค้าหมด (Sold Out)`, "ท็อปปิ้งหมด");
+        } else {
+          success(`ตั้งค่าท็อปปิ้ง "${item.nameTh}" เป็นพร้อมขาย (In Stock)`, "พร้อมขาย");
+        }
+      } else {
+        toastError("ไม่สามารถเปลี่ยนสถานะท็อปปิ้งได้", "เกิดข้อผิดพลาด");
+        fetchToppings();
+      }
+    } catch {
+      toastError("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์", "เกิดข้อผิดพลาด");
+      fetchToppings();
+    }
+  };
+
+  // Open Add Modal
+  const openAddModal = () => {
+    setSelectedItem(null);
+    setModalMode("create");
+    setFormNameTh("");
+    setFormNameEn("");
+    setFormPrice(10);
+    setFormImageUrl("/images/drink-pearl.jpg");
+    setFormSortOrder(total + 1);
+    setFormError(null);
+    setIsModalOpen(true);
   };
 
   // Open Edit Modal
   const openEditModal = (item: ToppingItem) => {
-    setEditingItem(item);
-    setIsAddingNew(false);
-    setEditForm({
-      nameTh: item.nameTh,
-      nameEn: item.nameEn,
-      price: item.price,
-      icedOnly: item.icedOnly ?? false,
-      sortOrder: item.sortOrder,
-    });
+    setSelectedItem(item);
+    setModalMode("edit");
+    setFormNameTh(item.nameTh);
+    setFormNameEn(item.nameEn);
+    setFormPrice(item.price);
+    setFormImageUrl(item.image);
+    setFormSortOrder(item.sortOrder);
+    setFormError(null);
+    setIsModalOpen(true);
     setActiveKebabId(null);
   };
 
-  // Open Add New Modal
-  const openAddModal = () => {
-    setEditingItem(null);
-    setIsAddingNew(true);
-    setEditForm({
-      nameTh: "",
-      nameEn: "",
-      price: 10,
-      icedOnly: false,
-      sortOrder: toppings.length + 1,
-    });
+  // Open Delete Modal
+  const openDeleteModal = (item: ToppingItem) => {
+    setDeleteItem(item);
+    setDeleteConfirmText("");
+    setDeleteError(null);
+    setIsDeleteModalOpen(true);
+    setActiveKebabId(null);
   };
 
-  // Save Modal Form
-  const handleSaveForm = (e: React.FormEvent) => {
+  // Save Modal Form (Create / Edit)
+  const handleSaveModal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isAddingNew) {
-      const newItem: ToppingItem = {
-        id: Date.now(),
-        nameTh: editForm.nameTh,
-        nameEn: editForm.nameEn,
-        price: Number(editForm.price),
-        image: "/images/drink-pearl.jpg",
-        isAvailable: true,
-        isSoldOut: false,
-        sortOrder: Number(editForm.sortOrder),
-        icedOnly: editForm.icedOnly,
-        orderCount: 0,
-      };
-      setToppings((prev) => [...prev, newItem]);
-      setIsAddingNew(false);
-    } else if (editingItem) {
-      setToppings((prev) =>
-        prev.map((item) =>
-          item.id === editingItem.id
-            ? {
-                ...item,
-                nameTh: editForm.nameTh,
-                nameEn: editForm.nameEn,
-                price: Number(editForm.price),
-                icedOnly: editForm.icedOnly,
-                sortOrder: Number(editForm.sortOrder),
-              }
-            : item
-        )
-      );
-      setEditingItem(null);
+    setFormError(null);
+
+    if (!formNameTh.trim()) {
+      setFormError("กรุณากรอกชื่อท็อปปิ้งภาษาไทย");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const token = getStoredToken();
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+
+      if (modalMode === "create") {
+        const res = await fetch(`${apiUrl}/api/v1/toppings`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            name_th: formNameTh.trim(),
+            name_en: formNameEn.trim(),
+            price: Number(formPrice),
+            image_url: formImageUrl.trim() || "/images/drink-pearl.jpg",
+            is_available: true,
+            is_sold_out: false,
+            sort_order: Number(formSortOrder),
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          setFormError(data.error || "เกิดข้อผิดพลาดในการสร้างท็อปปิ้ง");
+          toastError(data.error || "เกิดข้อผิดพลาดในการสร้างท็อปปิ้ง", "สร้างไม่สำเร็จ");
+          return;
+        }
+
+        success(`เพิ่มท็อปปิ้ง "${formNameTh.trim()}" สำเร็จเรียบร้อย`, "สร้างท็อปปิ้งสำเร็จ");
+      } else if (selectedItem) {
+        const res = await fetch(`${apiUrl}/api/v1/toppings/${selectedItem.id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            name_th: formNameTh.trim(),
+            name_en: formNameEn.trim(),
+            price: Number(formPrice),
+            image_url: formImageUrl.trim(),
+            sort_order: Number(formSortOrder),
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          setFormError(data.error || "เกิดข้อผิดพลาดในการแก้ไขท็อปปิ้ง");
+          toastError(data.error || "เกิดข้อผิดพลาดในการแก้ไขท็อปปิ้ง", "แก้ไขไม่สำเร็จ");
+          return;
+        }
+
+        success(`อัปเดตข้อมูลท็อปปิ้ง "${formNameTh.trim()}" เรียบร้อยแล้ว`, "บันทึกสำเร็จ");
+      }
+
+      setIsModalOpen(false);
+      fetchToppings();
+    } catch {
+      setFormError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
+      toastError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้", "เกิดข้อผิดพลาด");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Filter Toppings
-  const filteredToppings = toppings.filter((item) => {
-    const matchSearch =
-      item.nameTh.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.nameEn.toLowerCase().includes(searchQuery.toLowerCase());
+  // Delete Topping
+  const handleDeleteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deleteItem) return;
+    setDeleteError(null);
 
-    const matchStatus =
-      statusFilter === "all" ||
-      (statusFilter === "available" && item.isAvailable && !item.isSoldOut) ||
-      (statusFilter === "hidden" && !item.isAvailable) ||
-      (statusFilter === "soldout" && item.isSoldOut);
+    if (deleteConfirmText.trim().toLowerCase() !== "delete this topping") {
+      setDeleteError('กรุณาพิมพ์ "delete this topping" เพื่อยืนยันการลบ');
+      return;
+    }
 
-    return matchSearch && matchStatus;
-  });
+    setIsSubmitting(true);
+    try {
+      const token = getStoredToken();
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const res = await fetch(`${apiUrl}/api/v1/toppings/${deleteItem.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-  // Pagination Calculation
-  const totalPages = Math.ceil(filteredToppings.length / ITEMS_PER_PAGE) || 1;
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-  const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
-  const currentItems = filteredToppings.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+      if (!res.ok) {
+        const data = await res.json();
+        setDeleteError(data.error || "เกิดข้อผิดพลาดในการลบท็อปปิ้ง");
+        toastError(data.error || "เกิดข้อผิดพลาดในการลบท็อปปิ้ง", "ลบไม่สำเร็จ");
+        return;
+      }
 
-  // Close kebab when clicked outside
-  const handleContainerClick = () => {
-    if (activeKebabId !== null) {
-      setActiveKebabId(null);
+      success(`ลบท็อปปิ้ง "${deleteItem.nameTh}" ออกจากระบบแล้ว`, "ลบท็อปปิ้งสำเร็จ");
+      setIsDeleteModalOpen(false);
+      fetchToppings();
+    } catch {
+      setDeleteError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
+      toastError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้", "เกิดข้อผิดพลาด");
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
   return (
     <div
-      onClick={handleContainerClick}
       style={{
         display: "flex",
         minHeight: "100vh",
@@ -361,8 +515,7 @@ export default function ToppingsManagementPage() {
           </div>
 
           {/* Status Filters */}
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <Filter size={15} color="var(--ink-soft)" />
+          <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
             <select
               value={statusFilter}
               onChange={(e) => {
@@ -371,6 +524,7 @@ export default function ToppingsManagementPage() {
               }}
               style={{
                 padding: "0.45rem 0.85rem",
+                minWidth: "150px",
                 borderRadius: "0.6rem",
                 fontSize: "0.85rem",
                 fontFamily: "'Kanit', sans-serif",
@@ -389,332 +543,372 @@ export default function ToppingsManagementPage() {
           </div>
         </div>
 
+        {/* Loading State */}
+        {isLoading && (
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "4rem 0", gap: "0.5rem", color: "var(--teal)" }}>
+            <Loader2 size={24} className="animate-spin" />
+            <span style={{ fontSize: "0.95rem", fontWeight: 500 }}>กำลังโหลดรายการท็อปปิ้ง...</span>
+          </div>
+        )}
+
         {/* Toppings Cards Grid */}
-        <div
-          style={{
-            marginTop: "1.5rem",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-            gap: "1.25rem",
-          }}
-        >
-          {currentItems.map((item) => {
-            const isKebabOpen = activeKebabId === item.id;
+        {!isLoading && (
+          <div
+            style={{
+              marginTop: "1.5rem",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+              gap: "1.25rem",
+            }}
+          >
+            {toppings.map((item) => {
+              const isKebabOpen = activeKebabId === item.id;
+              const displayImg = getFullImageUrl(item.image);
 
-            return (
-              <div
-                key={item.id}
-                style={{
-                  backgroundColor: "var(--card)",
-                  borderRadius: "1.25rem",
-                  border: "1px solid rgba(50, 55, 65, 0.1)",
-                  boxShadow: "0 4px 16px -2px rgba(0,0,0,0.03)",
-                  overflow: "hidden",
-                  display: "flex",
-                  flexDirection: "column",
-                  position: "relative",
-                  opacity: !item.isAvailable ? 0.6 : 1,
-                  transition: "all 0.2s ease",
-                }}
-              >
-                {/* Image & Top Badges */}
-                <div style={{ position: "relative", width: "100%", height: "160px", backgroundColor: "#f0ece1" }}>
-                  <Image
-                    src={item.image}
-                    alt={item.nameTh}
-                    fill
-                    style={{
-                      objectFit: "cover",
-                      filter: item.isSoldOut ? "grayscale(80%)" : "none",
-                    }}
-                  />
-
-                  {/* Dimmed Overlay if Sold Out */}
-                  {item.isSoldOut && (
-                    <div
+              return (
+                <div
+                  key={item.id}
+                  style={{
+                    backgroundColor: "var(--card)",
+                    borderRadius: "1.25rem",
+                    border: "1px solid rgba(50, 55, 65, 0.1)",
+                    boxShadow: "0 4px 16px -2px rgba(0,0,0,0.03)",
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column",
+                    position: "relative",
+                    opacity: !item.isAvailable ? 0.6 : 1,
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  {/* Image & Top Badges */}
+                  <div style={{ position: "relative", width: "100%", height: "180px", backgroundColor: "#f0ece1" }}>
+                    <Image
+                      src={displayImg}
+                      alt={item.nameTh}
+                      fill
+                      unoptimized={displayImg.startsWith("http")}
                       style={{
-                        position: "absolute",
-                        inset: 0,
-                        backgroundColor: "rgba(0, 0, 0, 0.45)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
+                        objectFit: "cover",
+                        filter: item.isSoldOut ? "grayscale(80%)" : "none",
                       }}
-                    >
-                      <span
-                        style={{
-                          backgroundColor: "#e05353",
-                          color: "#fff",
-                          padding: "0.35rem 1rem",
-                          borderRadius: "9999px",
-                          fontWeight: 700,
-                          fontSize: "0.85rem",
-                          boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-                        }}
-                      >
-                        ท็อปปิ้งหมด (Sold Out)
-                      </span>
-                    </div>
-                  )}
+                    />
 
-                  {/* Hidden Badge */}
-                  {!item.isAvailable && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "0.75rem",
-                        left: "0.75rem",
-                        backgroundColor: "rgba(30, 30, 30, 0.75)",
-                        color: "#fff",
-                        padding: "0.2rem 0.6rem",
-                        borderRadius: "9999px",
-                        fontSize: "0.75rem",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.25rem",
-                        backdropFilter: "blur(4px)",
-                      }}
-                    >
-                      <EyeOff size={13} />
-                      <span>ซ่อนอยู่</span>
-                    </div>
-                  )}
-
-                  {/* Iced Only Tag */}
-                  {item.icedOnly && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        bottom: "0.6rem",
-                        left: "0.75rem",
-                        backgroundColor: "rgba(75, 155, 140, 0.9)",
-                        color: "#fff",
-                        padding: "0.15rem 0.5rem",
-                        borderRadius: "0.4rem",
-                        fontSize: "0.7rem",
-                        fontWeight: 600,
-                      }}
-                    >
-                      เฉพาะเมนูเย็น
-                    </div>
-                  )}
-
-                  {/* Kebab Menu Button (Top Right) */}
-                  <div style={{ position: "absolute", top: "0.75rem", right: "0.75rem", zIndex: 10 }}>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveKebabId(isKebabOpen ? null : item.id);
-                      }}
-                      style={{
-                        width: "32px",
-                        height: "32px",
-                        borderRadius: "50%",
-                        backgroundColor: "rgba(255, 255, 255, 0.9)",
-                        border: "1px solid rgba(0,0,0,0.1)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "pointer",
-                        boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
-                        transition: "all 0.15s ease",
-                      }}
-                      title="ตัวเลือกเพิ่มเติม"
-                    >
-                      <MoreVertical size={16} color="var(--ink)" />
-                    </button>
-
-                    {/* Kebab Popover Dropdown */}
-                    {isKebabOpen && (
+                    {/* Dimmed Overlay if Sold Out */}
+                    {item.isSoldOut && (
                       <div
-                        onClick={(e) => e.stopPropagation()}
                         style={{
                           position: "absolute",
-                          top: "38px",
-                          right: 0,
-                          width: "180px",
-                          backgroundColor: "var(--card)",
-                          borderRadius: "0.75rem",
-                          border: "1px solid rgba(50, 55, 65, 0.15)",
-                          boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                          padding: "0.35rem",
+                          inset: 0,
+                          backgroundColor: "rgba(0, 0, 0, 0.45)",
                           display: "flex",
-                          flexDirection: "column",
-                          gap: "0.2rem",
-                          zIndex: 50,
+                          alignItems: "center",
+                          justifyContent: "center",
                         }}
                       >
-                        {/* Option 1: Edit */}
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(item)}
+                        <span
                           style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.6rem",
-                            width: "100%",
-                            padding: "0.5rem 0.75rem",
+                            backgroundColor: "#e05353",
+                            color: "#fff",
+                            padding: "0.35rem 1rem",
+                            borderRadius: "9999px",
+                            fontWeight: 700,
                             fontSize: "0.85rem",
-                            border: "none",
-                            borderRadius: "0.5rem",
-                            backgroundColor: "transparent",
-                            color: "var(--ink)",
-                            cursor: "pointer",
-                            textAlign: "left",
-                            fontFamily: "'Kanit', sans-serif",
-                            transition: "background-color 0.15s ease",
+                            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
                           }}
-                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--cream)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                         >
-                          <Edit3 size={15} color="var(--teal)" />
-                          <span>แก้ไขข้อมูลท็อปปิ้ง</span>
-                        </button>
-
-                        {/* Option 2: Sold Out Toggle */}
-                        <button
-                          type="button"
-                          onClick={() => toggleSoldOut(item.id)}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.6rem",
-                            width: "100%",
-                            padding: "0.5rem 0.75rem",
-                            fontSize: "0.85rem",
-                            border: "none",
-                            borderRadius: "0.5rem",
-                            backgroundColor: "transparent",
-                            color: item.isSoldOut ? "var(--teal)" : "#e05353",
-                            cursor: "pointer",
-                            textAlign: "left",
-                            fontFamily: "'Kanit', sans-serif",
-                            transition: "background-color 0.15s ease",
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--cream)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                        >
-                          {item.isSoldOut ? (
-                            <>
-                              <CheckCircle2 size={15} color="var(--teal)" />
-                              <span>ตั้งเป็น "มีสินค้า"</span>
-                            </>
-                          ) : (
-                            <>
-                              <XCircle size={15} color="#e05353" />
-                              <span>ตั้งเป็น "ของหมด"</span>
-                            </>
-                          )}
-                        </button>
-
-                        <div style={{ height: "1px", backgroundColor: "rgba(50, 55, 65, 0.08)", margin: "0.2rem 0" }} />
-
-                        {/* Option 3: Eye / EyeOff Toggle */}
-                        <button
-                          type="button"
-                          onClick={() => toggleVisibility(item.id)}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.6rem",
-                            width: "100%",
-                            padding: "0.5rem 0.75rem",
-                            fontSize: "0.85rem",
-                            border: "none",
-                            borderRadius: "0.5rem",
-                            backgroundColor: "transparent",
-                            color: item.isAvailable ? "var(--ink-soft)" : "var(--teal)",
-                            cursor: "pointer",
-                            textAlign: "left",
-                            fontFamily: "'Kanit', sans-serif",
-                            transition: "background-color 0.15s ease",
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--cream)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                        >
-                          {item.isAvailable ? (
-                            <>
-                              <EyeOff size={15} color="var(--ink-soft)" />
-                              <span>ซ่อนท็อปปิ้งนี้</span>
-                            </>
-                          ) : (
-                            <>
-                              <Eye size={15} color="var(--teal)" />
-                              <span>เปิดแสดงท็อปปิ้ง</span>
-                            </>
-                          )}
-                        </button>
+                          ท็อปปิ้งหมด (Sold Out)
+                        </span>
                       </div>
                     )}
-                  </div>
-                </div>
 
-                {/* Content Details */}
-                <div style={{ padding: "1.1rem 1.25rem", flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem" }}>
-                      <div>
-                        <h3 style={{ fontSize: "1.1rem", fontWeight: 700, lineHeight: 1.3 }}>
-                          {item.nameTh}
-                        </h3>
-                        <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "2px" }}>
-                          {item.nameEn}
-                        </p>
+                    {/* Hidden Badge */}
+                    {!item.isAvailable && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "0.75rem",
+                          left: "0.75rem",
+                          backgroundColor: "rgba(30, 30, 30, 0.75)",
+                          color: "#fff",
+                          padding: "0.2rem 0.6rem",
+                          borderRadius: "9999px",
+                          fontSize: "0.75rem",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.25rem",
+                          backdropFilter: "blur(4px)",
+                        }}
+                      >
+                        <EyeOff size={13} />
+                        <span>ซ่อนจากหน้าร้าน</span>
                       </div>
+                    )}
 
-                      {/* Price Tag */}
-                      <div style={{ textAlign: "right" }}>
-                        <span style={{ fontSize: "1.35rem", fontWeight: 800, color: "var(--teal)", fontFamily: "'Kanit', sans-serif" }}>
-                          +{item.price}฿
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                    {/* Kebab Menu Button (Top Right) */}
+                    <div className="topping-kebab-container" style={{ position: "absolute", top: "0.75rem", right: "0.75rem", zIndex: 10 }}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveKebabId(isKebabOpen ? null : item.id);
+                        }}
+                        style={{
+                          width: "32px",
+                          height: "32px",
+                          borderRadius: "50%",
+                          backgroundColor: "rgba(255, 255, 255, 0.9)",
+                          border: "1px solid rgba(0,0,0,0.1)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+                          transition: "all 0.15s ease",
+                        }}
+                        title="ตัวเลือกเพิ่มเติม"
+                      >
+                        <MoreVertical size={16} color="var(--ink)" />
+                      </button>
 
-                  {/* Quick Bottom Status Bar */}
-                  <div
-                    style={{
-                      marginTop: "1.25rem",
-                      paddingTop: "0.75rem",
-                      borderTop: "1px solid rgba(50, 55, 65, 0.08)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      fontSize: "0.75rem",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                      {item.isSoldOut ? (
-                        <span style={{ color: "#e05353", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                          <XCircle size={13} /> ของหมด
-                        </span>
-                      ) : !item.isAvailable ? (
-                        <span style={{ color: "var(--ink-soft)", fontWeight: 500, display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                          <EyeOff size={13} /> ซ่อนอยู่
-                        </span>
-                      ) : (
-                        <span style={{ color: "var(--teal)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                          <CheckCircle2 size={13} /> พร้อมขาย
-                        </span>
+                      {/* Kebab Popover Dropdown */}
+                      {isKebabOpen && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            position: "absolute",
+                            top: "38px",
+                            right: 0,
+                            width: "185px",
+                            backgroundColor: "var(--card)",
+                            borderRadius: "0.75rem",
+                            border: "1px solid rgba(50, 55, 65, 0.15)",
+                            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                            padding: "0.35rem",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "0.2rem",
+                            zIndex: 50,
+                          }}
+                        >
+                          {/* Option 1: Edit */}
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(item)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.6rem",
+                              width: "100%",
+                              padding: "0.5rem 0.75rem",
+                              fontSize: "0.85rem",
+                              border: "none",
+                              borderRadius: "0.5rem",
+                              backgroundColor: "transparent",
+                              color: "var(--ink)",
+                              cursor: "pointer",
+                              textAlign: "left",
+                              fontFamily: "'Kanit', sans-serif",
+                              transition: "background-color 0.15s ease",
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--cream)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                          >
+                            <Edit3 size={15} color="var(--teal)" />
+                            <span>แก้ไขท็อปปิ้ง</span>
+                          </button>
+
+                          {/* Option 2: Sold Out Toggle */}
+                          <button
+                            type="button"
+                            onClick={() => toggleSoldOut(item)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.6rem",
+                              width: "100%",
+                              padding: "0.5rem 0.75rem",
+                              fontSize: "0.85rem",
+                              border: "none",
+                              borderRadius: "0.5rem",
+                              backgroundColor: "transparent",
+                              color: item.isSoldOut ? "var(--teal)" : "#e05353",
+                              cursor: "pointer",
+                              textAlign: "left",
+                              fontFamily: "'Kanit', sans-serif",
+                              transition: "background-color 0.15s ease",
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--cream)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                          >
+                            {item.isSoldOut ? (
+                              <>
+                                <CheckCircle2 size={15} color="var(--teal)" />
+                                <span>ตั้งเป็น "มีสินค้า"</span>
+                              </>
+                            ) : (
+                              <>
+                                <XCircle size={15} color="#e05353" />
+                                <span>ตั้งเป็น "ขายหมด"</span>
+                              </>
+                            )}
+                          </button>
+
+                          {/* Option 3: Eye / EyeOff Toggle */}
+                          <button
+                            type="button"
+                            onClick={() => toggleVisibility(item)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.6rem",
+                              width: "100%",
+                              padding: "0.5rem 0.75rem",
+                              fontSize: "0.85rem",
+                              border: "none",
+                              borderRadius: "0.5rem",
+                              backgroundColor: "transparent",
+                              color: item.isAvailable ? "var(--ink-soft)" : "var(--teal)",
+                              cursor: "pointer",
+                              textAlign: "left",
+                              fontFamily: "'Kanit', sans-serif",
+                              transition: "background-color 0.15s ease",
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--cream)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                          >
+                            {item.isAvailable ? (
+                              <>
+                                <EyeOff size={15} color="var(--ink-soft)" />
+                                <span>ซ่อนท็อปปิ้งนี้</span>
+                              </>
+                            ) : (
+                              <>
+                                <Eye size={15} color="var(--teal)" />
+                                <span>เปิดแสดงท็อปปิ้ง</span>
+                              </>
+                            )}
+                          </button>
+
+                          <div style={{ height: "1px", backgroundColor: "rgba(50, 55, 65, 0.08)", margin: "0.2rem 0" }} />
+
+                          {/* Option 4: Delete */}
+                          <button
+                            type="button"
+                            onClick={() => openDeleteModal(item)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.6rem",
+                              width: "100%",
+                              padding: "0.5rem 0.75rem",
+                              fontSize: "0.85rem",
+                              border: "none",
+                              borderRadius: "0.5rem",
+                              backgroundColor: "transparent",
+                              color: "#dc2626",
+                              cursor: "pointer",
+                              textAlign: "left",
+                              fontFamily: "'Kanit', sans-serif",
+                              transition: "background-color 0.15s ease",
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(220, 38, 38, 0.08)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                          >
+                            <Trash2 size={15} color="#dc2626" />
+                            <span>ลบท็อปปิ้ง</span>
+                          </button>
+                        </div>
                       )}
                     </div>
+                  </div>
 
-                    {item.orderCount !== undefined && (
-                      <span style={{ color: "var(--ink-soft)", fontWeight: 500, display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                        <Candy size={13} color="var(--teal)" />
-                        สั่งแล้ว {item.orderCount} ครั้ง
-                      </span>
-                    )}
+                  {/* Content Details */}
+                  <div style={{ padding: "1.1rem 1.25rem", flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem" }}>
+                        <div>
+                          <span style={{ fontSize: "0.75rem", color: "var(--teal)", fontWeight: 600 }}>
+                            ท็อปปิ้งเสริม
+                          </span>
+                          <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginTop: "0.15rem", lineHeight: 1.3 }}>
+                            {item.nameTh}
+                          </h3>
+                          <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "1px" }}>
+                            {item.nameEn}
+                          </p>
+                        </div>
+
+                        {/* Price Badge */}
+                        <div style={{ textAlign: "right" }}>
+                          <span style={{ fontSize: "1.35rem", fontWeight: 800, color: "var(--teal)", fontFamily: "'Kanit', sans-serif" }}>
+                            +฿{item.price}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick Bottom Status Bar */}
+                    <div
+                      style={{
+                        marginTop: "1rem",
+                        paddingTop: "0.75rem",
+                        borderTop: "1px solid rgba(50, 55, 65, 0.08)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        fontSize: "0.75rem",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        {/* Status Tag */}
+                        {item.isSoldOut ? (
+                          <span style={{ color: "#e05353", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                            <XCircle size={13} /> ขายหมด
+                          </span>
+                        ) : !item.isAvailable ? (
+                          <span style={{ color: "var(--ink-soft)", fontWeight: 500, display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                            <EyeOff size={13} /> ซ่อนอยู่
+                          </span>
+                        ) : (
+                          <span style={{ color: "var(--teal)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                            <CheckCircle2 size={13} /> พร้อมขาย
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                        <span
+                          style={{
+                            padding: "0.15rem 0.45rem",
+                            borderRadius: "0.35rem",
+                            backgroundColor: "var(--cream)",
+                            border: "1px solid rgba(50, 55, 65, 0.12)",
+                            color: "var(--ink-soft)",
+                            fontSize: "0.7rem",
+                            fontWeight: 600,
+                          }}
+                        >
+                          ลำดับ: #{item.sortOrder || 0}
+                        </span>
+
+                        {item.orderCount !== undefined && item.orderCount > 0 && (
+                          <span style={{ color: "var(--ink-soft)", fontWeight: 500, display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                            <Flame size={13} color="var(--teal)" />
+                            ขายแล้ว {item.orderCount}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Empty State */}
-        {filteredToppings.length === 0 && (
+        {!isLoading && toppings.length === 0 && (
           <div
             style={{
               marginTop: "2.5rem",
@@ -725,15 +919,15 @@ export default function ToppingsManagementPage() {
               border: "1px dashed rgba(50, 55, 65, 0.15)",
             }}
           >
-            <p style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--ink)" }}>ไม่พบรายการท็อปปิ้งที่ค้นหา</p>
+            <p style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--ink)" }}>ไม่พบรายการท็อปปิ้ง</p>
             <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", marginTop: "0.35rem" }}>
-              ลองเปลี่ยนคำค้นหา หรือรีเซ็ตตัวกรองสถานะ
+              ลองเปลี่ยนคำค้นหา หรือกดปุ่ม "เพิ่มท็อปปิ้งใหม่" เพื่อสร้างรายการแรก
             </p>
           </div>
         )}
 
         {/* Pagination Section */}
-        {filteredToppings.length > 0 && (
+        {!isLoading && total > 0 && (
           <div
             style={{
               marginTop: "2rem",
@@ -747,7 +941,7 @@ export default function ToppingsManagementPage() {
             }}
           >
             <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>
-              แสดงรายการที่ {startIndex + 1} - {Math.min(startIndex + ITEMS_PER_PAGE, filteredToppings.length)} จากทั้งหมด {filteredToppings.length} รายการ
+              แสดงรายการที่ {startIndex + 1} - {Math.min(startIndex + ITEMS_PER_PAGE, total)} จากทั้งหมด {total} รายการ
             </p>
 
             {/* Pagination Controls */}
@@ -755,7 +949,7 @@ export default function ToppingsManagementPage() {
               <button
                 type="button"
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={safeCurrentPage === 1}
+                disabled={currentPage === 1}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -765,8 +959,8 @@ export default function ToppingsManagementPage() {
                   borderRadius: "0.5rem",
                   border: "1px solid rgba(50, 55, 65, 0.1)",
                   backgroundColor: "var(--card)",
-                  color: safeCurrentPage === 1 ? "rgba(50,55,65,0.3)" : "var(--ink)",
-                  cursor: safeCurrentPage === 1 ? "not-allowed" : "pointer",
+                  color: currentPage === 1 ? "rgba(50,55,65,0.3)" : "var(--ink)",
+                  cursor: currentPage === 1 ? "not-allowed" : "pointer",
                 }}
               >
                 <ChevronLeft size={18} />
@@ -774,7 +968,7 @@ export default function ToppingsManagementPage() {
 
               {Array.from({ length: totalPages }).map((_, idx) => {
                 const pageNum = idx + 1;
-                const isActive = pageNum === safeCurrentPage;
+                const isActive = pageNum === currentPage;
                 return (
                   <button
                     key={pageNum}
@@ -801,7 +995,7 @@ export default function ToppingsManagementPage() {
               <button
                 type="button"
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={safeCurrentPage === totalPages}
+                disabled={currentPage === totalPages}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -811,8 +1005,8 @@ export default function ToppingsManagementPage() {
                   borderRadius: "0.5rem",
                   border: "1px solid rgba(50, 55, 65, 0.1)",
                   backgroundColor: "var(--card)",
-                  color: safeCurrentPage === totalPages ? "rgba(50,55,65,0.3)" : "var(--ink)",
-                  cursor: safeCurrentPage === totalPages ? "not-allowed" : "pointer",
+                  color: currentPage === totalPages ? "rgba(50,55,65,0.3)" : "var(--ink)",
+                  cursor: currentPage === totalPages ? "not-allowed" : "pointer",
                 }}
               >
                 <ChevronRight size={18} />
@@ -821,18 +1015,39 @@ export default function ToppingsManagementPage() {
           </div>
         )}
 
-        {/* Edit / Add Modal */}
-        {(editingItem || isAddingNew) && (
+        {/* Create / Edit Modal */}
+        <AddEditToppingModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSubmit={handleSaveModal}
+          mode={modalMode}
+          formNameTh={formNameTh}
+          setFormNameTh={setFormNameTh}
+          formNameEn={formNameEn}
+          setFormNameEn={setFormNameEn}
+          formPrice={formPrice}
+          setFormPrice={setFormPrice}
+          formSortOrder={formSortOrder}
+          setFormSortOrder={setFormSortOrder}
+          formImageUrl={formImageUrl}
+          setFormImageUrl={setFormImageUrl}
+          formError={formError}
+          isSubmitting={isSubmitting}
+          isUploading={isUploading}
+          onFileUpload={handleFileUpload}
+        />
+
+        {/* Delete Confirm Modal */}
+        {isDeleteModalOpen && deleteItem && (
           <div
             className="animate-fade-in"
             style={{
               position: "fixed",
               inset: 0,
-              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              backgroundColor: "rgba(0,0,0,0.5)",
               backdropFilter: "blur(4px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              display: "grid",
+              placeItems: "center",
               zIndex: 100,
               padding: "1rem",
             }}
@@ -842,185 +1057,109 @@ export default function ToppingsManagementPage() {
               style={{
                 backgroundColor: "var(--card)",
                 borderRadius: "1.25rem",
+                maxWidth: "440px",
                 width: "100%",
-                maxWidth: "480px",
                 padding: "1.75rem",
                 boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
-                border: "1px solid rgba(50, 55, 65, 0.1)",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <h3 style={{ fontSize: "1.25rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <Candy size={20} color="var(--teal)" />
-                  {isAddingNew ? "เพิ่มท็อปปิ้งใหม่" : "แก้ไขข้อมูลท็อปปิ้ง"}
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingItem(null);
-                    setIsAddingNew(false);
-                  }}
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", color: "#dc2626", marginBottom: "1rem" }}>
+                <div
                   style={{
-                    border: "none",
-                    background: "transparent",
-                    cursor: "pointer",
-                    padding: "0.25rem",
-                    borderRadius: "0.5rem",
-                    color: "var(--ink-soft)",
+                    width: "2.5rem",
+                    height: "2.5rem",
+                    borderRadius: "0.75rem",
+                    backgroundColor: "rgba(220, 38, 38, 0.12)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
                   }}
                 >
-                  <X size={20} />
-                </button>
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--ink)" }}>
+                    ยืนยันการลบท็อปปิ้ง
+                  </h3>
+                  <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)", margin: 0 }}>
+                    การดำเนินการนี้ไม่สามารถย้อนกลับได้
+                  </p>
+                </div>
               </div>
 
-              <form onSubmit={handleSaveForm} style={{ marginTop: "1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
-                {/* Topping Name TH */}
-                <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-                    ชื่อท็อปปิ้ง (ภาษาไทย)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="เช่น ไข่มุกบราวน์ชูการ์"
-                    value={editForm.nameTh}
-                    onChange={(e) => setEditForm({ ...editForm, nameTh: e.target.value })}
-                    style={{
-                      width: "100%",
-                      padding: "0.6rem 0.85rem",
-                      borderRadius: "0.6rem",
-                      border: "1px solid rgba(50, 55, 65, 0.15)",
-                      backgroundColor: "var(--cream)",
-                      fontFamily: "'Kanit', sans-serif",
-                      fontSize: "0.9rem",
-                      outline: "none",
-                    }}
-                  />
-                </div>
+              <p style={{ fontSize: "0.85rem", color: "var(--ink)", lineHeight: 1.5, marginBottom: "1rem" }}>
+                คุณแน่ใจหรือไม่ว่าต้องการลบท็อปปิ้ง <strong>"{deleteItem.nameTh}"</strong> ออกจากระบบ?
+              </p>
 
-                {/* Topping Name EN */}
-                <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-                    ชื่อท็อปปิ้ง (English)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Brown Sugar Boba"
-                    value={editForm.nameEn}
-                    onChange={(e) => setEditForm({ ...editForm, nameEn: e.target.value })}
-                    style={{
-                      width: "100%",
-                      padding: "0.6rem 0.85rem",
-                      borderRadius: "0.6rem",
-                      border: "1px solid rgba(50, 55, 65, 0.15)",
-                      backgroundColor: "var(--cream)",
-                      fontFamily: "'Kanit', sans-serif",
-                      fontSize: "0.9rem",
-                      outline: "none",
-                    }}
-                  />
-                </div>
-
-                {/* Price & Sort Order */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-                  <div>
-                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-                      ราคาบวกเพิ่ม (บาท)
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min={0}
-                      value={editForm.price}
-                      onChange={(e) => setEditForm({ ...editForm, price: Number(e.target.value) })}
-                      style={{
-                        width: "100%",
-                        padding: "0.6rem 0.85rem",
-                        borderRadius: "0.6rem",
-                        border: "1px solid rgba(50, 55, 65, 0.15)",
-                        backgroundColor: "var(--cream)",
-                        fontFamily: "'Kanit', sans-serif",
-                        fontSize: "0.9rem",
-                        outline: "none",
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-                      ลำดับการแสดงผล
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min={1}
-                      value={editForm.sortOrder}
-                      onChange={(e) => setEditForm({ ...editForm, sortOrder: Number(e.target.value) })}
-                      style={{
-                        width: "100%",
-                        padding: "0.6rem 0.85rem",
-                        borderRadius: "0.6rem",
-                        border: "1px solid rgba(50, 55, 65, 0.15)",
-                        backgroundColor: "var(--cream)",
-                        fontFamily: "'Kanit', sans-serif",
-                        fontSize: "0.9rem",
-                        outline: "none",
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Iced Only Option */}
-                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.85rem", fontWeight: 500 }}>
-                  <input
-                    type="checkbox"
-                    checked={editForm.icedOnly}
-                    onChange={(e) => setEditForm({ ...editForm, icedOnly: e.target.checked })}
-                    style={{ width: "16px", height: "16px", accentColor: "var(--teal)" }}
-                  />
-                  <span>ใส่ได้เฉพาะเมนูเย็นเท่านั้น (Iced Only)</span>
+              <div style={{ marginBottom: "1.25rem" }}>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.35rem" }}>
+                  พิมพ์คำว่า <code style={{ backgroundColor: "rgba(220, 38, 38, 0.1)", color: "#dc2626", padding: "0.1rem 0.35rem", borderRadius: "0.25rem" }}>delete this topping</code> เพื่อยืนยัน:
                 </label>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="delete this topping"
+                  style={{
+                    width: "100%",
+                    padding: "0.6rem 0.85rem",
+                    borderRadius: "0.6rem",
+                    border: "1px solid rgba(50, 55, 65, 0.15)",
+                    backgroundColor: "var(--cream)",
+                    fontFamily: "'Kanit', sans-serif",
+                    fontSize: "0.9rem",
+                    outline: "none",
+                  }}
+                />
+              </div>
 
-                {/* Action Buttons */}
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingItem(null);
-                      setIsAddingNew(false);
-                    }}
-                    style={{
-                      padding: "0.6rem 1.25rem",
-                      borderRadius: "0.6rem",
-                      border: "1px solid rgba(50, 55, 65, 0.15)",
-                      backgroundColor: "transparent",
-                      color: "var(--ink)",
-                      cursor: "pointer",
-                      fontFamily: "'Kanit', sans-serif",
-                      fontWeight: 500,
-                    }}
-                  >
-                    ยกเลิก
-                  </button>
-                  <button
-                    type="submit"
-                    style={{
-                      padding: "0.6rem 1.5rem",
-                      borderRadius: "0.6rem",
-                      border: "none",
-                      backgroundColor: "var(--teal)",
-                      color: "#fff",
-                      cursor: "pointer",
-                      fontFamily: "'Kanit', sans-serif",
-                      fontWeight: 600,
-                      boxShadow: "0 2px 8px rgba(75, 155, 140, 0.25)",
-                    }}
-                  >
-                    {isAddingNew ? "เพิ่มท็อปปิ้ง" : "บันทึกการแก้ไข"}
-                  </button>
+              {deleteError && (
+                <div style={{ marginBottom: "1rem", padding: "0.6rem", backgroundColor: "rgba(220, 38, 38, 0.1)", borderRadius: "0.5rem", color: "#dc2626", fontSize: "0.8rem" }}>
+                  {deleteError}
                 </div>
-              </form>
+              )}
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  style={{
+                    padding: "0.6rem 1.25rem",
+                    borderRadius: "0.6rem",
+                    border: "1px solid rgba(50, 55, 65, 0.15)",
+                    backgroundColor: "transparent",
+                    color: "var(--ink)",
+                    cursor: "pointer",
+                    fontFamily: "'Kanit', sans-serif",
+                    fontWeight: 500,
+                  }}
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteSubmit}
+                  disabled={isSubmitting || deleteConfirmText.trim().toLowerCase() !== "delete this topping"}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    padding: "0.6rem 1.5rem",
+                    borderRadius: "0.6rem",
+                    border: "none",
+                    backgroundColor: "#dc2626",
+                    color: "#fff",
+                    cursor: (isSubmitting || deleteConfirmText.trim().toLowerCase() !== "delete this topping") ? "not-allowed" : "pointer",
+                    opacity: (deleteConfirmText.trim().toLowerCase() !== "delete this topping") ? 0.6 : 1,
+                    fontFamily: "'Kanit', sans-serif",
+                    fontWeight: 600,
+                  }}
+                >
+                  {isSubmitting && <Loader2 size={16} className="animate-spin" />}
+                  <span>ลบท็อปปิ้งทันที</span>
+                </button>
+              </div>
             </div>
           </div>
         )}

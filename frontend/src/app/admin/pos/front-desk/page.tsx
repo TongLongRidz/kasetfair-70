@@ -29,6 +29,7 @@ interface Product {
   id: number;
   name_th: string;
   name_en: string;
+  desc: string;
   price: number;
   category: "flavours" | "combos";
   image: string;
@@ -63,6 +64,7 @@ const PRODUCTS: Product[] = [
     id: 1,
     name_th: "น้ำเต้าหู้ดั้งเดิม",
     name_en: "Original Soy Milk",
+    desc: "น้ำเต้าหู้เข้มข้น หอมถั่วเหลืองแท้ 100% ต้มสดใหม่ทุกวัน",
     price: 35,
     category: "flavours",
     image: "/images/hero-soy.jpg",
@@ -74,6 +76,7 @@ const PRODUCTS: Product[] = [
     id: 2,
     name_th: "น้ำเต้าหู้มัทฉะ",
     name_en: "Matcha Soy",
+    desc: "มัทฉะเกรดพรีเมียม ชงสดผสมน้ำเต้าหู้หอมละมุนเข้มข้น",
     price: 50,
     category: "flavours",
     image: "/images/drink-matcha.jpg",
@@ -85,6 +88,7 @@ const PRODUCTS: Product[] = [
     id: 3,
     name_th: "น้ำเต้าหู้ชาไทย",
     name_en: "Thai Tea Soy",
+    desc: "ชาไทยใบชาคัดพิเศษ หอมเข้มมันนัว กลมกล่อมลงตัว",
     price: 45,
     category: "flavours",
     image: "/images/drink-mango.jpg",
@@ -96,6 +100,7 @@ const PRODUCTS: Product[] = [
     id: 4,
     name_th: "น้ำเต้าหู้นมเย็น",
     name_en: "Nom Yen Soy",
+    desc: "สละนมเย็นสีชมพูหวานละมุน หอมสดชื่น ดื่มง่าย",
     price: 40,
     category: "flavours",
     image: "/images/drink-lychee.jpg",
@@ -107,6 +112,7 @@ const PRODUCTS: Product[] = [
     id: 5,
     name_th: "น้ำเต้าหู้ช็อกโกแลต",
     name_en: "Choco Soy",
+    desc: "โกโก้เข้มข้นสูตรพิเศษ เข้ากันได้ดีเยี่ยมกับน้ำเต้าหู้",
     price: 45,
     category: "flavours",
     image: "/images/drink-pearl.jpg",
@@ -115,9 +121,10 @@ const PRODUCTS: Product[] = [
     is_recommended: false,
   },
   {
-    id: 6,
+    id: 101,
     name_th: "Matcha + Red Bean / Boba",
     name_en: "Combo Matcha Lover",
+    desc: "มัทฉะเข้มข้นจับคู่กับไข่มุกหนึบหนับและถั่วแดงหวานมัน",
     price: 65,
     category: "combos",
     image: "/images/drink-matcha.jpg",
@@ -127,9 +134,10 @@ const PRODUCTS: Product[] = [
     default_toppings: ["ไข่มุกบราวน์ชูการ์", "ถั่วแดงกวนหวานมัน"],
   },
   {
-    id: 7,
+    id: 102,
     name_th: "Thai Tea + Boba",
     name_en: "Combo Thai Tea Boba",
+    desc: "ชาไทยรสเข้มสูตรเด็ด เสิร์ฟพร้อมไข่มุกบราวน์ชูการ์นุ่มหนึบ",
     price: 55,
     category: "combos",
     image: "/images/drink-mango.jpg",
@@ -139,9 +147,10 @@ const PRODUCTS: Product[] = [
     default_toppings: ["ไข่มุกบราวน์ชูการ์"],
   },
   {
-    id: 8,
+    id: 103,
     name_th: "Nom Yen + Grass Jelly",
     name_en: "Combo Pinky Grass Jelly",
+    desc: "นมเย็นชมพูหวานละมุน ตัดกับความหนึบเย็นชื่นใจของเฉาก๊วย",
     price: 50,
     category: "combos",
     image: "/images/drink-lychee.jpg",
@@ -149,6 +158,32 @@ const PRODUCTS: Product[] = [
     is_sold_out: false,
     is_recommended: false,
     default_toppings: ["เฉาก๊วยหนึบ"],
+  },
+  {
+    id: 104,
+    name_th: "Choco Special Combo",
+    name_en: "Combo Choco Delight",
+    desc: "ช็อกโกแลตเข้มข้นจับคู่ท็อปปิ้งสาคูและเฉาก๊วย เคี้ยวเพลิน",
+    price: 55,
+    category: "combos",
+    image: "/images/drink-pearl.jpg",
+    is_available: true,
+    is_sold_out: false,
+    is_recommended: false,
+    default_toppings: ["สาคูใบเตย", "เฉาก๊วยหนึบ"],
+  },
+  {
+    id: 105,
+    name_th: "Original Signature Combo",
+    name_en: "Combo Original All-Star",
+    desc: "น้ำเต้าหู้สูตรโบราณ พร้อมเครื่องแน่นจัดเต็ม เม็ดแมงลัก เมล็ดเจีย สาคู",
+    price: 50,
+    category: "combos",
+    image: "/images/hero-soy.jpg",
+    is_available: true,
+    is_sold_out: false,
+    is_recommended: false,
+    default_toppings: ["เม็ดแมงลัก", "เมล็ดเจีย", "สาคูใบเตย"],
   },
 ];
 
@@ -298,78 +333,98 @@ export default function POSFrontDeskPage() {
   };
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "var(--cream)", fontFamily: "'Kanit', sans-serif" }}>
+    <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "var(--cream)" }}>
       <AdminSidebar />
 
-      <main style={{ flex: 1, padding: "1.75rem 2.5rem 6rem 2.5rem", overflowY: "auto", minWidth: 0, position: "relative" }}>
-        {/* Header Bar */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
-          <div>
-            <h1 style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--ink)", lineHeight: 1.2 }}>
-              ระบบขายหน้าร้าน (POS Walk-in)
-            </h1>
+      <main className="kanit-theme" style={{ flex: 1, padding: "1.75rem 2.5rem 6rem 2.5rem", overflowY: "auto", minWidth: 0, position: "relative", fontFamily: "'Kanit', sans-serif" }}>
+        <div style={{ maxWidth: "640px", margin: "0 auto" }}>
+          {/* Header Bar */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "1rem" }}>
+            <div>
+              <h1 style={{ fontSize: "1.35rem", fontWeight: 800, color: "var(--ink)", lineHeight: 1.2 }}>
+                รายการเมนูเครื่องดื่ม
+              </h1>
+              <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)", marginTop: "0.25rem" }}>
+                กดเลือกเมนูเพื่อปรับความหวาน, อุณหภูมิ และท็อปปิ้ง
+              </p>
+            </div>
+
+            {/* Search Input */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", backgroundColor: "var(--card)", padding: "0.45rem 0.85rem", borderRadius: "9999px", border: "1px solid rgba(50,55,65,0.1)", width: "100%", maxWidth: "260px" }}>
+              <Search size={16} color="var(--ink-soft)" />
+              <input
+                type="text"
+                placeholder="ค้นหาเมนู..."
+                value={searchMenu}
+                onChange={(e) => setSearchMenu(e.target.value)}
+                style={{ border: "none", background: "transparent", outline: "none", fontSize: "0.825rem", width: "100%", fontFamily: "'Kanit', sans-serif" }}
+              />
+            </div>
           </div>
 
-          {/* Search Input */}
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", backgroundColor: "var(--card)", padding: "0.55rem 0.95rem", borderRadius: "0.75rem", border: "1px solid rgba(50,55,65,0.1)", minWidth: "260px" }}>
-            <Search size={18} color="var(--ink-soft)" />
-            <input
-              type="text"
-              placeholder="ค้นหาเมนูเครื่องดื่ม..."
-              value={searchMenu}
-              onChange={(e) => setSearchMenu(e.target.value)}
-              style={{ border: "none", background: "transparent", outline: "none", fontSize: "0.875rem", width: "100%", fontFamily: "'Kanit', sans-serif" }}
-            />
+          {/* Category Tabs */}
+          <div
+            style={{
+              marginTop: "0.85rem",
+              display: "flex",
+              gap: "0.5rem",
+              borderBottom: "1px solid rgba(50, 55, 65, 0.1)",
+              paddingBottom: "0.5rem",
+              overflowX: "auto",
+            }}
+          >
+            {[
+              { id: "all", label: "ทั้งหมด" },
+              { id: "flavours", label: "รสชาติหลัก" },
+              { id: "combos", label: "เมนูคอมโบ" },
+            ].map((tab) => {
+              const isSelected = selectedCategory === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setSelectedCategory(tab.id as any)}
+                  style={{
+                    borderRadius: "9999px",
+                    padding: "0.45rem 0.9rem",
+                    fontSize: "0.825rem",
+                    fontWeight: isSelected ? 700 : 500,
+                    cursor: "pointer",
+                    border: isSelected ? "none" : "1px solid rgba(50, 55, 65, 0.1)",
+                    backgroundColor: isSelected ? "var(--ink)" : "var(--card)",
+                    color: isSelected ? "var(--cream)" : "var(--ink-soft)",
+                    transition: "all 0.2s ease",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
-        </div>
 
-        {/* Category Tabs */}
-        <div style={{ display: "flex", gap: "0.6rem", marginTop: "1.25rem", overflowX: "auto", paddingBottom: "4px" }}>
-          {[
-            { id: "all", label: "ทั้งหมด" },
-            { id: "flavours", label: "รสชาติหลัก" },
-            { id: "combos", label: "เมนูคอมโบ" },
-          ].map((tab) => {
-            const active = selectedCategory === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setSelectedCategory(tab.id as any)}
-                style={{
-                  padding: "0.5rem 1.25rem",
-                  borderRadius: "9999px",
-                  border: active ? "none" : "1px solid rgba(50, 55, 65, 0.1)",
-                  backgroundColor: active ? "var(--ink)" : "var(--card)",
-                  color: active ? "var(--cream)" : "var(--ink-soft)",
-                  fontWeight: active ? 700 : 500,
-                  fontSize: "0.85rem",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  transition: "all 0.15s ease",
-                  boxShadow: active ? "0 4px 12px rgba(0,0,0,0.15)" : "none",
-                }}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Product Grid (Full Width Responsive Catalog) */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "1.25rem", marginTop: "1.25rem" }}>
-          {filteredProducts.map((p) => (
-            <div
+          {/* Products Grid (2 Columns Exact Match with Storefront) */}
+          <div
+            style={{
+              marginTop: "1rem",
+              display: "grid",
+              gridTemplateColumns: "repeat(2, 1fr)",
+              gap: "0.85rem",
+            }}
+          >
+          {filteredProducts.map((p, i) => (
+            <article
               key={p.id}
+              className="animate-rise"
               onClick={() => handleOpenCustomizer(p)}
               style={{
-                backgroundColor: "var(--card)",
+                animationDelay: `${50 + i * 30}ms`,
+                overflow: "hidden",
                 borderRadius: "1.25rem",
+                backgroundColor: "var(--card)",
                 border: "1px solid rgba(50, 55, 65, 0.1)",
-                padding: "1rem",
                 display: "flex",
                 flexDirection: "column",
-                justifyContent: "space-between",
                 cursor: "pointer",
                 transition: "transform 0.15s ease, box-shadow 0.15s ease",
                 boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
@@ -383,39 +438,95 @@ export default function POSFrontDeskPage() {
                 e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.03)";
               }}
             >
-              <div>
-                <div style={{ position: "relative", width: "100%", height: "140px", borderRadius: "0.9rem", overflow: "hidden", marginBottom: "0.75rem" }}>
-                  <Image src={p.image} alt={p.name_th} fill sizes="240px" style={{ objectFit: "cover" }} />
-                  {p.is_recommended && (
-                    <span style={{ position: "absolute", top: 8, left: 8, backgroundColor: "var(--warm)", color: "var(--ink)", fontSize: "0.7rem", padding: "2px 8px", borderRadius: "9999px", fontWeight: 700 }}>
-                      แนะนำ
-                    </span>
-                  )}
-                  {p.category === "combos" && (
-                    <span style={{ position: "absolute", bottom: 8, left: 8, backgroundColor: "var(--teal)", color: "#fff", fontSize: "0.7rem", padding: "2px 8px", borderRadius: "9999px", fontWeight: 700 }}>
-                      COMBO
-                    </span>
-                  )}
-                </div>
-
-                <h3 style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--ink)", lineHeight: 1.3 }}>
-                  {p.name_th}
-                </h3>
-                <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)", marginTop: "2px" }}>
-                  {p.name_en}
-                </p>
+              <div style={{ position: "relative", width: "100%", aspectRatio: "1/1" }}>
+                <Image
+                  src={p.image}
+                  alt={p.name_th}
+                  fill
+                  sizes="(max-width: 640px) 50vw, 240px"
+                  priority={i < 4}
+                  style={{ objectFit: "cover" }}
+                />
+                {p.is_recommended && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      left: "0.5rem",
+                      top: "0.5rem",
+                      borderRadius: "9999px",
+                      backgroundColor: "var(--warm)",
+                      padding: "0.2rem 0.6rem",
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      color: "var(--ink)",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+                    }}
+                  >
+                    แนะนำ
+                  </span>
+                )}
+                {p.category === "combos" && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      right: "0.5rem",
+                      top: "0.5rem",
+                      borderRadius: "9999px",
+                      backgroundColor: "var(--teal)",
+                      padding: "0.2rem 0.5rem",
+                      fontSize: "9px",
+                      fontWeight: 700,
+                      color: "var(--cream)",
+                    }}
+                  >
+                    COMBO
+                  </span>
+                )}
               </div>
 
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1rem", paddingTop: "0.6rem", borderTop: "1px solid rgba(50,55,65,0.06)" }}>
-                <span style={{ fontSize: "1.25rem", fontWeight: 800, color: "var(--teal)" }}>
-                  ฿{p.price}
-                </span>
-                <div style={{ width: "32px", height: "32px", borderRadius: "9999px", backgroundColor: "rgba(75, 155, 140, 0.15)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--teal)" }}>
-                  <Plus size={18} />
+              <div style={{ padding: "0.85rem", display: "flex", flexDirection: "column", flex: 1, justifyContent: "space-between" }}>
+                <div>
+                  <h3 style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--ink)" }}>{p.name_th}</h3>
+                  <p className="font-mono" style={{ fontSize: "0.7rem", color: "var(--ink-soft)", marginTop: "0.1rem" }}>
+                    {p.name_en}
+                  </p>
+                  <p style={{ marginTop: "0.35rem", fontSize: "0.75rem", color: "var(--ink-soft)", lineHeight: 1.35 }}>
+                    {p.desc}
+                  </p>
+                </div>
+
+                <div style={{ marginTop: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div>
+                    <span style={{ fontSize: "0.7rem", color: "var(--ink-soft)" }}>เริ่มต้น </span>
+                    <span className="font-display" style={{ fontSize: "1.25rem", color: "var(--ink)" }}>
+                      {p.price}฿
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenCustomizer(p);
+                    }}
+                    style={{
+                      borderRadius: "9999px",
+                      backgroundColor: "var(--ink)",
+                      padding: "0.4rem 0.85rem",
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                      color: "var(--cream)",
+                      border: "none",
+                      cursor: "pointer",
+                      transition: "opacity 0.15s ease",
+                    }}
+                  >
+                    เลือก +
+                  </button>
                 </div>
               </div>
-            </div>
+            </article>
           ))}
+          </div>
         </div>
 
         {/* Floating Cart Button (Bottom Right - Exactly like Storefront) */}

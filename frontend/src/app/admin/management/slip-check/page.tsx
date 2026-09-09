@@ -22,6 +22,7 @@ import {
   MoreVertical,
   Check,
 } from "lucide-react";
+import { useToast } from "@/components/ui/toast";
 
 export type PaymentVerificationStatus = "verified" | "pending" | "fraud";
 export type PaymentMethod = "promptpay_qr" | "cash";
@@ -189,6 +190,7 @@ const INITIAL_SLIP_ORDERS: SlipOrderItem[] = [
 ];
 
 export default function SlipCheckManagementPage() {
+  const { success, error: toastError, info, warning } = useToast();
   const [orders, setOrders] = useState<SlipOrderItem[]>(INITIAL_SLIP_ORDERS);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | PaymentVerificationStatus>("all");
@@ -244,6 +246,7 @@ export default function SlipCheckManagementPage() {
 
   // Status Change Handlers
   const handleSetStatus = (orderId: number, status: PaymentVerificationStatus, note?: string) => {
+    const target = orders.find((o) => o.id === orderId);
     setOrders((prev) =>
       prev.map((o) => {
         if (o.id === orderId) {
@@ -256,6 +259,16 @@ export default function SlipCheckManagementPage() {
         return o;
       })
     );
+
+    if (target) {
+      if (status === "verified") {
+        success(`อนุมัติสลิปออเดอร์ ${target.orderNo} (${target.queueNo}) เรียบร้อยแล้ว`, "อนุมัติการชำระเงิน");
+      } else if (status === "fraud") {
+        toastError(`ปฏิเสธสลิปออเดอร์ ${target.orderNo} (${target.queueNo}) แล้ว`, "ปฏิเสธสลิป");
+      } else if (status === "pending") {
+        info(`ย้ายออเดอร์ ${target.orderNo} กลับมารอตรวจสอบ`, "รอตรวจสอบ");
+      }
+    }
 
     // If active modal is open, update selectedOrder
     if (selectedOrder && selectedOrder.id === orderId) {
@@ -297,37 +310,20 @@ export default function SlipCheckManagementPage() {
     <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "var(--cream)", fontFamily: "'Kanit', sans-serif" }}>
       <AdminSidebar />
 
-      <main style={{ flex: 1, padding: "2rem 2.5rem", overflowY: "auto" }}>
-        {/* Header Title */}
-        <div style={{ marginBottom: "1.5rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <span
-              className="font-mono"
-              style={{
-                fontSize: "11px",
-                textTransform: "uppercase",
-                letterSpacing: "0.15em",
-                color: "var(--teal)",
-                fontWeight: 600,
-                backgroundColor: "rgba(75, 155, 140, 0.15)",
-                padding: "0.2rem 0.6rem",
-                borderRadius: "9999px",
-              }}
-            >
-              PAYMENT VERIFICATION
-            </span>
+      <main style={{ flex: 1, padding: "1.75rem 2.5rem", overflowY: "auto", minWidth: 0 }}>
+        {/* Header Section */}
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
+          <div>
+            <h1 style={{ fontSize: "1.75rem", fontWeight: 800, lineHeight: 1.2, margin: 0 }}>
+              การตรวจสอบการชำระเงิน
+            </h1>
           </div>
-          <h1 style={{ fontSize: "1.85rem", fontWeight: 800, color: "var(--ink)", marginTop: "0.4rem", lineHeight: 1.15 }}>
-            การตรวจสอบการชำระเงิน
-          </h1>
-          <p style={{ color: "var(--ink-soft)", fontSize: "0.875rem", marginTop: "0.2rem" }}>
-            ตรวจสอบสลิปโอนเงิน PromptPay / รูปถ่ายเงินสดหน้าร้าน และยืนยันความถูกต้องของยอดชำระ
-          </p>
         </div>
 
         {/* Main Table Container (Dashboard Style) */}
         <section
           style={{
+            marginTop: "1.5rem",
             borderRadius: "1.25rem",
             backgroundColor: "var(--card)",
             padding: "1.5rem",
@@ -465,14 +461,14 @@ export default function SlipCheckManagementPage() {
           </div>
 
           {/* Controls Bar: Filter Tabs & Search / Sort */}
-          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "0.85rem", marginBottom: "1.25rem" }}>
+          <div className="admin-controls-bar">
             {/* Filter Tabs */}
-            <div style={{ display: "flex", gap: "0.35rem", backgroundColor: "var(--cream)", padding: "3px", borderRadius: "0.65rem", border: "1px solid rgba(50, 55, 65, 0.1)" }}>
+            <div className="admin-filter-tabs">
               {[
                 { id: "all", label: "ทั้งหมด" },
-                { id: "pending", label: "ยังไม่ได้ยืนยัน" },
+                { id: "pending", label: "รอตรวจสอบ" },
                 { id: "verified", label: "ยืนยันแล้ว" },
-                { id: "fraud", label: "เนียนเลยนะครับ" },
+                { id: "fraud", label: "สลิปไม่ถูกต้อง" },
               ].map((tab) => {
                 const isSelected = statusFilter === tab.id;
                 return (
@@ -493,6 +489,8 @@ export default function SlipCheckManagementPage() {
                       backgroundColor: isSelected ? "var(--ink)" : "transparent",
                       color: isSelected ? "var(--cream)" : "var(--ink-soft)",
                       transition: "all 0.15s ease",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
                     }}
                   >
                     {tab.label}
@@ -501,21 +499,11 @@ export default function SlipCheckManagementPage() {
               })}
             </div>
 
-            {/* Search & Sort (Max Item moved to bottom pagination) */}
-            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.6rem" }}>
+            {/* Search & Sort */}
+            <div className="admin-search-wrapper">
               {/* Search */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.4rem",
-                  backgroundColor: "var(--cream)",
-                  padding: "0.45rem 0.75rem",
-                  borderRadius: "0.6rem",
-                  border: "1px solid rgba(50, 55, 65, 0.12)",
-                }}
-              >
-                <Search size={15} color="var(--ink-soft)" />
+              <div className="admin-search-box">
+                <Search size={15} color="var(--ink-soft)" style={{ flexShrink: 0 }} />
                 <input
                   type="text"
                   placeholder="ค้นหาเลขที่, คิว, ชื่อ, เบอร์..."
@@ -523,15 +511,6 @@ export default function SlipCheckManagementPage() {
                   onChange={(e) => {
                     setSearch(e.target.value);
                     setPage(1);
-                  }}
-                  style={{
-                    border: "none",
-                    background: "transparent",
-                    outline: "none",
-                    fontSize: "0.825rem",
-                    width: "180px",
-                    fontFamily: "'Kanit', sans-serif",
-                    color: "var(--ink)",
                   }}
                 />
               </div>
@@ -567,7 +546,7 @@ export default function SlipCheckManagementPage() {
           </div>
 
           {/* Table */}
-          <div style={{ overflowX: "auto" }}>
+          <div style={{ overflowX: "visible" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.875rem" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid rgba(50, 55, 65, 0.12)", color: "var(--ink-soft)", fontSize: "0.8rem" }}>
@@ -587,6 +566,7 @@ export default function SlipCheckManagementPage() {
                   const isPending = order.paymentStatus === "pending";
                   const isVerified = order.paymentStatus === "verified";
                   const isFraud = order.paymentStatus === "fraud";
+                  const isKebabOpen = activeKebabId === order.id;
 
                   return (
                     <tr
@@ -594,6 +574,8 @@ export default function SlipCheckManagementPage() {
                       style={{
                         borderBottom: "1px solid rgba(50, 55, 65, 0.06)",
                         transition: "background-color 0.15s ease",
+                        position: isKebabOpen ? "relative" : "static",
+                        zIndex: isKebabOpen ? 50 : 1,
                       }}
                     >
                       <td className="font-mono" style={{ padding: "0.85rem 0.6rem", fontSize: "0.825rem", fontWeight: 600 }}>
@@ -706,7 +688,7 @@ export default function SlipCheckManagementPage() {
                       </td>
 
                       {/* Status Action: Kebab Menu */}
-                      <td style={{ padding: "0.85rem 0.6rem", textAlign: "right" }}>
+                      <td style={{ padding: "0.85rem 0.6rem", textAlign: "right", position: isKebabOpen ? "relative" : "static", zIndex: isKebabOpen ? 50 : 1 }}>
                         <div className="kebab-container" style={{ position: "relative", display: "inline-block" }}>
                           <button
                             type="button"

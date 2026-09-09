@@ -52,6 +52,9 @@ func main() {
 
 	h := handler.NewAppHandler(cfg, postgresDB, redisClient)
 
+	// Static file serving for uploads
+	r.Static("/uploads", "./uploads")
+
 	// API Routes
 	r.GET("/health", h.HealthCheck)
 	r.GET("/api/v1/health", h.HealthCheck)
@@ -64,6 +67,12 @@ func main() {
 		v1.POST("/auth/login", h.Login)
 		v1.POST("/admin/login", h.Login) // alias for convenience
 
+		// Public Menu & Topping Read (Customer or Public viewing)
+		v1.GET("/products", h.GetProducts)
+		v1.GET("/products/:id", h.GetProductByID)
+		v1.GET("/toppings", h.GetToppings)
+		v1.GET("/toppings/:id", h.GetToppingByID)
+
 		// Protected Admin Routes (Requires valid JWT and is_activate == true)
 		if postgresDB != nil && postgresDB.DB != nil {
 			adminGroup := v1.Group("")
@@ -75,6 +84,19 @@ func main() {
 				adminGroup.POST("/admins", h.CreateAdmin)
 				adminGroup.PUT("/admins/:uuid", h.UpdateAdmin)
 				adminGroup.DELETE("/admins/:uuid", h.DeleteAdmin)
+
+				// Admin Product Management
+				adminGroup.POST("/products", h.CreateProduct)
+				adminGroup.PUT("/products/:id", h.UpdateProduct)
+				adminGroup.DELETE("/products/:id", h.DeleteProduct)
+
+				// Admin Topping Management
+				adminGroup.POST("/toppings", h.CreateTopping)
+				adminGroup.PUT("/toppings/:id", h.UpdateTopping)
+				adminGroup.DELETE("/toppings/:id", h.DeleteTopping)
+
+				// Uploads (Images)
+				adminGroup.POST("/upload", h.UploadImage)
 			}
 		}
 	}

@@ -147,9 +147,22 @@ func (h *AppHandler) GetAdmins(c *gin.Context) {
 		return
 	}
 
+	var currentAdminUUID string
+	if val, exists := c.Get("current_admin"); exists {
+		if curAdmin, ok := val.(*model.Admin); ok {
+			currentAdminUUID = curAdmin.UUID
+		}
+	}
+
+	orderClause := "is_superadmin DESC, created_at DESC, id DESC"
+	if currentAdminUUID != "" {
+		// Place current authenticated admin at the very top, followed by superadmins, then latest created_at
+		orderClause = fmt.Sprintf("CASE WHEN uuid = '%s' THEN 0 ELSE 1 END ASC, is_superadmin DESC, created_at DESC, id DESC", currentAdminUUID)
+	}
+
 	var admins []model.Admin
 	offset := (page - 1) * pageSize
-	if err := query.Order("id ASC").Limit(pageSize).Offset(offset).Find(&admins).Error; err != nil {
+	if err := query.Order(orderClause).Limit(pageSize).Offset(offset).Find(&admins).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch admins"})
 		return
 	}

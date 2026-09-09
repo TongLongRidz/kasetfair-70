@@ -61,3 +61,53 @@ type Topping struct {
 func (Topping) TableName() string {
 	return "toppings"
 }
+
+// DTOs for Products
+type CreateProductRequest struct {
+	NameTh        string  `json:"name_th" binding:"required,min=1,max=150"`
+	NameEn        string  `json:"name_en"`
+	DescTh        *string `json:"desc_th"`
+	DescEn        *string `json:"desc_en"`
+	Price         int     `json:"price" binding:"min=0"`
+	ImageURL      *string `json:"image_url"`
+	IsCombo       bool    `json:"is_combo"`
+	IsAvailable   *bool   `json:"is_available"`
+	IsSoldOut     *bool   `json:"is_sold_out"`
+	IsRecommended *bool   `json:"is_recommended"`
+	SortOrder     *int    `json:"sort_order"`
+}
+
+type UpdateProductRequest struct {
+	NameTh        *string `json:"name_th"`
+	NameEn        *string `json:"name_en"`
+	DescTh        *string `json:"desc_th"`
+	DescEn        *string `json:"desc_en"`
+	Price         *int    `json:"price"`
+	ImageURL      *string `json:"image_url"`
+	IsCombo       *bool   `json:"is_combo"`
+	IsAvailable   *bool   `json:"is_available"`
+	IsSoldOut     *bool   `json:"is_sold_out"`
+	IsRecommended *bool   `json:"is_recommended"`
+	SortOrder     *int    `json:"sort_order"`
+}
+
+// DTOs for Toppings
+type CreateToppingRequest struct {
+	NameTh      string  `json:"name_th" binding:"required,min=1,max=100"`
+	NameEn      string  `json:"name_en"`
+	Price       int     `json:"price" binding:"min=0"`
+	ImageURL    *string `json:"image_url"`
+	IsAvailable *bool   `json:"is_available"`
+	IsSoldOut   *bool   `json:"is_sold_out"`
+	SortOrder   *int    `json:"sort_order"`
+}
+
+type UpdateToppingRequest struct {
+	NameTh      *string `json:"name_th"`
+	NameEn      *string `json:"name_en"`
+	Price       *int    `json:"price"`
+	ImageURL    *string `json:"image_url"`
+	IsAvailable *bool   `json:"is_available"`
+	IsSoldOut   *bool   `json:"is_sold_out"`
+	SortOrder   *int    `json:"sort_order"`
+}
