@@ -86,17 +86,20 @@ func main() {
 				adminGroup.DELETE("/admins/:uuid", h.DeleteAdmin)
 
 				// Admin Product Management
+				adminGroup.PUT("/products/reorder", h.ReorderProducts)
 				adminGroup.POST("/products", h.CreateProduct)
 				adminGroup.PUT("/products/:id", h.UpdateProduct)
 				adminGroup.DELETE("/products/:id", h.DeleteProduct)
 
 				// Admin Topping Management
+				adminGroup.PUT("/toppings/reorder", h.ReorderToppings)
 				adminGroup.POST("/toppings", h.CreateTopping)
 				adminGroup.PUT("/toppings/:id", h.UpdateTopping)
 				adminGroup.DELETE("/toppings/:id", h.DeleteTopping)
 
 				// Uploads (Images)
 				adminGroup.POST("/upload", h.UploadImage)
+				adminGroup.DELETE("/upload", h.DeleteUpload)
 			}
 		}
 	}

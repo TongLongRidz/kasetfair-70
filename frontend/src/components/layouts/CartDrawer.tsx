@@ -40,34 +40,34 @@ export default function CartDrawer({
   extraHeaderContent,
   discountAmount = 0,
 }: CartDrawerProps) {
-  const [isRendered, setIsRendered] = useState(isOpen);
-  const [isClosing, setIsClosing] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      setIsRendered(true);
-      setIsClosing(false);
-    } else if (isRendered && !isClosing) {
-      // Trigger smooth exit animation
-      setIsClosing(true);
+      setIsMounted(true);
+      document.body.classList.add("lock-scroll");
+      document.documentElement.classList.add("lock-scroll");
+      const rAF = requestAnimationFrame(() => {
+        setIsVisible(true);
+      });
+      return () => cancelAnimationFrame(rAF);
+    } else {
+      setIsVisible(false);
       const timer = setTimeout(() => {
-        setIsRendered(false);
-        setIsClosing(false);
+        setIsMounted(false);
+        document.body.classList.remove("lock-scroll");
+        document.documentElement.classList.remove("lock-scroll");
       }, 300);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        document.body.classList.remove("lock-scroll");
+        document.documentElement.classList.remove("lock-scroll");
+      };
     }
   }, [isOpen]);
 
-  const handleClose = () => {
-    setIsClosing(true);
-    setTimeout(() => {
-      onClose();
-      setIsRendered(false);
-      setIsClosing(false);
-    }, 300);
-  };
-
-  if (!isRendered && !isOpen) return null;
+  if (!isMounted && !isOpen) return null;
 
   const totalCups = cart.reduce((sum, item) => sum + item.quantity, 0);
   const rawTotal = cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
@@ -75,7 +75,6 @@ export default function CartDrawer({
 
   return (
     <div
-      className={isClosing ? "animate-fade-out" : "animate-fade-in"}
       style={{
         position: "fixed",
         inset: 0,
@@ -84,11 +83,13 @@ export default function CartDrawer({
         backdropFilter: "blur(4px)",
         display: "flex",
         justifyContent: "flex-end",
+        opacity: isVisible ? 1 : 0,
+        pointerEvents: isVisible ? "auto" : "none",
+        transition: "opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1)",
       }}
-      onClick={handleClose}
+      onClick={onClose}
     >
       <div
-        className={isClosing ? "animate-slide-out-right" : "animate-slide-right"}
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
@@ -99,6 +100,8 @@ export default function CartDrawer({
           flexDirection: "column",
           boxShadow: "-10px 0 35px rgba(0, 0, 0, 0.25)",
           borderLeft: "1px solid rgba(50, 55, 65, 0.1)",
+          transform: isVisible ? "translateX(0)" : "translateX(100%)",
+          transition: "transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)",
         }}
       >
         {/* Drawer Header */}
@@ -139,7 +142,7 @@ export default function CartDrawer({
 
           <button
             type="button"
-            onClick={handleClose}
+            onClick={onClose}
             aria-label="ปิดตะกร้า"
             style={{
               width: "36px",

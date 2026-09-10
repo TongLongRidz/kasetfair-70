@@ -17,7 +17,10 @@
   padding: 0;
 }
 
-button, input, select, textarea {
+button,
+input,
+select,
+textarea {
   font-family: inherit;
 }
 
@@ -64,7 +67,7 @@ body {
 }
 
 .font-mitr {
-  font-family: 'Mitr', sans-serif;
+  font-family: 'Kanit', sans-serif;
 }
 
 /* Admin area font class */
@@ -74,7 +77,7 @@ body {
 .admin-theme input,
 .admin-theme select,
 .admin-theme textarea {
-  font-family: 'Mitr', sans-serif;
+  font-family: 'Kanit', sans-serif;
 }
 
 /* Specific Kanit theme for POS front desk */
@@ -95,41 +98,6 @@ body {
 .kanit-theme .font-display,
 .kanit-theme .font-display * {
   font-family: 'Anton', sans-serif !important;
-}
-
-/* Mitr font weight normalization for crisp readability */
-.admin-theme [style*="font-weight: 800"],
-.admin-theme [style*="font-weight:800"],
-.admin-theme [style*="fontWeight: 800"],
-.admin-theme [style*="fontWeight:800"],
-.admin-theme [style*="font-weight: 700"],
-.admin-theme [style*="font-weight:700"],
-.admin-theme [style*="fontWeight: 700"],
-.admin-theme [style*="fontWeight:700"],
-.admin-theme h1,
-.admin-theme h2,
-.admin-theme h3,
-.admin-theme th,
-.admin-theme b,
-.admin-theme strong {
-  font-weight: 600 !important;
-}
-
-.admin-theme [style*="font-weight: 600"],
-.admin-theme [style*="font-weight:600"],
-.admin-theme [style*="fontWeight: 600"],
-.admin-theme [style*="fontWeight:600"],
-.admin-theme label {
-  font-weight: 500 !important;
-}
-
-.admin-theme p,
-.admin-theme span,
-.admin-theme td,
-.admin-theme input,
-.admin-theme select,
-.admin-theme button {
-  font-weight: 400;
 }
 
 .admin-theme .font-mono,
@@ -156,6 +124,7 @@ body {
     opacity: 0;
     transform: translateY(16px);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0);
@@ -167,9 +136,12 @@ body {
 }
 
 @keyframes badge-bounce {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: scale(1);
   }
+
   50% {
     transform: scale(1.05);
   }
@@ -184,6 +156,7 @@ body {
     transform: translateY(100%);
     opacity: 0.8;
   }
+
   100% {
     transform: translateY(0);
     opacity: 1;
@@ -198,6 +171,7 @@ body {
   0% {
     opacity: 0;
   }
+
   100% {
     opacity: 1;
   }
@@ -212,6 +186,7 @@ body {
     opacity: 0;
     transform: scale(0.94) translateY(8px);
   }
+
   100% {
     opacity: 1;
     transform: scale(1) translateY(0);
@@ -226,6 +201,7 @@ body {
   0% {
     transform: translateX(100%);
   }
+
   100% {
     transform: translateX(0);
   }
@@ -239,6 +215,7 @@ body {
   0% {
     transform: translateX(0);
   }
+
   100% {
     transform: translateX(100%);
   }
@@ -252,6 +229,7 @@ body {
   0% {
     opacity: 1;
   }
+
   100% {
     opacity: 0;
   }
@@ -267,6 +245,7 @@ body {
     transform: translateY(-8px);
     max-height: 0;
   }
+
   100% {
     opacity: 1;
     transform: translateY(0);
@@ -284,6 +263,7 @@ body {
     transform: translateY(0);
     max-height: 80vh;
   }
+
   100% {
     opacity: 0;
     transform: translateY(-8px);
@@ -300,31 +280,59 @@ body {
   .nav-menu-link {
     display: none !important;
   }
+
   .nav-queue-btn {
     padding: 0.3rem 0.6rem !important;
     font-size: 0.7rem !important;
   }
+
   .hero-banner-card {
     padding: 1rem 1rem !important;
     min-height: 155px !important;
     border-radius: 18px !important;
   }
+
   .hero-banner-content {
     max-width: 62% !important;
   }
+
   .hero-banner-title {
     font-size: 1.35rem !important;
     line-height: 1.15 !important;
   }
+
   .hero-banner-desc {
     font-size: 0.725rem !important;
     line-height: 1.35 !important;
     margin-top: 0.25rem !important;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
   }
+
+  .hero-banner-image-wrapper {
+    width: 9rem !important;
+    height: 9rem !important;
+    right: -1.2rem !important;
+    bottom: -1.2rem !important;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 640px) {
+  .hero-banner-image-wrapper {
+    width: 10.5rem !important;
+    height: 10.5rem !important;
+    right: -1.4rem !important;
+    bottom: -1.4rem !important;
+  }
+}
+
+/* Prevent background scroll when Drawer / Modal is open */
+body.lock-scroll,
+html.lock-scroll {
+  overflow: hidden !important;
+  touch-action: none;
+}
+
+.lock-scroll-container {
+  overflow: hidden !important;
 }
 
 /* Admin Responsive Table / Card View */
@@ -352,13 +360,26 @@ body {
   padding: 3px;
   border-radius: 0.65rem;
   border: 1px solid rgba(50, 55, 65, 0.1);
-  overflow-x: auto;
   max-width: 100%;
-  scrollbar-width: none;
 }
 
-.admin-filter-tabs::-webkit-scrollbar {
+.admin-filter-dropdown-wrapper {
   display: none;
+  width: 100%;
+}
+
+.admin-filter-select {
+  width: 100%;
+  padding: 0.5rem 0.85rem;
+  border-radius: 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: 'Kanit', sans-serif;
+  background-color: var(--cream);
+  border: 1px solid rgba(50, 55, 65, 0.15);
+  color: var(--ink);
+  cursor: pointer;
+  outline: none;
 }
 
 .admin-search-wrapper {
@@ -377,7 +398,7 @@ body {
   border-radius: 0.6rem;
   border: 1px solid rgba(50, 55, 65, 0.12);
   flex: 1;
-  min-width: 160px;
+  min-width: 260px;
 }
 
 .admin-search-box input {
@@ -387,31 +408,75 @@ body {
   font-size: 0.825rem;
   width: 100%;
   color: var(--ink);
+  font-family: 'Kanit', sans-serif;
+}
+
+.admin-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  background-color: var(--teal);
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 0.6rem;
+  border: none;
+  font-weight: 600;
+  font-size: 0.85rem;
+  font-family: 'Kanit', sans-serif;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(75, 155, 140, 0.2);
+  transition: transform 0.15s ease, background-color 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.admin-add-btn:hover {
+  background-color: #3d887a;
 }
 
 @media (max-width: 768px) {
   .admin-table-view {
     display: none !important;
   }
+
   .admin-cards-view {
     display: flex !important;
     flex-direction: column;
     gap: 0.75rem;
   }
+
   .admin-controls-bar {
     flex-direction: column;
     align-items: stretch !important;
     gap: 0.75rem;
   }
+
   .admin-filter-tabs {
-    width: 100%;
-    justify-content: flex-start;
+    display: none !important;
   }
+
+  .admin-filter-dropdown-wrapper {
+    display: block !important;
+  }
+
   .admin-search-wrapper {
     width: 100%;
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 0.65rem;
   }
+
+  .admin-add-btn {
+    width: 100%;
+    padding: 0.65rem 1rem;
+    font-size: 0.9rem;
+    justify-content: center;
+  }
+
   .admin-search-box {
     width: 100%;
+    min-width: 0 !important;
   }
 }
 
@@ -463,10 +528,11 @@ body {
   .admin-sidebar-desktop {
     display: none !important;
   }
+
   .admin-topbar-mobile {
     display: flex !important;
   }
-  
+
   /* Make main admin wrappers adapt to topbar */
   div:has(> aside.admin-sidebar-desktop),
   div:has(> header.admin-topbar-mobile) {
@@ -474,15 +540,15 @@ body {
   }
 
   main:has(~ aside.admin-sidebar-desktop),
-  aside.admin-sidebar-desktop + main,
-  header.admin-topbar-mobile + main {
+  aside.admin-sidebar-desktop+main,
+  header.admin-topbar-mobile+main {
     padding: 1rem 1rem 4rem 1rem !important;
     width: 100% !important;
   }
 
   main:has(~ aside.admin-sidebar-desktop) h1,
-  aside.admin-sidebar-desktop + main h1,
-  header.admin-topbar-mobile + main h1 {
+  aside.admin-sidebar-desktop+main h1,
+  header.admin-topbar-mobile+main h1 {
     font-size: 1.35rem !important;
     line-height: 1.25 !important;
   }
@@ -495,6 +561,107 @@ body {
 
   .admin-kpi-card {
     padding: 1rem 1.15rem !important;
+  }
+}
+
+/* Responsive Menu Products Grid */
+.menu-products-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  justify-items: center;
+}
+
+.menu-products-grid>article {
+  width: 80%;
+  max-width: 320px;
+}
+
+@media (min-width: 480px) {
+  .menu-products-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.85rem;
+    justify-items: stretch;
+  }
+
+  .menu-products-grid>article {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+@media (min-width: 640px) {
+  .menu-products-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .menu-products-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.1rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .menu-products-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1.15rem;
+  }
+}
+
+/* Responsive Toppings Grid */
+.toppings-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  justify-items: center;
+}
+
+.toppings-grid>article {
+  width: 80%;
+  max-width: 320px;
+}
+
+@media (min-width: 480px) {
+  .toppings-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.85rem;
+    justify-items: stretch;
+  }
+
+  .toppings-grid>article {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+@media (min-width: 640px) {
+  .toppings-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .toppings-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.1rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .toppings-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1.15rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .toppings-grid {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1.2rem;
   }
 }
 
@@ -523,12 +690,12 @@ body {
   .admin-dashboard-middle-grid {
     grid-template-columns: 1fr !important;
   }
-  
+
   /* When stacked / not enough width, place Channels on top */
   .admin-dashboard-channel-col {
     order: 1 !important;
   }
-  
+
   .admin-dashboard-trend-col {
     order: 2 !important;
   }
@@ -538,9 +705,21 @@ body {
   }
 }
 
+/* Responsive Line Break */
+.mobile-break {
+  display: inline;
+}
 
+.desktop-break {
+  display: none;
+}
 
+@media (min-width: 641px) {
+  .mobile-break {
+    display: none;
+  }
 
-
-
-
+  .desktop-break {
+    display: inline;
+  }
+}

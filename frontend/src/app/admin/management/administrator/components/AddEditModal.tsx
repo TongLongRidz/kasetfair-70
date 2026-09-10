@@ -282,7 +282,7 @@ export default function AddEditModal({
               >
                 <div>
                   <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--ink)" }}>
-                    สิทธิ์ Superadmin
+                    สิทธิ์ Super Admin
                   </div>
                   <div style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "1px" }}>
                     ให้มีอำนาจดูแลระบบและจัดการแอดมินทั้งหมด

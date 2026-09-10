@@ -71,7 +71,7 @@ func (h *AppHandler) GetProducts(c *gin.Context) {
 
 	var products []model.Product
 	offset := (page - 1) * pageSize
-	if err := query.Order("sort_order ASC, id ASC").Limit(pageSize).Offset(offset).Find(&products).Error; err != nil {
+	if err := query.Preload("ComboRecipes.Topping").Preload("ComboRecipes.BaseProduct").Order("is_recommended DESC, sort_order ASC, id ASC").Limit(pageSize).Offset(offset).Find(&products).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch products"})
 		return
 	}
@@ -105,7 +105,7 @@ func (h *AppHandler) GetProductByID(c *gin.Context) {
 	}
 
 	var product model.Product
-	if err := h.DB.DB.Preload("ComboRecipes.Topping").First(&product, id).Error; err != nil {
+	if err := h.DB.DB.Preload("ComboRecipes.Topping").Preload("ComboRecipes.BaseProduct").First(&product, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
 			return
@@ -147,25 +147,58 @@ func (h *AppHandler) CreateProduct(c *gin.Context) {
 		sortOrder = *req.SortOrder
 	}
 
+	// Auto-detect combo if recipes/toppings provided
+	isCombo := req.IsCombo
+	if len(req.ToppingIDs) > 0 || req.BaseProductID != nil {
+		isCombo = true
+	}
+
 	product := model.Product{
 		NameTh:        req.NameTh,
 		NameEn:        req.NameEn,
 		DescTh:        req.DescTh,
 		DescEn:        req.DescEn,
-		Price:         req.Price,
+		PriceHot:      req.PriceHot,
+		PriceIced:     req.PriceIced,
 		ImageURL:      req.ImageURL,
-		IsCombo:       req.IsCombo,
+		IsCombo:       isCombo,
 		IsAvailable:   isAvailable,
 		IsSoldOut:     isSoldOut,
 		IsRecommended: isRecommended,
 		SortOrder:     sortOrder,
 	}
 
-	if err := h.DB.DB.Create(&product).Error; err != nil {
+	err := h.DB.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&product).Error; err != nil {
+			return err
+		}
+
+		// If combo recipes are specified, save them
+		if isCombo && len(req.ToppingIDs) > 0 {
+			var baseID uint
+			if req.BaseProductID != nil {
+				baseID = *req.BaseProductID
+			}
+			for _, topID := range req.ToppingIDs {
+				recipe := model.ProductComboRecipe{
+					ComboProductID: product.ID,
+					BaseProductID:  baseID,
+					ToppingID:      topID,
+				}
+				if err := tx.Create(&recipe).Error; err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create product: " + err.Error()})
 		return
 	}
 
+	h.DB.DB.Preload("ComboRecipes.Topping").Preload("ComboRecipes.BaseProduct").First(&product, product.ID)
 	c.JSON(http.StatusCreated, product)
 }
 
@@ -212,8 +245,11 @@ func (h *AppHandler) UpdateProduct(c *gin.Context) {
 	if req.DescEn != nil {
 		updates["desc_en"] = req.DescEn
 	}
-	if req.Price != nil {
-		updates["price"] = *req.Price
+	if req.PriceHot != nil {
+		updates["price_hot"] = req.PriceHot
+	}
+	if req.PriceIced != nil {
+		updates["price_iced"] = req.PriceIced
 	}
 	if req.ImageURL != nil {
 		updates["image_url"] = req.ImageURL
@@ -234,14 +270,52 @@ func (h *AppHandler) UpdateProduct(c *gin.Context) {
 		updates["sort_order"] = *req.SortOrder
 	}
 
-	if len(updates) > 0 {
-		if err := h.DB.DB.Model(&product).Updates(updates).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product: " + err.Error()})
-			return
+	txErr := h.DB.DB.Transaction(func(tx *gorm.DB) error {
+		if len(updates) > 0 {
+			if req.ImageURL != nil && product.ImageURL != nil && *product.ImageURL != "" && *product.ImageURL != *req.ImageURL {
+				deleteUploadFile(*product.ImageURL)
+			}
+
+			if err := tx.Model(&product).Updates(updates).Error; err != nil {
+				return err
+			}
 		}
+
+		// If ToppingIDs is provided in update payload, sync product_combo_recipes
+		if req.ToppingIDs != nil {
+			// Delete existing combo recipes for this product
+			if err := tx.Where("combo_product_id = ?", product.ID).Delete(&model.ProductComboRecipe{}).Error; err != nil {
+				return err
+			}
+
+			if len(*req.ToppingIDs) > 0 {
+				var baseID uint
+				if req.BaseProductID != nil {
+					baseID = *req.BaseProductID
+				}
+				for _, topID := range *req.ToppingIDs {
+					recipe := model.ProductComboRecipe{
+						ComboProductID: product.ID,
+						BaseProductID:  baseID,
+						ToppingID:      topID,
+					}
+					if err := tx.Create(&recipe).Error; err != nil {
+						return err
+					}
+				}
+				// Ensure is_combo is set to true
+				tx.Model(&product).Update("is_combo", true)
+			}
+		}
+		return nil
+	})
+
+	if txErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product: " + txErr.Error()})
+		return
 	}
 
-	h.DB.DB.First(&product, id)
+	h.DB.DB.Preload("ComboRecipes.Topping").Preload("ComboRecipes.BaseProduct").First(&product, id)
 	c.JSON(http.StatusOK, product)
 }
 
@@ -269,12 +343,42 @@ func (h *AppHandler) DeleteProduct(c *gin.Context) {
 		return
 	}
 
+	if product.ImageURL != nil && *product.ImageURL != "" {
+		deleteUploadFile(*product.ImageURL)
+	}
+
 	if err := h.DB.DB.Delete(&product).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete product: " + err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Product deleted successfully", "id": id})
+}
+
+// ReorderProducts handles PUT /api/v1/products/reorder
+func (h *AppHandler) ReorderProducts(c *gin.Context) {
+	if h.DB == nil || h.DB.DB == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Database is not connected"})
+		return
+	}
+
+	var req model.ReorderProductsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	tx := h.DB.DB.Begin()
+	for _, item := range req.Items {
+		if err := tx.Model(&model.Product{}).Where("id = ?", item.ID).Update("sort_order", item.SortOrder).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product order: " + err.Error()})
+			return
+		}
+	}
+	tx.Commit()
+
+	c.JSON(http.StatusOK, gin.H{"message": "Products reordered successfully", "count": len(req.Items)})
 }
 
 // ==========================================
@@ -382,6 +486,14 @@ func (h *AppHandler) CreateTopping(c *gin.Context) {
 		return
 	}
 
+	allowHot := true
+	if req.AllowHot != nil {
+		allowHot = *req.AllowHot
+	}
+	allowIced := true
+	if req.AllowIced != nil {
+		allowIced = *req.AllowIced
+	}
 	isAvailable := true
 	if req.IsAvailable != nil {
 		isAvailable = *req.IsAvailable
@@ -399,13 +511,15 @@ func (h *AppHandler) CreateTopping(c *gin.Context) {
 		NameTh:      req.NameTh,
 		NameEn:      req.NameEn,
 		Price:       req.Price,
+		AllowHot:    allowHot,
+		AllowIced:   allowIced,
 		ImageURL:    req.ImageURL,
 		IsAvailable: isAvailable,
 		IsSoldOut:   isSoldOut,
 		SortOrder:   sortOrder,
 	}
 
-	if err := h.DB.DB.Create(&topping).Error; err != nil {
+	if err := h.DB.DB.Select("NameTh", "NameEn", "Price", "AllowHot", "AllowIced", "ImageURL", "IsAvailable", "IsSoldOut", "SortOrder").Create(&topping).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create topping: " + err.Error()})
 		return
 	}
@@ -452,6 +566,12 @@ func (h *AppHandler) UpdateTopping(c *gin.Context) {
 	}
 	if req.Price != nil {
 		updates["price"] = *req.Price
+	}
+	if req.AllowHot != nil {
+		updates["allow_hot"] = *req.AllowHot
+	}
+	if req.AllowIced != nil {
+		updates["allow_iced"] = *req.AllowIced
 	}
 	if req.ImageURL != nil {
 		updates["image_url"] = req.ImageURL
@@ -509,9 +629,50 @@ func (h *AppHandler) DeleteTopping(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Topping deleted successfully", "id": id})
 }
 
+// ReorderToppings handles PUT /api/v1/toppings/reorder
+func (h *AppHandler) ReorderToppings(c *gin.Context) {
+	if h.DB == nil || h.DB.DB == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Database is not connected"})
+		return
+	}
+
+	var req model.ReorderToppingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	tx := h.DB.DB.Begin()
+	for _, item := range req.Items {
+		if err := tx.Model(&model.Topping{}).Where("id = ?", item.ID).Update("sort_order", item.SortOrder).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update topping order: " + err.Error()})
+			return
+		}
+	}
+	tx.Commit()
+
+	c.JSON(http.StatusOK, gin.H{"message": "Toppings reordered successfully", "count": len(req.Items)})
+}
+
 // ==========================================
 // FILE UPLOAD HANDLER
 // ==========================================
+
+// Helper to safely delete file from ./uploads directory
+func deleteUploadFile(fileURL string) {
+	if !strings.HasPrefix(fileURL, "/uploads/") {
+		return
+	}
+	cleanRelPath := filepath.Clean(strings.TrimPrefix(fileURL, "/uploads/"))
+	if strings.Contains(cleanRelPath, "..") || cleanRelPath == "." || cleanRelPath == "/" {
+		return
+	}
+	targetPath := filepath.Join("./uploads", cleanRelPath)
+	if _, err := os.Stat(targetPath); err == nil {
+		_ = os.Remove(targetPath)
+	}
+}
 
 // UploadImage handles POST /api/v1/upload
 func (h *AppHandler) UploadImage(c *gin.Context) {
@@ -534,7 +695,21 @@ func (h *AppHandler) UploadImage(c *gin.Context) {
 		return
 	}
 
+	// Determine subfolder (e.g. "menu", "toppings", or default "")
+	folder := c.DefaultPostForm("folder", c.Query("folder"))
+	cleanFolder := ""
+	if folder != "" {
+		folder = filepath.Clean(folder)
+		if !strings.Contains(folder, "..") && folder != "." && folder != "/" {
+			cleanFolder = folder
+		}
+	}
+
 	uploadDir := "./uploads"
+	if cleanFolder != "" {
+		uploadDir = filepath.Join("./uploads", cleanFolder)
+	}
+
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory"})
 		return
@@ -549,6 +724,10 @@ func (h *AppHandler) UploadImage(c *gin.Context) {
 	}
 
 	fileURL := fmt.Sprintf("/uploads/%s", filename)
+	if cleanFolder != "" {
+		fileURL = fmt.Sprintf("/uploads/%s/%s", cleanFolder, filename)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"url":       fileURL,
 		"filename":  filename,
@@ -556,4 +735,19 @@ func (h *AppHandler) UploadImage(c *gin.Context) {
 		"timestamp": time.Now().Unix(),
 	})
 }
+
+// DeleteUpload handles DELETE /api/v1/upload
+func (h *AppHandler) DeleteUpload(c *gin.Context) {
+	var req struct {
+		URL string `json:"url" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payload: url is required"})
+		return
+	}
+
+	deleteUploadFile(req.URL)
+	c.JSON(http.StatusOK, gin.H{"message": "File deleted successfully", "url": req.URL})
+}
+
 

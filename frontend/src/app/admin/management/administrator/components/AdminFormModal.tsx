@@ -267,7 +267,7 @@ export default function AdminFormModal({
                   style={{ width: "16px", height: "16px", accentColor: "#dc2626" }}
                 />
                 <span style={{ color: "var(--ink)" }}>
-                  <strong>กำหนดสิทธิ์ Superadmin</strong> - ให้มีอำนาจดูแลระบบทั้งหมด
+                  <strong>กำหนดสิทธิ์ Super Admin</strong> - ให้มีอำนาจดูแลระบบทั้งหมด
                 </span>
               </label>
             </div>

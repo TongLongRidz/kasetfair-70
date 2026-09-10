@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import AdminSidebar from "@/components/layouts/AdminSidebar";
 import {
@@ -14,19 +14,18 @@ import {
   XCircle,
   ChevronLeft,
   ChevronRight,
-  Filter,
-  X,
-  Candy,
   Flame,
   Trash2,
   Loader2,
   AlertTriangle,
-  Upload,
   ImageIcon,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { getStoredToken } from "@/lib/auth";
 import { useToast } from "@/components/ui/toast";
 import AddEditToppingModal from "./components/AddEditToppingModal";
+import ImageCropModal from "@/components/ui/modals/ImageCropModal";
 
 interface ToppingItem {
   id: number;
@@ -34,10 +33,11 @@ interface ToppingItem {
   nameEn: string;
   price: number;
   image: string;
+  allowHot: boolean;
+  allowIced: boolean;
   isAvailable: boolean; // is_available (เปิด/ซ่อน)
   isSoldOut: boolean;   // is_sold_out (ขายหมด/มีของ)
   sortOrder: number;
-  icedOnly?: boolean;
   orderCount?: number;
 }
 
@@ -56,9 +56,11 @@ export default function ToppingsManagementPage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Upload image state
+  // Upload image & Crop state
   const [isUploading, setIsUploading] = useState<boolean>(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
+  const [rawImageSrc, setRawImageSrc] = useState<string>("");
+  const [pendingCroppedBlob, setPendingCroppedBlob] = useState<Blob | null>(null);
 
   // Edit/Add Modal State
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -68,9 +70,14 @@ export default function ToppingsManagementPage() {
 
   const [formNameTh, setFormNameTh] = useState("");
   const [formNameEn, setFormNameEn] = useState("");
-  const [formPrice, setFormPrice] = useState<number>(10);
-  const [formImageUrl, setFormImageUrl] = useState("/images/drink-pearl.jpg");
+  const [formPrice, setFormPrice] = useState<number | string>(10);
+  const [formAllowHot, setFormAllowHot] = useState<boolean>(true);
+  const [formAllowIced, setFormAllowIced] = useState<boolean>(true);
+  const [formImageUrl, setFormImageUrl] = useState("");
   const [formSortOrder, setFormSortOrder] = useState<number>(1);
+
+  // Reordering State & API Call
+  const [isReordering, setIsReordering] = useState(false);
 
   // Delete Modal State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
@@ -80,7 +87,7 @@ export default function ToppingsManagementPage() {
 
   // Helper to format image URL (handle relative /uploads from backend)
   const getFullImageUrl = (url: string) => {
-    if (!url) return "/images/drink-pearl.jpg";
+    if (!url) return "";
     if (url.startsWith("/uploads/")) {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
       return `${apiUrl}${url}`;
@@ -108,7 +115,9 @@ export default function ToppingsManagementPage() {
           nameTh: t.name_th,
           nameEn: t.name_en || "",
           price: t.price,
-          image: t.image_url || "/images/drink-pearl.jpg",
+          allowHot: Boolean(t.allow_hot),
+          allowIced: Boolean(t.allow_iced),
+          image: t.image_url || "",
           isAvailable: t.is_available,
           isSoldOut: t.is_sold_out,
           sortOrder: t.sort_order || 0,
@@ -147,46 +156,114 @@ export default function ToppingsManagementPage() {
     return () => document.removeEventListener("click", handleDocumentClick);
   }, []);
 
-  // Handle File Upload
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle File Selection (Open Crop Modal)
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      toastError("ขนาดไฟล์เกิน 5MB กรุณาเลือกไฟล์ที่เล็กลง", "อัปโหลดล้มเหลว");
+    if (file.size > 10 * 1024 * 1024) {
+      toastError("ขนาดไฟล์เกิน 10MB กรุณาเลือกไฟล์ที่เล็กลง", "ไฟล์มีขนาดใหญ่เกินไป");
       return;
     }
 
-    setIsUploading(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setRawImageSrc(reader.result as string);
+      setIsCropModalOpen(true);
+    };
+    reader.readAsDataURL(file);
+
+    // Reset input so user can pick same file again if needed
+    e.target.value = "";
+  };
+
+  // Handle Cropped Image Complete
+  const handleCropComplete = (croppedBlob: Blob) => {
+    setPendingCroppedBlob(croppedBlob);
+    const localPreviewUrl = URL.createObjectURL(croppedBlob);
+    setFormImageUrl(localPreviewUrl);
+    setRawImageSrc("");
+    setIsCropModalOpen(false);
+  };
+
+  // Remove / Clear image and delete from uploads directory on backend
+  const handleRemoveImage = async () => {
+    const oldUrl = formImageUrl;
+    setFormImageUrl("");
+    setPendingCroppedBlob(null);
+
+    if (oldUrl && oldUrl.startsWith("/uploads/")) {
+      try {
+        const token = getStoredToken();
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+        await fetch(`${apiUrl}/api/v1/upload`, {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ url: oldUrl }),
+        });
+      } catch (err) {
+        console.error("Error deleting image from server:", err);
+      }
+    }
+  };
+
+  // Save new sort order to backend
+  const saveReorderedToppings = async (newOrderedToppings: ToppingItem[]) => {
+    setIsReordering(true);
     try {
       const token = getStoredToken();
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
-      const formData = new FormData();
-      formData.append("file", file);
 
-      const res = await fetch(`${apiUrl}/api/v1/upload`, {
-        method: "POST",
+      const payload = {
+        items: newOrderedToppings.map((m, idx) => ({
+          id: m.id,
+          sort_order: idx + 1,
+        })),
+      };
+
+      const res = await fetch(`${apiUrl}/api/v1/toppings/reorder`, {
+        method: "PUT",
         headers: {
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: formData,
+        body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
-      if (res.ok && data.url) {
-        setFormImageUrl(data.url);
-        success("อัปโหลดรูปภาพสำเร็จเรียบร้อย", "สำเร็จ");
+      if (res.ok) {
+        success("บันทึกลำดับท็อปปิ้งใหม่เรียบร้อยแล้ว", "สลับลำดับสำเร็จ");
       } else {
-        toastError(data.error || "อัปโหลดรูปภาพไม่สำเร็จ", "เกิดข้อผิดพลาด");
+        const data = await res.json();
+        toastError(data.error || "ไม่สามารถบันทึกลำดับได้", "เกิดข้อผิดพลาด");
+        fetchToppings();
       }
     } catch {
-      toastError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่ออัปโหลดได้", "เกิดข้อผิดพลาด");
+      toastError("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์", "เกิดข้อผิดพลาด");
+      fetchToppings();
     } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      setIsReordering(false);
     }
+  };
+
+  // Move topping up/down (Press Up/Down buttons)
+  const moveItem = (index: number, direction: "up" | "down") => {
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= toppings.length) return;
+
+    const updated = [...toppings];
+    const [moved] = updated.splice(index, 1);
+    updated.splice(targetIndex, 0, moved);
+
+    const reorderedList = updated.map((item, idx) => ({
+      ...item,
+      sortOrder: idx + 1,
+    }));
+
+    setToppings(reorderedList);
+    saveReorderedToppings(reorderedList);
   };
 
   // Toggle Visibility (Icon ตา: ซ่อน / แสดง)
@@ -270,8 +347,11 @@ export default function ToppingsManagementPage() {
     setFormNameTh("");
     setFormNameEn("");
     setFormPrice(10);
-    setFormImageUrl("/images/drink-pearl.jpg");
-    setFormSortOrder(total + 1);
+    setFormAllowHot(true);
+    setFormAllowIced(true);
+    setFormImageUrl("");
+    setPendingCroppedBlob(null);
+    setFormSortOrder(toppings.length > 0 ? Math.max(...toppings.map((t) => t.sortOrder || 0)) + 1 : 1);
     setFormError(null);
     setIsModalOpen(true);
   };
@@ -283,7 +363,10 @@ export default function ToppingsManagementPage() {
     setFormNameTh(item.nameTh);
     setFormNameEn(item.nameEn);
     setFormPrice(item.price);
+    setFormAllowHot(item.allowHot !== undefined ? item.allowHot : true);
+    setFormAllowIced(item.allowIced !== undefined ? item.allowIced : true);
     setFormImageUrl(item.image);
+    setPendingCroppedBlob(null);
     setFormSortOrder(item.sortOrder);
     setFormError(null);
     setIsModalOpen(true);
@@ -309,10 +392,47 @@ export default function ToppingsManagementPage() {
       return;
     }
 
+    if (!formAllowHot && !formAllowIced) {
+      setFormError("กรุณาเลือกประเภทเครื่องดื่มอย่างน้อย 1 ประเภท (ร้อน หรือ เย็น)");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const token = getStoredToken();
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+
+      let finalImageUrl = formImageUrl;
+
+      // If user selected/cropped a new image, upload it now
+      if (pendingCroppedBlob) {
+        setIsUploading(true);
+        const formData = new FormData();
+        formData.append("file", pendingCroppedBlob, "topping_image.jpg");
+        formData.append("folder", "toppings");
+
+        const uploadRes = await fetch(`${apiUrl}/api/v1/upload`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        const uploadData = await uploadRes.json();
+        if (uploadRes.ok && uploadData.url) {
+          finalImageUrl = uploadData.url;
+        } else {
+          setFormError(uploadData.error || "เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ");
+          toastError(uploadData.error || "เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ", "อัปโหลดไม่สำเร็จ");
+          setIsSubmitting(false);
+          setIsUploading(false);
+          return;
+        }
+        setIsUploading(false);
+      }
+
+      const priceNum = Number(formPrice) || 0;
 
       if (modalMode === "create") {
         const res = await fetch(`${apiUrl}/api/v1/toppings`, {
@@ -324,11 +444,13 @@ export default function ToppingsManagementPage() {
           body: JSON.stringify({
             name_th: formNameTh.trim(),
             name_en: formNameEn.trim(),
-            price: Number(formPrice),
-            image_url: formImageUrl.trim() || "/images/drink-pearl.jpg",
+            price: priceNum,
+            allow_hot: formAllowHot,
+            allow_iced: formAllowIced,
+            image_url: finalImageUrl.trim(),
             is_available: true,
             is_sold_out: false,
-            sort_order: Number(formSortOrder),
+            sort_order: Number(formSortOrder) || 1,
           }),
         });
 
@@ -350,9 +472,11 @@ export default function ToppingsManagementPage() {
           body: JSON.stringify({
             name_th: formNameTh.trim(),
             name_en: formNameEn.trim(),
-            price: Number(formPrice),
-            image_url: formImageUrl.trim(),
-            sort_order: Number(formSortOrder),
+            price: priceNum,
+            allow_hot: formAllowHot,
+            allow_iced: formAllowIced,
+            image_url: finalImageUrl.trim(),
+            sort_order: Number(formSortOrder) || 1,
           }),
         });
 
@@ -366,6 +490,7 @@ export default function ToppingsManagementPage() {
         success(`อัปเดตข้อมูลท็อปปิ้ง "${formNameTh.trim()}" เรียบร้อยแล้ว`, "บันทึกสำเร็จ");
       }
 
+      setPendingCroppedBlob(null);
       setIsModalOpen(false);
       fetchToppings();
     } catch {
@@ -373,6 +498,7 @@ export default function ToppingsManagementPage() {
       toastError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้", "เกิดข้อผิดพลาด");
     } finally {
       setIsSubmitting(false);
+      setIsUploading(false);
     }
   };
 
@@ -435,111 +561,103 @@ export default function ToppingsManagementPage() {
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
           <div>
             <h1 style={{ fontSize: "1.75rem", fontWeight: 800, lineHeight: 1.2 }}>
-              จัดการท็อปปิ้งเสริม
+              จัดการท็อปปิ้ง
             </h1>
           </div>
-
-          {/* Add Topping Button */}
-          <button
-            type="button"
-            onClick={openAddModal}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              backgroundColor: "var(--teal)",
-              color: "#fff",
-              padding: "0.6rem 1.25rem",
-              borderRadius: "0.75rem",
-              border: "none",
-              fontWeight: 600,
-              fontSize: "0.9rem",
-              cursor: "pointer",
-              boxShadow: "0 4px 14px rgba(75, 155, 140, 0.25)",
-              transition: "transform 0.15s ease",
-            }}
-          >
-            <Plus size={18} />
-            <span>เพิ่มท็อปปิ้งใหม่</span>
-          </button>
         </div>
 
-        {/* Filter and Search Bar */}
+        {/* Filter and Search Bar Container */}
         <div
           style={{
             marginTop: "1.5rem",
             backgroundColor: "var(--card)",
-            padding: "1rem 1.25rem",
-            borderRadius: "1rem",
+            padding: "1.5rem",
+            borderRadius: "1.25rem",
             border: "1px solid rgba(50, 55, 65, 0.1)",
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "1rem",
-            alignItems: "center",
-            justifyContent: "space-between",
+            boxShadow: "0 4px 20px -2px rgba(0,0,0,0.03)",
           }}
         >
-          {/* Search Input */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              backgroundColor: "var(--cream)",
-              padding: "0.5rem 0.85rem",
-              borderRadius: "0.75rem",
-              border: "1px solid rgba(50, 55, 65, 0.1)",
-              flex: "1 1 240px",
-              maxWidth: "360px",
-            }}
-          >
-            <Search size={18} color="var(--ink-soft)" />
-            <input
-              type="text"
-              placeholder="ค้นหาชื่อท็อปปิ้ง (ไทย / อังกฤษ)..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              style={{
-                border: "none",
-                background: "transparent",
-                outline: "none",
-                fontSize: "0.875rem",
-                width: "100%",
-                fontFamily: "'Kanit', sans-serif",
-                color: "var(--ink)",
-              }}
-            />
-          </div>
+          {/* Controls Bar: Filter Tabs / Dropdown on Left & Add Button / Search on Right */}
+          <div className="admin-controls-bar" style={{ marginBottom: 0 }}>
+            {/* Left Side: Filter Tabs (Desktop) */}
+            <div className="admin-filter-tabs">
+              {[
+                { id: "all", label: "ทั้งหมด" },
+                { id: "available", label: "พร้อมขาย" },
+                { id: "soldout", label: "ขายหมด" },
+                { id: "hidden", label: "ซ่อนอยู่" },
+              ].map((tab) => {
+                const isSelected = statusFilter === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      setStatusFilter(tab.id as any);
+                      setCurrentPage(1);
+                    }}
+                    style={{
+                      padding: "0.4rem 0.85rem",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.8rem",
+                      fontWeight: isSelected ? 700 : 500,
+                      fontFamily: "'Kanit', sans-serif",
+                      border: "none",
+                      cursor: "pointer",
+                      backgroundColor: isSelected ? "var(--ink)" : "transparent",
+                      color: isSelected ? "var(--cream)" : "var(--ink-soft)",
+                      transition: "all 0.15s ease",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
 
-          {/* Status Filters */}
-          <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value as any);
-                setCurrentPage(1);
-              }}
-              style={{
-                padding: "0.45rem 0.85rem",
-                minWidth: "150px",
-                borderRadius: "0.6rem",
-                fontSize: "0.85rem",
-                fontFamily: "'Kanit', sans-serif",
-                backgroundColor: "var(--cream)",
-                border: "1px solid rgba(50, 55, 65, 0.1)",
-                color: "var(--ink)",
-                cursor: "pointer",
-                outline: "none",
-              }}
-            >
-              <option value="all">สถานะทั้งหมด</option>
-              <option value="available">พร้อมขาย</option>
-              <option value="soldout">ขายหมด (Sold out)</option>
-              <option value="hidden">ซ่อนท็อปปิ้ง</option>
-            </select>
+            {/* Left Side: Filter Dropdown (Mobile) */}
+            <div className="admin-filter-dropdown-wrapper">
+              <select
+                className="admin-filter-select"
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value as any);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="all">ทั้งหมด</option>
+                <option value="available">พร้อมขาย</option>
+                <option value="soldout">ขายหมด (Sold out)</option>
+                <option value="hidden">ซ่อนอยู่</option>
+              </select>
+            </div>
+
+            {/* Right Side: Add Topping Button (left of search) & Search Box */}
+            <div className="admin-search-wrapper">
+              <button
+                type="button"
+                className="admin-add-btn"
+                onClick={openAddModal}
+              >
+                <Plus size={16} />
+                <span>เพิ่มท็อปปิ้งใหม่</span>
+              </button>
+
+              <div className="admin-search-box">
+                <Search size={15} color="var(--ink-soft)" style={{ flexShrink: 0 }} />
+                <input
+                  type="text"
+                  placeholder="ค้นหาชื่อท็อปปิ้ง (ไทย / อังกฤษ)..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -553,97 +671,156 @@ export default function ToppingsManagementPage() {
 
         {/* Toppings Cards Grid */}
         {!isLoading && (
-          <div
-            style={{
-              marginTop: "1.5rem",
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-              gap: "1.25rem",
-            }}
-          >
-            {toppings.map((item) => {
+          <div className="toppings-grid" style={{ marginTop: "1.5rem" }}>
+            {toppings.map((item, index) => {
               const isKebabOpen = activeKebabId === item.id;
               const displayImg = getFullImageUrl(item.image);
 
               return (
-                <div
+                <article
                   key={item.id}
+                  className="animate-rise"
                   style={{
+                    animationDelay: `${50 + index * 40}ms`,
                     backgroundColor: "var(--card)",
                     borderRadius: "1.25rem",
                     border: "1px solid rgba(50, 55, 65, 0.1)",
                     boxShadow: "0 4px 16px -2px rgba(0,0,0,0.03)",
-                    overflow: "hidden",
                     display: "flex",
                     flexDirection: "column",
                     position: "relative",
                     opacity: !item.isAvailable ? 0.6 : 1,
-                    transition: "all 0.2s ease",
+                    transition: "border 0.2s ease, transform 0.15s ease, opacity 0.2s ease",
+                    zIndex: isKebabOpen ? 50 : 1,
                   }}
                 >
-                  {/* Image & Top Badges */}
-                  <div style={{ position: "relative", width: "100%", height: "180px", backgroundColor: "#f0ece1" }}>
-                    <Image
-                      src={displayImg}
-                      alt={item.nameTh}
-                      fill
-                      unoptimized={displayImg.startsWith("http")}
-                      style={{
-                        objectFit: "cover",
-                        filter: item.isSoldOut ? "grayscale(80%)" : "none",
-                      }}
-                    />
-
-                    {/* Dimmed Overlay if Sold Out */}
-                    {item.isSoldOut && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          inset: 0,
-                          backgroundColor: "rgba(0, 0, 0, 0.45)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <span
+                  {/* Image & Top Badges (1:1 Aspect Ratio like menu page) */}
+                  <div style={{ position: "relative", width: "100%", aspectRatio: "1/1", backgroundColor: "#f0ece1", borderTopLeftRadius: "1.25rem", borderTopRightRadius: "1.25rem" }}>
+                    {/* Inner wrapper for image overflow clipping */}
+                    <div style={{ position: "absolute", inset: 0, overflow: "hidden", borderTopLeftRadius: "1.25rem", borderTopRightRadius: "1.25rem" }}>
+                      {displayImg ? (
+                        <Image
+                          src={displayImg}
+                          alt={item.nameTh}
+                          fill
+                          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 300px"
+                          unoptimized={displayImg.startsWith("http")}
+                          draggable={false}
                           style={{
-                            backgroundColor: "#e05353",
-                            color: "#fff",
-                            padding: "0.35rem 1rem",
-                            borderRadius: "9999px",
-                            fontWeight: 700,
-                            fontSize: "0.85rem",
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+                            objectFit: "cover",
+                            filter: item.isSoldOut || !item.isAvailable ? "grayscale(80%)" : "none",
+                            userSelect: "none",
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: "#ebe6d8",
+                            color: "var(--ink-soft)",
+                            gap: "0.35rem",
+                            opacity: 0.6,
                           }}
                         >
-                          ท็อปปิ้งหมด (Sold Out)
-                        </span>
-                      </div>
-                    )}
+                          <ImageIcon size={32} strokeWidth={1.5} />
+                          <span style={{ fontSize: "0.7rem", fontWeight: 500 }}>ไม่มีรูปภาพ</span>
+                        </div>
+                      )}
 
-                    {/* Hidden Badge */}
-                    {!item.isAvailable && (
+                      {/* Dimmed Overlay if Sold Out or Hidden */}
+                      {item.isSoldOut ? (
+                        <div
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            backgroundColor: "rgba(0, 0, 0, 0.45)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <span
+                            style={{
+                              backgroundColor: "#e05353",
+                              color: "#fff",
+                              padding: "0.35rem 1rem",
+                              borderRadius: "9999px",
+                              fontWeight: 700,
+                              fontSize: "0.85rem",
+                              boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+                            }}
+                          >
+                            สินค้าหมด (Sold Out)
+                          </span>
+                        </div>
+                      ) : !item.isAvailable ? (
+                        <div
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            backgroundColor: "rgba(0, 0, 0, 0.5)",
+                            backdropFilter: "blur(2px)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <span
+                            style={{
+                              backgroundColor: "rgba(50, 55, 65, 0.9)",
+                              color: "#fff",
+                              padding: "0.35rem 1rem",
+                              borderRadius: "9999px",
+                              fontWeight: 700,
+                              fontSize: "0.85rem",
+                              boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.35rem",
+                            }}
+                          >
+                            <EyeOff size={15} />
+                            <span>ซ่อนอยู่ (Hidden)</span>
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {/* Order Badge (Top-Left) */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "0.75rem",
+                        left: "0.75rem",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.35rem",
+                        zIndex: 10,
+                      }}
+                    >
                       <div
                         style={{
-                          position: "absolute",
-                          top: "0.75rem",
-                          left: "0.75rem",
-                          backgroundColor: "rgba(30, 30, 30, 0.75)",
+                          backgroundColor: "rgba(30, 30, 30, 0.85)",
+                          backdropFilter: "blur(4px)",
                           color: "#fff",
-                          padding: "0.2rem 0.6rem",
+                          padding: "0.25rem 0.6rem",
                           borderRadius: "9999px",
                           fontSize: "0.75rem",
+                          fontWeight: 700,
                           display: "flex",
                           alignItems: "center",
                           gap: "0.25rem",
-                          backdropFilter: "blur(4px)",
+                          boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
                         }}
                       >
-                        <EyeOff size={13} />
-                        <span>ซ่อนจากหน้าร้าน</span>
+                        <span>#{item.sortOrder || index + 1}</span>
                       </div>
-                    )}
+                    </div>
 
                     {/* Kebab Menu Button (Top Right) */}
                     <div className="topping-kebab-container" style={{ position: "absolute", top: "0.75rem", right: "0.75rem", zIndex: 10 }}>
@@ -679,18 +856,83 @@ export default function ToppingsManagementPage() {
                             position: "absolute",
                             top: "38px",
                             right: 0,
-                            width: "185px",
+                            width: "215px",
                             backgroundColor: "var(--card)",
                             borderRadius: "0.75rem",
                             border: "1px solid rgba(50, 55, 65, 0.15)",
                             boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                            padding: "0.35rem",
+                            padding: "0.4rem",
                             display: "flex",
                             flexDirection: "column",
-                            gap: "0.2rem",
+                            gap: "0.3rem",
                             zIndex: 50,
                           }}
                         >
+                          {/* Row 1: 2 Columns for Order Adjustment */}
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.35rem" }}>
+                            {/* Column 1: Move Up */}
+                            <button
+                              type="button"
+                              disabled={index === 0 || isReordering}
+                              onClick={() => {
+                                moveItem(index, "up");
+                                setActiveKebabId(null);
+                              }}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "0.3rem",
+                                padding: "0.45rem 0.3rem",
+                                fontSize: "0.8rem",
+                                fontWeight: 500,
+                                border: "1px solid rgba(50, 55, 65, 0.1)",
+                                borderRadius: "0.45rem",
+                                backgroundColor: index === 0 ? "rgba(50, 55, 65, 0.04)" : "var(--cream)",
+                                color: index === 0 ? "rgba(50, 55, 65, 0.3)" : "var(--ink)",
+                                cursor: index === 0 || isReordering ? "not-allowed" : "pointer",
+                                fontFamily: "'Kanit', sans-serif",
+                                transition: "all 0.15s ease",
+                              }}
+                              title="ปรับขึ้น"
+                            >
+                              <ArrowUp size={14} color={index === 0 ? "rgba(50, 55, 65, 0.3)" : "var(--teal)"} />
+                              <span>ปรับขึ้น</span>
+                            </button>
+
+                            {/* Column 2: Move Down */}
+                            <button
+                              type="button"
+                              disabled={index === toppings.length - 1 || isReordering}
+                              onClick={() => {
+                                moveItem(index, "down");
+                                setActiveKebabId(null);
+                              }}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "0.3rem",
+                                padding: "0.45rem 0.3rem",
+                                fontSize: "0.8rem",
+                                fontWeight: 500,
+                                border: "1px solid rgba(50, 55, 65, 0.1)",
+                                borderRadius: "0.45rem",
+                                backgroundColor: index === toppings.length - 1 ? "rgba(50, 55, 65, 0.04)" : "var(--cream)",
+                                color: index === toppings.length - 1 ? "rgba(50, 55, 65, 0.3)" : "var(--ink)",
+                                cursor: index === toppings.length - 1 || isReordering ? "not-allowed" : "pointer",
+                                fontFamily: "'Kanit', sans-serif",
+                                transition: "all 0.15s ease",
+                              }}
+                              title="ปรับลง"
+                            >
+                              <ArrowDown size={14} color={index === toppings.length - 1 ? "rgba(50, 55, 65, 0.3)" : "var(--teal)"} />
+                              <span>ปรับลง</span>
+                            </button>
+                          </div>
+
+                          <div style={{ height: "1px", backgroundColor: "rgba(50, 55, 65, 0.08)", margin: "0.15rem 0" }} />
+
                           {/* Option 1: Edit */}
                           <button
                             type="button"
@@ -715,7 +957,7 @@ export default function ToppingsManagementPage() {
                             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                           >
                             <Edit3 size={15} color="var(--teal)" />
-                            <span>แก้ไขท็อปปิ้ง</span>
+                            <span>แก้ไขข้อมูลท็อปปิ้ง</span>
                           </button>
 
                           {/* Option 2: Sold Out Toggle */}
@@ -816,92 +1058,67 @@ export default function ToppingsManagementPage() {
                             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                           >
                             <Trash2 size={15} color="#dc2626" />
-                            <span>ลบท็อปปิ้ง</span>
+                            <span>ลบรายการท็อปปิ้ง</span>
                           </button>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  {/* Content Details */}
-                  <div style={{ padding: "1.1rem 1.25rem", flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  {/* Content Details (Styled exactly like menu card) */}
+                  <div style={{ padding: "0.85rem", flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                     <div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem" }}>
-                        <div>
-                          <span style={{ fontSize: "0.75rem", color: "var(--teal)", fontWeight: 600 }}>
-                            ท็อปปิ้งเสริม
-                          </span>
-                          <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginTop: "0.15rem", lineHeight: 1.3 }}>
-                            {item.nameTh}
-                          </h3>
-                          <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "1px" }}>
-                            {item.nameEn}
-                          </p>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.35rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
+                          {item.allowHot && (
+                            <span style={{ fontSize: "0.65rem", padding: "0.1rem 0.35rem", borderRadius: "0.25rem", backgroundColor: "rgba(224, 83, 83, 0.1)", color: "#e05353", fontWeight: 600 }}>
+                              ร้อน
+                            </span>
+                          )}
+                          {item.allowIced && (
+                            <span style={{ fontSize: "0.65rem", padding: "0.1rem 0.35rem", borderRadius: "0.25rem", backgroundColor: "rgba(2, 132, 199, 0.12)", color: "#0284c7", fontWeight: 600 }}>
+                              เย็น
+                            </span>
+                          )}
                         </div>
 
-                        {/* Price Badge */}
-                        <div style={{ textAlign: "right" }}>
-                          <span style={{ fontSize: "1.35rem", fontWeight: 800, color: "var(--teal)", fontFamily: "'Kanit', sans-serif" }}>
-                            +฿{item.price}
+                        {item.isSoldOut && (
+                          <span style={{ color: "#e05353", fontSize: "0.7rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.2rem" }}>
+                            <XCircle size={12} /> หมด
                           </span>
-                        </div>
+                        )}
+                        {!item.isAvailable && (
+                          <span style={{ color: "var(--ink-soft)", fontSize: "0.7rem", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.2rem" }}>
+                            <EyeOff size={12} /> ซ่อน
+                          </span>
+                        )}
                       </div>
+
+                      <h3 style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--ink)", marginTop: "0.15rem" }}>
+                        {item.nameTh}
+                      </h3>
+                      <p className="font-mono" style={{ fontSize: "0.7rem", color: "var(--ink-soft)", marginTop: "0.1rem" }}>
+                        {item.nameEn}
+                      </p>
                     </div>
 
-                    {/* Quick Bottom Status Bar */}
-                    <div
-                      style={{
-                        marginTop: "1rem",
-                        paddingTop: "0.75rem",
-                        borderTop: "1px solid rgba(50, 55, 65, 0.08)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        fontSize: "0.75rem",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        {/* Status Tag */}
-                        {item.isSoldOut ? (
-                          <span style={{ color: "#e05353", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                            <XCircle size={13} /> ขายหมด
-                          </span>
-                        ) : !item.isAvailable ? (
-                          <span style={{ color: "var(--ink-soft)", fontWeight: 500, display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                            <EyeOff size={13} /> ซ่อนอยู่
-                          </span>
-                        ) : (
-                          <span style={{ color: "var(--teal)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                            <CheckCircle2 size={13} /> พร้อมขาย
-                          </span>
-                        )}
-                      </div>
-
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                        <span
-                          style={{
-                            padding: "0.15rem 0.45rem",
-                            borderRadius: "0.35rem",
-                            backgroundColor: "var(--cream)",
-                            border: "1px solid rgba(50, 55, 65, 0.12)",
-                            color: "var(--ink-soft)",
-                            fontSize: "0.7rem",
-                            fontWeight: 600,
-                          }}
-                        >
-                          ลำดับ: #{item.sortOrder || 0}
+                    {/* Bottom Price & Sales Info (Matching menu card) */}
+                    <div style={{ marginTop: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.35rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+                        <span className="font-display" style={{ fontSize: "1.1rem", color: "var(--ink)", fontWeight: 700 }}>
+                          +{item.price}฿
                         </span>
-
-                        {item.orderCount !== undefined && item.orderCount > 0 && (
-                          <span style={{ color: "var(--ink-soft)", fontWeight: 500, display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                            <Flame size={13} color="var(--teal)" />
-                            ขายแล้ว {item.orderCount}
-                          </span>
-                        )}
                       </div>
+
+                      {item.orderCount !== undefined && item.orderCount > 0 && (
+                        <span style={{ color: "var(--ink-soft)", fontSize: "0.75rem", fontWeight: 500, display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                          <Flame size={13} color="var(--teal)" />
+                          ขายแล้ว {item.orderCount}
+                        </span>
+                      )}
                     </div>
                   </div>
-                </div>
+                </article>
               );
             })}
           </div>
@@ -1027,14 +1244,29 @@ export default function ToppingsManagementPage() {
           setFormNameEn={setFormNameEn}
           formPrice={formPrice}
           setFormPrice={setFormPrice}
+          formAllowHot={formAllowHot}
+          setFormAllowHot={setFormAllowHot}
+          formAllowIced={formAllowIced}
+          setFormAllowIced={setFormAllowIced}
           formSortOrder={formSortOrder}
-          setFormSortOrder={setFormSortOrder}
           formImageUrl={formImageUrl}
           setFormImageUrl={setFormImageUrl}
           formError={formError}
           isSubmitting={isSubmitting}
           isUploading={isUploading}
-          onFileUpload={handleFileUpload}
+          onFileUpload={handleFileSelect}
+          onRemoveImage={handleRemoveImage}
+        />
+
+        {/* Image Crop Modal (1:1 Ratio) */}
+        <ImageCropModal
+          isOpen={isCropModalOpen}
+          imageSrc={rawImageSrc}
+          onClose={() => {
+            setIsCropModalOpen(false);
+            setRawImageSrc("");
+          }}
+          onCropComplete={handleCropComplete}
         />
 
         {/* Delete Confirm Modal */}

@@ -462,7 +462,7 @@ export default function SlipCheckManagementPage() {
 
           {/* Controls Bar: Filter Tabs & Search / Sort */}
           <div className="admin-controls-bar">
-            {/* Filter Tabs */}
+            {/* Filter Tabs (Desktop) */}
             <div className="admin-filter-tabs">
               {[
                 { id: "all", label: "ทั้งหมด" },
@@ -497,6 +497,23 @@ export default function SlipCheckManagementPage() {
                   </button>
                 );
               })}
+            </div>
+
+            {/* Filter Dropdown (Mobile) */}
+            <div className="admin-filter-dropdown-wrapper">
+              <select
+                className="admin-filter-select"
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value as any);
+                  setPage(1);
+                }}
+              >
+                <option value="all">สถานะ: ทั้งหมด</option>
+                <option value="pending">สถานะ: รอตรวจสอบ</option>
+                <option value="verified">สถานะ: ยืนยันแล้ว</option>
+                <option value="fraud">สถานะ: สลิปไม่ถูกต้อง</option>
+              </select>
             </div>
 
             {/* Search & Sort */}

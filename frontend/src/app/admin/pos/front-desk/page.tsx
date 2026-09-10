@@ -1,15 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import AdminSidebar from "@/components/layouts/AdminSidebar";
 import CartDrawer from "@/components/layouts/CartDrawer";
+import OrderProductModal, { OrderItemResult } from "@/components/ui/modals/OrderProductModal";
 import {
   Search,
   Plus,
   Minus,
   Trash2,
-  Phone,
   Sparkles,
   ShoppingBag,
   CreditCard,
@@ -23,6 +23,8 @@ import {
   RotateCcw,
   Flame,
   Award,
+  Loader2,
+  ImageIcon,
 } from "lucide-react";
 
 interface Product {
@@ -30,12 +32,14 @@ interface Product {
   name_th: string;
   name_en: string;
   desc: string;
-  price: number;
+  price_hot: number | null;
+  price_iced: number | null;
   category: "flavours" | "combos";
   image: string;
   is_available: boolean;
   is_sold_out: boolean;
   is_recommended: boolean;
+  sort_order: number;
   default_toppings?: string[];
 }
 
@@ -44,6 +48,9 @@ interface Topping {
   name_th: string;
   name_en: string;
   price: number;
+  allow_hot: boolean;
+  allow_iced: boolean;
+  is_available: boolean;
   is_sold_out: boolean;
 }
 
@@ -59,161 +66,17 @@ interface CartItem {
   note: string;
 }
 
-const PRODUCTS: Product[] = [
-  {
-    id: 1,
-    name_th: "น้ำเต้าหู้ดั้งเดิม",
-    name_en: "Original Soy Milk",
-    desc: "น้ำเต้าหู้เข้มข้น หอมถั่วเหลืองแท้ 100% ต้มสดใหม่ทุกวัน",
-    price: 35,
-    category: "flavours",
-    image: "/images/hero-soy.jpg",
-    is_available: true,
-    is_sold_out: false,
-    is_recommended: true,
-  },
-  {
-    id: 2,
-    name_th: "น้ำเต้าหู้มัทฉะ",
-    name_en: "Matcha Soy",
-    desc: "มัทฉะเกรดพรีเมียม ชงสดผสมน้ำเต้าหู้หอมละมุนเข้มข้น",
-    price: 50,
-    category: "flavours",
-    image: "/images/drink-matcha.jpg",
-    is_available: true,
-    is_sold_out: false,
-    is_recommended: true,
-  },
-  {
-    id: 3,
-    name_th: "น้ำเต้าหู้ชาไทย",
-    name_en: "Thai Tea Soy",
-    desc: "ชาไทยใบชาคัดพิเศษ หอมเข้มมันนัว กลมกล่อมลงตัว",
-    price: 45,
-    category: "flavours",
-    image: "/images/drink-mango.jpg",
-    is_available: true,
-    is_sold_out: false,
-    is_recommended: false,
-  },
-  {
-    id: 4,
-    name_th: "น้ำเต้าหู้นมเย็น",
-    name_en: "Nom Yen Soy",
-    desc: "สละนมเย็นสีชมพูหวานละมุน หอมสดชื่น ดื่มง่าย",
-    price: 40,
-    category: "flavours",
-    image: "/images/drink-lychee.jpg",
-    is_available: true,
-    is_sold_out: false,
-    is_recommended: false,
-  },
-  {
-    id: 5,
-    name_th: "น้ำเต้าหู้ช็อกโกแลต",
-    name_en: "Choco Soy",
-    desc: "โกโก้เข้มข้นสูตรพิเศษ เข้ากันได้ดีเยี่ยมกับน้ำเต้าหู้",
-    price: 45,
-    category: "flavours",
-    image: "/images/drink-pearl.jpg",
-    is_available: true,
-    is_sold_out: false,
-    is_recommended: false,
-  },
-  {
-    id: 101,
-    name_th: "Matcha + Red Bean / Boba",
-    name_en: "Combo Matcha Lover",
-    desc: "มัทฉะเข้มข้นจับคู่กับไข่มุกหนึบหนับและถั่วแดงหวานมัน",
-    price: 65,
-    category: "combos",
-    image: "/images/drink-matcha.jpg",
-    is_available: true,
-    is_sold_out: false,
-    is_recommended: true,
-    default_toppings: ["ไข่มุกบราวน์ชูการ์", "ถั่วแดงกวนหวานมัน"],
-  },
-  {
-    id: 102,
-    name_th: "Thai Tea + Boba",
-    name_en: "Combo Thai Tea Boba",
-    desc: "ชาไทยรสเข้มสูตรเด็ด เสิร์ฟพร้อมไข่มุกบราวน์ชูการ์นุ่มหนึบ",
-    price: 55,
-    category: "combos",
-    image: "/images/drink-mango.jpg",
-    is_available: true,
-    is_sold_out: false,
-    is_recommended: true,
-    default_toppings: ["ไข่มุกบราวน์ชูการ์"],
-  },
-  {
-    id: 103,
-    name_th: "Nom Yen + Grass Jelly",
-    name_en: "Combo Pinky Grass Jelly",
-    desc: "นมเย็นชมพูหวานละมุน ตัดกับความหนึบเย็นชื่นใจของเฉาก๊วย",
-    price: 50,
-    category: "combos",
-    image: "/images/drink-lychee.jpg",
-    is_available: true,
-    is_sold_out: false,
-    is_recommended: false,
-    default_toppings: ["เฉาก๊วยหนึบ"],
-  },
-  {
-    id: 104,
-    name_th: "Choco Special Combo",
-    name_en: "Combo Choco Delight",
-    desc: "ช็อกโกแลตเข้มข้นจับคู่ท็อปปิ้งสาคูและเฉาก๊วย เคี้ยวเพลิน",
-    price: 55,
-    category: "combos",
-    image: "/images/drink-pearl.jpg",
-    is_available: true,
-    is_sold_out: false,
-    is_recommended: false,
-    default_toppings: ["สาคูใบเตย", "เฉาก๊วยหนึบ"],
-  },
-  {
-    id: 105,
-    name_th: "Original Signature Combo",
-    name_en: "Combo Original All-Star",
-    desc: "น้ำเต้าหู้สูตรโบราณ พร้อมเครื่องแน่นจัดเต็ม เม็ดแมงลัก เมล็ดเจีย สาคู",
-    price: 50,
-    category: "combos",
-    image: "/images/hero-soy.jpg",
-    is_available: true,
-    is_sold_out: false,
-    is_recommended: false,
-    default_toppings: ["เม็ดแมงลัก", "เมล็ดเจีย", "สาคูใบเตย"],
-  },
-];
-
-const TOPPINGS: Topping[] = [
-  { id: 1, name_th: "ไข่มุกบราวน์ชูการ์", name_en: "Brown Sugar Boba", price: 10, is_sold_out: false },
-  { id: 2, name_th: "เฉาก๊วยหนึบ", name_en: "Grass Jelly", price: 10, is_sold_out: false },
-  { id: 3, name_th: "เม็ดแมงลัก", name_en: "Basil Seeds", price: 5, is_sold_out: false },
-  { id: 4, name_th: "เมล็ดเจีย", name_en: "Chia Seeds", price: 10, is_sold_out: false },
-  { id: 5, name_th: "สาคูใบเตย", name_en: "Pandan Sago", price: 5, is_sold_out: false },
-  { id: 6, name_th: "ถั่วแดงกวนหวานมัน", name_en: "Sweet Red Bean", price: 10, is_sold_out: false },
-];
-
 export default function POSFrontDeskPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [toppings, setToppings] = useState<Topping[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [selectedCategory, setSelectedCategory] = useState<"all" | "flavours" | "combos">("all");
-  const [searchMenu, setSearchMenu] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   // Item Customizer Modal State
   const [customizingProduct, setCustomizingProduct] = useState<Product | null>(null);
-  const [custTemp, setCustTemp] = useState<"iced" | "hot">("iced");
-  const [custSweetness, setCustSweetness] = useState<"0%" | "25%" | "50%" | "75%" | "100%">("50%");
-  const [custToppings, setCustToppings] = useState<Topping[]>([]);
-  const [custQuantity, setCustQuantity] = useState<number>(1);
-  const [custNote, setCustNote] = useState<string>("");
-
-  // Customer Loyalty Lookup State
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [foundCustomer, setFoundCustomer] = useState<{ name: string; points: number } | null>(null);
-  const [isRedeemingReward, setIsRedeemingReward] = useState(false);
 
   // Payment Checkout Modal State
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -221,53 +84,118 @@ export default function POSFrontDeskPage() {
   const [cashReceived, setCashReceived] = useState<string>("");
   const [orderSuccessQueue, setOrderSuccessQueue] = useState<{ queueNumber: string; orderId: number; total: number; change: number } | null>(null);
 
-  // Filter Products
-  const filteredProducts = PRODUCTS.filter((p) => {
-    if (selectedCategory !== "all" && p.category !== selectedCategory) return false;
-    if (searchMenu.trim() && !p.name_th.includes(searchMenu.trim()) && !p.name_en.toLowerCase().includes(searchMenu.toLowerCase())) return false;
-    return true;
-  });
+  // Helper to get image URL
+  const getFullImageUrl = (url?: string) => {
+    if (!url) return "";
+    if (url.startsWith("/uploads/")) {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      return `${apiUrl}${url}`;
+    }
+    return url;
+  };
+
+  // Fetch real products and toppings from API
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      
+      // Fetch available products
+      const resProducts = await fetch(`${apiUrl}/api/v1/products?page_size=100&status=available`);
+      if (resProducts.ok) {
+        const prodData = await resProducts.json();
+        const mappedProducts: Product[] = (prodData.data || []).map((p: any) => {
+          const comboToppingNames = (p.combo_recipes || [])
+            .map((r: any) => r.topping?.name_th)
+            .filter(Boolean);
+
+          return {
+            id: p.id,
+            name_th: p.name_th,
+            name_en: p.name_en || "",
+            desc: p.desc_th || "",
+            price_hot: p.price_hot,
+            price_iced: p.price_iced,
+            category: p.is_combo ? "combos" : "flavours",
+            image: getFullImageUrl(p.image_url),
+            is_available: p.is_available,
+            is_sold_out: p.is_sold_out,
+            is_recommended: p.is_recommended,
+            sort_order: p.sort_order || 0,
+            default_toppings: comboToppingNames,
+          };
+        });
+        setProducts(mappedProducts);
+      }
+
+      // Fetch available toppings
+      const resToppings = await fetch(`${apiUrl}/api/v1/toppings?page_size=100&status=available`);
+      if (resToppings.ok) {
+        const topData = await resToppings.json();
+        const mappedToppings: Topping[] = (topData.data || []).map((t: any) => ({
+          id: t.id,
+          name_th: t.name_th,
+          name_en: t.name_en || "",
+          price: t.price || 0,
+          allow_hot: Boolean(t.allow_hot),
+          allow_iced: Boolean(t.allow_iced),
+          is_available: Boolean(t.is_available),
+          is_sold_out: Boolean(t.is_sold_out),
+        }));
+        setToppings(mappedToppings);
+      }
+    } catch (err) {
+      console.error("Error fetching POS data:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Filter Products (Recommended items first, then sort_order)
+  const filteredProducts = products
+    .filter((p) => {
+      if (selectedCategory !== "all" && p.category !== selectedCategory) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (a.is_recommended !== b.is_recommended) {
+        return a.is_recommended ? -1 : 1;
+      }
+      return a.sort_order - b.sort_order;
+    });
+
+  // Helper to get base price of product based on chosen temperature
+  const getProductPrice = (product: Product, temp: "iced" | "hot") => {
+    if (temp === "hot") {
+      return product.price_hot !== null && product.price_hot !== undefined ? product.price_hot : (product.price_iced || 0);
+    }
+    return product.price_iced !== null && product.price_iced !== undefined ? product.price_iced : (product.price_hot || 0);
+  };
 
   // Open Customizer
   const handleOpenCustomizer = (product: Product) => {
     setCustomizingProduct(product);
-    setCustTemp("iced");
-    setCustSweetness("50%");
-    setCustToppings([]);
-    setCustQuantity(1);
-    setCustNote("");
   };
 
-  // Toggle Topping in Customizer
-  const handleToggleTopping = (topping: Topping) => {
-    if (custToppings.some((t) => t.id === topping.id)) {
-      setCustToppings(custToppings.filter((t) => t.id !== topping.id));
-    } else {
-      setCustToppings([...custToppings, topping]);
-    }
-  };
-
-  // Add customized item to cart
-  const handleAddToCart = () => {
-    if (!customizingProduct) return;
-
-    const toppingTotal = custToppings.reduce((s, t) => s + t.price, 0);
-    const unitPrice = customizingProduct.price + toppingTotal;
-    const totalPrice = unitPrice * custQuantity;
-
+  // Add customized item from OrderProductModal to cart
+  const handleAddToCart = (result: OrderItemResult) => {
     const newItem: CartItem = {
-      cart_item_id: `${customizingProduct.id}-${custTemp}-${custSweetness}-${custToppings.map((t) => t.id).sort().join(",")}-${Date.now()}`,
-      product: customizingProduct,
-      temperature: custTemp,
-      sweetness: custSweetness,
-      toppings: custToppings,
-      quantity: custQuantity,
-      unit_price: unitPrice,
-      total_price: totalPrice,
-      note: custNote.trim(),
+      cart_item_id: `${result.product.id}-${result.temperature}-${result.sweetness}-${result.toppings.map((t) => t.id).sort().join(",")}-${Date.now()}`,
+      product: result.product as Product,
+      temperature: result.temperature,
+      sweetness: result.sweetness,
+      toppings: result.toppings as Topping[],
+      quantity: result.quantity,
+      unit_price: result.unitPrice,
+      total_price: result.totalPrice,
+      note: result.note,
     };
 
-    setCart([...cart, newItem]);
+    setCart((prev) => [...prev, newItem]);
     setCustomizingProduct(null);
   };
 
@@ -293,23 +221,8 @@ export default function POSFrontDeskPage() {
 
   // Cart Calculations
   const subtotal = cart.reduce((sum, item) => sum + item.total_price, 0);
-  const discountAmount = isRedeemingReward ? 35 : 0;
-  const netTotal = Math.max(0, subtotal - discountAmount);
+  const netTotal = subtotal;
   const totalCups = cart.reduce((sum, item) => sum + item.quantity, 0);
-
-  // Customer Phone Lookup simulation
-  const handleLookupCustomer = (phone: string) => {
-    setCustomerPhone(phone);
-    if (phone.replace(/\D/g, "").length >= 9) {
-      setFoundCustomer({
-        name: "คุณฟ้า (สมาชิกประจำ)",
-        points: 12,
-      });
-    } else {
-      setFoundCustomer(null);
-      setIsRedeemingReward(false);
-    }
-  };
 
   // Handle Checkout Submit
   const handleFinishCheckout = () => {
@@ -326,40 +239,25 @@ export default function POSFrontDeskPage() {
     setIsCheckoutOpen(false);
     setIsCartOpen(false);
     setCart([]);
-    setCustomerPhone("");
-    setFoundCustomer(null);
-    setIsRedeemingReward(false);
     setCashReceived("");
   };
+
+  const isAnyOverlayOpen = isCartOpen || !!customizingProduct || isCheckoutOpen || !!orderSuccessQueue;
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "var(--cream)" }}>
       <AdminSidebar />
 
-      <main className="kanit-theme" style={{ flex: 1, padding: "1.75rem 2.5rem 6rem 2.5rem", overflowY: "auto", minWidth: 0, position: "relative", fontFamily: "'Kanit', sans-serif" }}>
+      <main className="kanit-theme" style={{ flex: 1, padding: "1.75rem 2.5rem 6rem 2.5rem", overflowY: isAnyOverlayOpen ? "hidden" : "auto", minWidth: 0, position: "relative", fontFamily: "'Kanit', sans-serif" }}>
         <div style={{ maxWidth: "640px", margin: "0 auto" }}>
           {/* Header Bar */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "1rem" }}>
-            <div>
-              <h1 style={{ fontSize: "1.35rem", fontWeight: 800, color: "var(--ink)", lineHeight: 1.2 }}>
-                รายการเมนูเครื่องดื่ม
-              </h1>
-              <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)", marginTop: "0.25rem" }}>
-                กดเลือกเมนูเพื่อปรับความหวาน, อุณหภูมิ และท็อปปิ้ง
-              </p>
-            </div>
-
-            {/* Search Input */}
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", backgroundColor: "var(--card)", padding: "0.45rem 0.85rem", borderRadius: "9999px", border: "1px solid rgba(50,55,65,0.1)", width: "100%", maxWidth: "260px" }}>
-              <Search size={16} color="var(--ink-soft)" />
-              <input
-                type="text"
-                placeholder="ค้นหาเมนู..."
-                value={searchMenu}
-                onChange={(e) => setSearchMenu(e.target.value)}
-                style={{ border: "none", background: "transparent", outline: "none", fontSize: "0.825rem", width: "100%", fontFamily: "'Kanit', sans-serif" }}
-              />
-            </div>
+          <div>
+            <h1 style={{ fontSize: "1.35rem", fontWeight: 800, color: "var(--ink)", lineHeight: 1.2 }}>
+              รายการเมนูเครื่องดื่ม
+            </h1>
+            <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)", marginTop: "0.25rem" }}>
+              กดเลือกเมนูเพื่อปรับความหวาน อุณหภูมิ และท็อปปิ้ง
+            </p>
           </div>
 
           {/* Category Tabs */}
@@ -404,19 +302,30 @@ export default function POSFrontDeskPage() {
           </div>
 
           {/* Products Grid (2 Columns Exact Match with Storefront) */}
-          <div
-            style={{
-              marginTop: "1rem",
-              display: "grid",
-              gridTemplateColumns: "repeat(2, 1fr)",
-              gap: "0.85rem",
-            }}
-          >
-          {filteredProducts.map((p, i) => (
-            <article
-              key={p.id}
-              className="animate-rise"
-              onClick={() => handleOpenCustomizer(p)}
+          {loading ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "260px", gap: "0.75rem", color: "var(--ink-soft)" }}>
+              <Loader2 size={32} className="animate-spin" color="var(--teal)" />
+              <span style={{ fontSize: "0.875rem" }}>กำลังโหลดรายการเมนู...</span>
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "260px", gap: "0.5rem", color: "var(--ink-soft)" }}>
+              <span style={{ fontSize: "1.5rem" }}>🔍</span>
+              <p style={{ fontSize: "0.9rem", fontWeight: 600 }}>ไม่พบเมนูที่ค้นหา</p>
+            </div>
+          ) : (
+            <div
+              style={{
+                marginTop: "1rem",
+                display: "grid",
+                gridTemplateColumns: "repeat(2, 1fr)",
+                gap: "0.85rem",
+              }}
+            >
+            {filteredProducts.map((p, i) => (
+              <article
+                key={p.id}
+                className="animate-rise"
+                onClick={() => handleOpenCustomizer(p)}
               style={{
                 animationDelay: `${50 + i * 30}ms`,
                 overflow: "hidden",
@@ -438,15 +347,45 @@ export default function POSFrontDeskPage() {
                 e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.03)";
               }}
             >
-              <div style={{ position: "relative", width: "100%", aspectRatio: "1/1" }}>
-                <Image
-                  src={p.image}
-                  alt={p.name_th}
-                  fill
-                  sizes="(max-width: 640px) 50vw, 240px"
-                  priority={i < 4}
-                  style={{ objectFit: "cover" }}
-                />
+              {/* Image & Top Badges (1:1 Aspect Ratio like admin/management/menu) */}
+              <div style={{ position: "relative", width: "100%", aspectRatio: "1/1", backgroundColor: "#f0ece1", borderTopLeftRadius: "1.25rem", borderTopRightRadius: "1.25rem" }}>
+                {/* Inner wrapper for image overflow clipping */}
+                <div style={{ position: "absolute", inset: 0, overflow: "hidden", borderTopLeftRadius: "1.25rem", borderTopRightRadius: "1.25rem" }}>
+                  {p.image ? (
+                    <Image
+                      src={p.image}
+                      alt={p.name_th}
+                      fill
+                      sizes="(max-width: 640px) 50vw, 240px"
+                      priority={i < 4}
+                      unoptimized={p.image.startsWith("http")}
+                      draggable={false}
+                      style={{
+                        objectFit: "cover",
+                        userSelect: "none",
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: "#ebe6d8",
+                        color: "var(--ink-soft)",
+                        gap: "0.35rem",
+                        opacity: 0.6,
+                      }}
+                    >
+                      <ImageIcon size={32} strokeWidth={1.5} />
+                      <span style={{ fontSize: "0.7rem", fontWeight: 500 }}>ไม่มีรูปภาพ</span>
+                    </div>
+                  )}
+                </div>
+
                 {p.is_recommended && (
                   <span
                     style={{
@@ -460,6 +399,7 @@ export default function POSFrontDeskPage() {
                       fontWeight: 700,
                       color: "var(--ink)",
                       boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+                      zIndex: 10,
                     }}
                   >
                     แนะนำ
@@ -477,6 +417,7 @@ export default function POSFrontDeskPage() {
                       fontSize: "9px",
                       fontWeight: 700,
                       color: "var(--cream)",
+                      zIndex: 10,
                     }}
                   >
                     COMBO
@@ -499,7 +440,7 @@ export default function POSFrontDeskPage() {
                   <div>
                     <span style={{ fontSize: "0.7rem", color: "var(--ink-soft)" }}>เริ่มต้น </span>
                     <span className="font-display" style={{ fontSize: "1.25rem", color: "var(--ink)" }}>
-                      {p.price}฿
+                      {p.price_iced ?? p.price_hot ?? 0}฿
                     </span>
                   </div>
                   <button
@@ -526,7 +467,8 @@ export default function POSFrontDeskPage() {
               </div>
             </article>
           ))}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Floating Cart Button (Bottom Right - Exactly like Storefront) */}
@@ -602,265 +544,16 @@ export default function POSFrontDeskPage() {
           title="ตะกร้าเครื่องดื่ม (Walk-in)"
           subtitle={`ทั้งหมด ${totalCups} แก้ว`}
           checkoutButtonText="ชำระเงิน & ออกบัตรคิว"
-          discountAmount={discountAmount}
-          extraHeaderContent={
-            <div style={{ padding: "0.85rem", backgroundColor: "var(--card)", borderRadius: "1rem", border: "1px solid rgba(50,55,65,0.08)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                <Phone size={15} color="var(--teal)" />
-                <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>เบอร์โทรศัพท์สมาชิก (Optional):</span>
-              </div>
-              <input
-                type="tel"
-                placeholder="กรอกเบอร์โทรลูกค้า เช่น 081-234-5678 เพื่อสะสมแต้ม"
-                value={customerPhone}
-                onChange={(e) => handleLookupCustomer(e.target.value)}
-                style={{
-                  width: "100%",
-                  marginTop: "0.4rem",
-                  padding: "0.5rem 0.75rem",
-                  borderRadius: "0.6rem",
-                  border: "1px solid rgba(50,55,65,0.15)",
-                  backgroundColor: "var(--cream)",
-                  fontSize: "0.875rem",
-                  fontFamily: "'Kanit', sans-serif",
-                  outline: "none",
-                }}
-              />
-              {foundCustomer && (
-                <div style={{ marginTop: "0.6rem", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.85rem", paddingTop: "0.4rem", borderTop: "1px dashed rgba(50,55,65,0.1)" }}>
-                  <span style={{ color: "var(--ink)", fontWeight: 600 }}>{foundCustomer.name}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <span style={{ color: "var(--teal)", fontWeight: 700 }}>{foundCustomer.points} แต้ม</span>
-                    {foundCustomer.points >= 5 && (
-                      <button
-                        type="button"
-                        onClick={() => setIsRedeemingReward(!isRedeemingReward)}
-                        style={{
-                          fontSize: "0.75rem",
-                          padding: "3px 8px",
-                          borderRadius: "9999px",
-                          border: "none",
-                          backgroundColor: isRedeemingReward ? "#22c55e" : "var(--teal)",
-                          color: "#fff",
-                          cursor: "pointer",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {isRedeemingReward ? "ใช้แต้มแล้ว (-35บ.)" : "แลกฟรี 1 แก้ว (5แต้ม)"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          }
         />
 
-        {/* Item Customizer Modal (Matched with Storefront) */}
-        {customizingProduct && (
-          <div
-            className="animate-fade-in"
-            style={{
-              position: "fixed",
-              inset: 0,
-              backgroundColor: "rgba(0,0,0,0.5)",
-              backdropFilter: "blur(4px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 100,
-              padding: "1rem",
-            }}
-          >
-            <div
-              className="animate-modal-pop"
-              style={{
-                backgroundColor: "var(--card)",
-                borderRadius: "1.5rem",
-                width: "100%",
-                maxWidth: "480px",
-                maxHeight: "90vh",
-                overflowY: "auto",
-                padding: "1.5rem",
-                boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <h3 style={{ fontSize: "1.25rem", fontWeight: 800, color: "var(--ink)" }}>
-                    {customizingProduct.name_th}
-                  </h3>
-                  <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>{customizingProduct.name_en}</p>
-                </div>
-                <button type="button" onClick={() => setCustomizingProduct(null)} style={{ border: "none", background: "none", cursor: "pointer", color: "var(--ink-soft)", fontSize: "1.25rem" }}>
-                  ✕
-                </button>
-              </div>
-
-              <hr style={{ margin: "1rem 0", borderColor: "rgba(50, 55, 65, 0.1)" }} />
-
-              {/* 1. Temperature Selection */}
-              <div>
-                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, marginBottom: "0.4rem" }}>
-                  1. เลือกอุณหภูมิ (Temperature)
-                </label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
-                  <button
-                    type="button"
-                    onClick={() => setCustTemp("iced")}
-                    style={{
-                      padding: "0.7rem",
-                      borderRadius: "0.75rem",
-                      border: custTemp === "iced" ? "2px solid var(--teal)" : "1px solid rgba(50, 55, 65, 0.15)",
-                      backgroundColor: custTemp === "iced" ? "rgba(75, 155, 140, 0.12)" : "var(--cream)",
-                      color: custTemp === "iced" ? "var(--teal)" : "var(--ink)",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      fontSize: "0.85rem",
-                    }}
-                  >
-                    เย็น (Iced)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCustTemp("hot")}
-                    style={{
-                      padding: "0.7rem",
-                      borderRadius: "0.75rem",
-                      border: custTemp === "hot" ? "2px solid var(--warm)" : "1px solid rgba(50, 55, 65, 0.15)",
-                      backgroundColor: custTemp === "hot" ? "rgba(220, 160, 50, 0.12)" : "var(--cream)",
-                      color: custTemp === "hot" ? "var(--warm)" : "var(--ink)",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      fontSize: "0.85rem",
-                    }}
-                  >
-                    ร้อน (Hot)
-                  </button>
-                </div>
-              </div>
-
-              {/* 2. Sweetness Selector */}
-              <div style={{ marginTop: "1.25rem" }}>
-                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, marginBottom: "0.4rem" }}>
-                  2. ระดับความหวาน (Sweetness)
-                </label>
-                <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
-                  {(["0%", "25%", "50%", "75%", "100%"] as const).map((lvl) => (
-                    <button
-                      key={lvl}
-                      type="button"
-                      onClick={() => setCustSweetness(lvl)}
-                      style={{
-                        flex: 1,
-                        minWidth: "55px",
-                        padding: "0.55rem 0.2rem",
-                        borderRadius: "0.65rem",
-                        border: custSweetness === lvl ? "2px solid var(--ink)" : "1px solid rgba(50, 55, 65, 0.15)",
-                        backgroundColor: custSweetness === lvl ? "var(--ink)" : "var(--cream)",
-                        color: custSweetness === lvl ? "var(--cream)" : "var(--ink)",
-                        fontWeight: 700,
-                        fontSize: "0.8rem",
-                        cursor: "pointer",
-                      }}
-                    >
-                      {lvl}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 3. Toppings Selector */}
-              <div style={{ marginTop: "1.25rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
-                  <label style={{ fontSize: "0.85rem", fontWeight: 700 }}>3. เลือกท็อปปิ้ง (Toppings)</label>
-                  <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>เลือกได้หลายอย่าง</span>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.4rem", maxHeight: "160px", overflowY: "auto" }}>
-                  {TOPPINGS.map((top) => {
-                    const isSelected = custToppings.some((t) => t.id === top.id);
-                    const isBobaDisabled = custTemp === "hot" && top.id === 1;
-                    return (
-                      <button
-                        key={top.id}
-                        type="button"
-                        disabled={isBobaDisabled}
-                        onClick={() => handleToggleTopping(top)}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          padding: "0.55rem 0.85rem",
-                          borderRadius: "0.75rem",
-                          border: isSelected ? "2px solid var(--teal)" : "1px solid rgba(50, 55, 65, 0.12)",
-                          backgroundColor: isSelected ? "rgba(75, 155, 140, 0.12)" : "var(--cream)",
-                          color: isBobaDisabled ? "var(--ink-soft)" : "var(--ink)",
-                          fontSize: "0.85rem",
-                          fontWeight: isSelected ? 700 : 500,
-                          cursor: isBobaDisabled ? "not-allowed" : "pointer",
-                        }}
-                      >
-                        <span>
-                          {isSelected ? "✓ " : "+ "} {top.name_th}
-                        </span>
-                        <span style={{ color: "var(--teal)", fontWeight: 700 }}>
-                          +{top.price}฿
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Note input */}
-              <div style={{ marginTop: "1rem" }}>
-                <input
-                  type="text"
-                  placeholder="หมายเหตุเพิ่มเติม (เช่น แยกน้ำแข็ง)..."
-                  value={custNote}
-                  onChange={(e) => setCustNote(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "0.5rem 0.75rem",
-                    borderRadius: "0.6rem",
-                    border: "1px solid rgba(50,55,65,0.15)",
-                    backgroundColor: "var(--cream)",
-                    fontSize: "0.85rem",
-                    outline: "none",
-                  }}
-                />
-              </div>
-
-              {/* Modal Bottom CTA */}
-              <div style={{ marginTop: "1.25rem", display: "flex", alignItems: "center", gap: "1rem" }}>
-                <div>
-                  <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>ราคารวม</span>
-                  <p style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--ink)", lineHeight: 1 }}>
-                    {(customizingProduct.price + custToppings.reduce((s, t) => s + t.price, 0)) * custQuantity}฿
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddToCart}
-                  style={{
-                    flex: 1,
-                    borderRadius: "9999px",
-                    backgroundColor: "var(--teal)",
-                    padding: "0.75rem 1rem",
-                    fontSize: "0.95rem",
-                    fontWeight: 700,
-                    color: "var(--cream)",
-                    border: "none",
-                    cursor: "pointer",
-                    boxShadow: "0 4px 15px rgba(75, 155, 140, 0.3)",
-                  }}
-                >
-                  เพิ่มลงตะกร้า +
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Item Customizer Modal (Reusable Modal with Checkbox Toppings) */}
+        <OrderProductModal
+          isOpen={!!customizingProduct}
+          onClose={() => setCustomizingProduct(null)}
+          product={customizingProduct}
+          toppings={toppings}
+          onAddToCart={handleAddToCart}
+        />
 
         {/* Payment Checkout Modal */}
         {isCheckoutOpen && (

@@ -2,6 +2,37 @@
 
 ---
 
+## 📌 สรุปภาพรวมหน้าทั้งหมดและสถานะการพัฒนา (Pages & Implementation Status)
+
+### 👤 ฝั่งลูกค้า (Customer / Storefront)
+| ลำดับ | หน้า (Route) | คำอธิบาย / ความสามารถ | สถานะ |
+| :--- | :--- | :--- | :---: |
+| 1 | `/` (Landing Page) | หน้าหลักร้านค้า, แบนเนอร์สไลด์, รายการเมนู, ตะกร้าสินค้า, เช็คแต้มสะสม | ⏳ In Progress |
+| 2 | `/order` | หน้ารถเข็น & กรอกข้อมูลสั่งซื้อ เลือกเวลา และชำระเงิน | ⏳ In Progress |
+| 3 | `/payment/[uuid]` | หน้าแสดง QR Code พร้อมเพย์ และอัปโหลดสลิปหลักฐานโอนเงิน | ⏳ Pending |
+| 4 | `/queue` | หน้าติดตามสถานะคิวคำสั่งซื้อ Real-time | ⏳ In Progress |
+| 5 | `/promotion` | หน้ารายละเอียดโปรโมชั่นและสิทธิพิเศษ | ⏳ Pending |
+| 6 | `/about-us` | หน้าเกี่ยวกับร้านและช่องทางติดต่อ | ⏳ Pending |
+
+---
+
+### 🛠️ ฝั่งผู้ดูแลระบบ (Admin Portal - `/admin`)
+| ลำดับ | หมวดหมู่ | หน้า (Route) | คำอธิบาย / ความสามารถ | สถานะ |
+| :--- | :--- | :--- | :--- | :---: |
+| 1 | Auth | `/admin/login` | หน้าล็อกอินผู้ดูแลระบบ (JWT Token) | ✅ เสร็จแล้ว |
+| 2 | Management | `/admin/management/administrator` | **จัดการแอดมิน**: เพิ่ม/แก้ไข/ลบ, ตั้ง Superadmin, เปิด/ปิดสถานะ | ✅ **เสร็จแล้ว** |
+| 3 | Management | `/admin/management/menu` | **จัดการเมนู**: เพิ่ม/แก้ไข/ลบ, อัปโหลด+Cropรูป 1:1, สลับลำดับ (Drag & Drop / Reorder), ราคาร้อน/เย็น, แนะนำ, ซ่อน, ขายหมด, **สูตรคอมโบ (`product_combo_recipes`)** เลือกเครื่องดื่มเบส + ท็อปปิ้งในเซ็ต, Pagination 5 รายการ/หน้า | ✅ **เสร็จแล้ว** |
+| 4 | Management | `/admin/management/toppings` | **จัดการท็อปปิ้ง**: เพิ่ม/แก้ไข/ลบ, อัปโหลด+Cropรูป 1:1, สลับลำดับ (Reorder), เลือกร้อน/เย็น, ซ่อน, ขายหมด, Pagination 6 รายการ/หน้า | ✅ **เสร็จแล้ว** |
+| 5 | Management | `/admin/management/dashboard` | แดชบอร์ดสรุปยอดขาย รายรับ-รายจ่าย กราฟแนวโน้ม และสถิติ | ⏳ Pending |
+| 6 | Management | `/admin/management/slip-check` | ระบบตรวจสอบสลิปและอนุมัติออเดอร์ออนไลน์ | ⏳ Pending |
+| 7 | Management | `/admin/management/banner` | จัดการชุดแบนเนอร์และภาพประชาสัมพันธ์หน้าแรก | ⏳ Pending |
+| 8 | Management | `/admin/management/promotion` | จัดการโปรโมชั่นและเงื่อนไขการใช้แต้มสะสม | ⏳ Pending |
+| 9 | Management | `/admin/management/customer` | ดูรายชื่อสมาชิก ประวัติแต้มสะสม และการแลกสิทธิ์ | ⏳ Pending |
+| 10 | POS | `/admin/pos/front-desk` | หน้าจอขายหน้าร้าน (POS Walk-in) คิดเงิน ออกคิว AXX | ⏳ Pending |
+| 11 | POS | `/admin/pos/kitchen` | หน้าจอบาร์น้ำ/ห้องครัว (Kitchen Display) จัดการสถานะคิว | ⏳ Pending |
+
+---
+
 ## 1. ลูกค้า (Customer / Storefront)
 
 ### 1.1 หน้าหลัก (Landing Page)
@@ -159,7 +190,8 @@
 | `name_en` | VARCHAR(150) | NOT NULL | ชื่อสินค้าภาษาอังกฤษ (เช่น Matcha Soy Milk, Combo Matcha Lover) |
 | `desc_th` | TEXT | NULL | รายละเอียดสินค้าภาษาไทย |
 | `desc_en` | TEXT | NULL | รายละเอียดสินค้าภาษาอังกฤษ |
-| `price` | INT | NOT NULL | ราคาเริ่มต้น / ราคาเซ็ต (บาท) |
+| `price_hot` | INT | NULL | ราคาร้อน (บาท) |
+| `price_iced` | INT | NULL | ราคาเย็น (บาท) |
 | `image_url` | VARCHAR(255) | NULL | รูปภาพสินค้า |
 | `is_combo` | BOOLEAN | DEFAULT FALSE | เป็นเมนูเซ็ตคอมโบที่มีสูตรเฉพาะหรือไม่ |
 | `is_available` | BOOLEAN | DEFAULT TRUE | สถานะพร้อมขาย (เปิด/ซ่อน) |
@@ -185,10 +217,12 @@
 | `name_th` | VARCHAR(100) | NOT NULL | ชื่อท็อปปิ้งภาษาไทย (เช่น ไข่มุก, เฉาก๊วย) |
 | `name_en` | VARCHAR(100) | NOT NULL | ชื่อท็อปปิ้งภาษาอังกฤษ (เช่น Boba, Grass Jelly) |
 | `price` | INT | NOT NULL DEFAULT 0 | ราคาบวกเพิ่มต่อช็อต (บาท) |
+| `allow_hot` | BOOLEAN | NOT NULL DEFAULT TRUE | อนุญาตให้ใส่ในเครื่องดื่มร้อน |
+| `allow_iced` | BOOLEAN | NOT NULL DEFAULT TRUE | อนุญาตให้ใส่ในเครื่องดื่มเย็น |
 | `image_url` | VARCHAR(255) | NULL | รูปภาพท็อปปิ้ง |
-| `is_available` | BOOLEAN | DEFAULT TRUE | สถานะพร้อมขาย (เปิด/ซ่อน) |
-| `is_sold_out` | BOOLEAN | DEFAULT FALSE | สถานะขายหมด |
-| `sort_order` | INT | DEFAULT 0 | ลำดับการแสดงผล |
+| `is_available` | BOOLEAN | NOT NULL DEFAULT TRUE | สถานะพร้อมขาย (เปิด/ซ่อน) |
+| `is_sold_out` | BOOLEAN | NOT NULL DEFAULT FALSE | สถานะขายหมด |
+| `sort_order` | INT | NOT NULL DEFAULT 0 | ลำดับการแสดงผล |
 | `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สร้าง |
 | `updated_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่แก้ไขล่าสุด |
 
@@ -329,7 +363,8 @@ erDiagram
         string name_en
         text desc_th
         text desc_en
-        int price
+        int price_hot
+        int price_iced
         string image_url
         boolean is_combo
         boolean is_available
@@ -350,6 +385,8 @@ erDiagram
         string name_th
         string name_en
         int price
+        boolean allow_hot
+        boolean allow_iced
         string image_url
         boolean is_available
         boolean is_sold_out
@@ -470,7 +507,8 @@ classDiagram
         +string name_en
         +string desc_th
         +string desc_en
-        +int price
+        +int price_hot
+        +int price_iced
         +string image_url
         +bool is_combo
         +bool is_available
@@ -494,6 +532,8 @@ classDiagram
         +string name_th
         +string name_en
         +int price
+        +bool allow_hot
+        +bool allow_iced
         +string image_url
         +bool is_available
         +bool is_sold_out

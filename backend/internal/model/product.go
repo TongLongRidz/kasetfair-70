@@ -11,7 +11,8 @@ type Product struct {
 	NameEn        string               `gorm:"type:varchar(150);not null" json:"name_en"`
 	DescTh        *string              `gorm:"type:text" json:"desc_th"`
 	DescEn        *string              `gorm:"type:text" json:"desc_en"`
-	Price         int                  `gorm:"type:int;not null" json:"price"`
+	PriceHot      *int                 `gorm:"type:int" json:"price_hot"`
+	PriceIced     *int                 `gorm:"type:int" json:"price_iced"`
 	ImageURL      *string              `gorm:"type:varchar(255)" json:"image_url"`
 	IsCombo       bool                 `gorm:"default:false;not null" json:"is_combo"`
 	IsAvailable   bool                 `gorm:"default:true;not null" json:"is_available"`
@@ -24,7 +25,7 @@ type Product struct {
 }
 
 func (Product) TableName() string {
-	return "products"
+	return "product"
 }
 
 // ProductComboRecipe represents recipe components for combo set products
@@ -50,16 +51,18 @@ type Topping struct {
 	NameTh      string    `gorm:"type:varchar(100);not null" json:"name_th"`
 	NameEn      string    `gorm:"type:varchar(100);not null" json:"name_en"`
 	Price       int       `gorm:"type:int;default:0;not null" json:"price"`
+	AllowHot    bool      `gorm:"type:boolean;not null" json:"allow_hot"`
+	AllowIced   bool      `gorm:"type:boolean;not null" json:"allow_iced"`
 	ImageURL    *string   `gorm:"type:varchar(255)" json:"image_url"`
-	IsAvailable bool      `gorm:"default:true;not null" json:"is_available"`
-	IsSoldOut   bool      `gorm:"default:false;not null" json:"is_sold_out"`
+	IsAvailable bool      `gorm:"type:boolean;not null" json:"is_available"`
+	IsSoldOut   bool      `gorm:"type:boolean;not null" json:"is_sold_out"`
 	SortOrder   int       `gorm:"default:0;not null" json:"sort_order"`
 	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt   time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 func (Topping) TableName() string {
-	return "toppings"
+	return "topping"
 }
 
 // DTOs for Products
@@ -68,13 +71,16 @@ type CreateProductRequest struct {
 	NameEn        string  `json:"name_en"`
 	DescTh        *string `json:"desc_th"`
 	DescEn        *string `json:"desc_en"`
-	Price         int     `json:"price" binding:"min=0"`
+	PriceHot      *int    `json:"price_hot"`
+	PriceIced     *int    `json:"price_iced"`
 	ImageURL      *string `json:"image_url"`
 	IsCombo       bool    `json:"is_combo"`
 	IsAvailable   *bool   `json:"is_available"`
 	IsSoldOut     *bool   `json:"is_sold_out"`
 	IsRecommended *bool   `json:"is_recommended"`
 	SortOrder     *int    `json:"sort_order"`
+	BaseProductID *uint   `json:"base_product_id"`
+	ToppingIDs    []uint  `json:"topping_ids"`
 }
 
 type UpdateProductRequest struct {
@@ -82,13 +88,34 @@ type UpdateProductRequest struct {
 	NameEn        *string `json:"name_en"`
 	DescTh        *string `json:"desc_th"`
 	DescEn        *string `json:"desc_en"`
-	Price         *int    `json:"price"`
+	PriceHot      *int    `json:"price_hot"`
+	PriceIced     *int    `json:"price_iced"`
 	ImageURL      *string `json:"image_url"`
 	IsCombo       *bool   `json:"is_combo"`
 	IsAvailable   *bool   `json:"is_available"`
 	IsSoldOut     *bool   `json:"is_sold_out"`
 	IsRecommended *bool   `json:"is_recommended"`
 	SortOrder     *int    `json:"sort_order"`
+	BaseProductID *uint   `json:"base_product_id"`
+	ToppingIDs    *[]uint `json:"topping_ids"`
+}
+
+type ReorderProductItem struct {
+	ID        uint `json:"id" binding:"required"`
+	SortOrder int  `json:"sort_order"`
+}
+
+type ReorderProductsRequest struct {
+	Items []ReorderProductItem `json:"items" binding:"required"`
+}
+
+type ReorderToppingItem struct {
+	ID        uint `json:"id" binding:"required"`
+	SortOrder int  `json:"sort_order"`
+}
+
+type ReorderToppingsRequest struct {
+	Items []ReorderToppingItem `json:"items" binding:"required"`
 }
 
 // DTOs for Toppings
@@ -96,6 +123,8 @@ type CreateToppingRequest struct {
 	NameTh      string  `json:"name_th" binding:"required,min=1,max=100"`
 	NameEn      string  `json:"name_en"`
 	Price       int     `json:"price" binding:"min=0"`
+	AllowHot    *bool   `json:"allow_hot"`
+	AllowIced   *bool   `json:"allow_iced"`
 	ImageURL    *string `json:"image_url"`
 	IsAvailable *bool   `json:"is_available"`
 	IsSoldOut   *bool   `json:"is_sold_out"`
@@ -106,6 +135,8 @@ type UpdateToppingRequest struct {
 	NameTh      *string `json:"name_th"`
 	NameEn      *string `json:"name_en"`
 	Price       *int    `json:"price"`
+	AllowHot    *bool   `json:"allow_hot"`
+	AllowIced   *bool   `json:"allow_iced"`
 	ImageURL    *string `json:"image_url"`
 	IsAvailable *bool   `json:"is_available"`
 	IsSoldOut   *bool   `json:"is_sold_out"`

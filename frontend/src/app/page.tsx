@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/layouts/Navbar";
 import Footer from "@/components/layouts/Footer";
-import { Search } from "lucide-react";
 
 // Types
 type Temperature = "iced" | "hot";
@@ -191,7 +190,7 @@ interface BannerSlide {
   tag: string;
   title: string;
   highlight: string;
-  desc: string;
+  desc: React.ReactNode;
   ctaText: string;
   ctaLink: string;
   image: string;
@@ -203,7 +202,13 @@ const BANNERS: BannerSlide[] = [
     tag: "",
     title: "น้ำเต้าหู้",
     highlight: "5 รสชาติ",
-    desc: "น้ำเต้าหู้สดใหม่ทุกวัน พร้อมท็อปปิ้งแน่นแก้ว ให้จิบระหว่างเดินงาน",
+    desc: (
+      <>
+        น้ำเต้าหู้สดใหม่ทุกวัน
+        <br className="mobile-break" />{" "}พร้อมท็อปปิ้งแน่นแก้ว
+        <br />ให้จิบเพลินระหว่างเดินงาน
+      </>
+    ),
     ctaText: "สั่งเลย!",
     ctaLink: "/order",
     image: "/images/hero-soy.jpg",
@@ -234,7 +239,6 @@ const BANNERS: BannerSlide[] = [
 export default function Home() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"all" | "flavours" | "combos">("all");
-  const [searchQuery, setSearchQuery] = useState("");
   const [currentSlide, setCurrentSlide] = useState(0);
 
   const handleBannerCtaClick = (e: React.MouseEvent<HTMLAnchorElement>, ctaLink: string) => {
@@ -253,18 +257,14 @@ export default function Home() {
     activeTab === "all"
       ? [...FLAVOURS, ...COMBOS]
       : activeTab === "flavours"
-      ? FLAVOURS
-      : COMBOS;
+        ? FLAVOURS
+        : COMBOS;
 
-  const displayProducts = baseProducts.filter((p) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.trim().toLowerCase();
-    return (
-      p.name.toLowerCase().includes(q) ||
-      p.nameEn.toLowerCase().includes(q) ||
-      p.desc.toLowerCase().includes(q)
-    );
-  });
+  const displayProducts = [...baseProducts]
+    .sort((a, b) => {
+      if (a.recommended === b.recommended) return 0;
+      return a.recommended ? -1 : 1;
+    });
 
 
   return (
@@ -360,7 +360,7 @@ export default function Home() {
               className="hero-banner-image-wrapper"
               style={{
                 position: "absolute",
-                right: "-1.5rem",
+                right: "-1.7rem",
                 bottom: "-1.5rem",
                 width: "13rem",
                 height: "13rem",
@@ -368,14 +368,22 @@ export default function Home() {
                 overflow: "hidden",
                 border: "4px solid rgba(247, 246, 240, 0.25)",
                 boxShadow: "0 8px 25px rgba(0,0,0,0.2)",
+                userSelect: "none",
+                WebkitUserSelect: "none",
               }}
             >
               <Image
                 src={BANNERS[currentSlide].image}
                 alt={BANNERS[currentSlide].title}
                 fill
-                sizes="(max-width: 480px) 140px, 220px"
-                style={{ objectFit: "cover" }}
+                sizes="(max-width: 480px) 130px, (max-width: 640px) 160px, 220px"
+                draggable={false}
+                style={{
+                  objectFit: "cover",
+                  userSelect: "none",
+                  WebkitUserSelect: "none",
+                  pointerEvents: "none",
+                }}
                 priority
               />
             </div>
@@ -391,23 +399,8 @@ export default function Home() {
 
         {/* Menu Section */}
         <section id="menu" style={{ marginTop: "1.75rem", scrollMarginTop: "4.5rem" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "0.75rem" }}>
-            <div>
-              <h2 style={{ fontSize: "1.35rem", fontWeight: 600 }}>รายการเมนูเครื่องดื่ม</h2>
-              <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>กดเลือกเมนูเพื่อปรับความหวาน, อุณหภูมิ และท็อปปิ้ง</p>
-            </div>
-
-            {/* Search Input (Matched with POS walk-in) */}
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", backgroundColor: "var(--card)", padding: "0.45rem 0.85rem", borderRadius: "9999px", border: "1px solid rgba(50,55,65,0.1)", width: "100%", maxWidth: "240px" }}>
-              <Search size={16} color="var(--ink-soft)" />
-              <input
-                type="text"
-                placeholder="ค้นหาเมนู..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ border: "none", background: "transparent", outline: "none", fontSize: "0.825rem", width: "100%", fontFamily: "'Kanit', sans-serif" }}
-              />
-            </div>
+          <div>
+            <h2 style={{ fontSize: "1.35rem", fontWeight: 600 }}>รายการเมนูเครื่องดื่ม</h2>
           </div>
 
           {/* Category Tabs */}
@@ -548,7 +541,7 @@ export default function Home() {
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
             <div>
               <h2 style={{ fontSize: "1.35rem", fontWeight: 600 }}>ท็อปปิ้ง (Toppings)</h2>
-              <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>เพิ่มความอร่อยให้เครื่องดื่มแก้วโปรด</p>
+              <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>เพิ่มความอร่อยให้เครื่องดื่มของคุณ</p>
             </div>
           </div>
 

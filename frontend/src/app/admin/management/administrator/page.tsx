@@ -387,34 +387,9 @@ export default function AdminListPage() {
         {/* Header Section */}
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
           <div>
-              <h1 style={{ fontSize: "1.75rem", fontWeight: 800, lineHeight: 1.2 }}>
-              จัดการบัญชีผู้ดูแลระบบ (Admin List)
+            <h1 style={{ fontSize: "1.75rem", fontWeight: 800, lineHeight: 1.2 }}>
+              จัดการบัญชีผู้ดูแลระบบ
             </h1>
-          </div>
-
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button
-              type="button"
-              onClick={handleOpenCreate}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                backgroundColor: "var(--teal)",
-                color: "#fff",
-                padding: "0.6rem 1.25rem",
-                borderRadius: "0.75rem",
-                border: "none",
-                fontWeight: 600,
-                fontSize: "0.9rem",
-                cursor: "pointer",
-                boxShadow: "0 4px 14px rgba(75, 155, 140, 0.25)",
-                transition: "transform 0.15s ease",
-              }}
-            >
-              <Plus size={18} />
-              <span>เพิ่มแอดมินใหม่</span>
-            </button>
           </div>
         </div>
 
@@ -431,15 +406,15 @@ export default function AdminListPage() {
             flexDirection: "column",
           }}
         >
-          {/* Controls Bar: Filter Tabs & Search Bar */}
+          {/* Controls Bar: Filter Tabs & Search Bar / Add Button */}
           <div className="admin-controls-bar">
-            {/* Filter Tabs */}
+            {/* Filter Tabs (Desktop) */}
             <div className="admin-filter-tabs">
               {[
                 { id: "all", label: "ทั้งหมด" },
                 { id: "active", label: "เปิดใช้งาน" },
                 { id: "inactive", label: "รอเปิดใช้งาน" },
-                { id: "superadmin", label: "Superadmin" },
+                { id: "superadmin", label: "Super Admin" },
               ].map((tab) => {
                 const isSelected = statusFilter === tab.id;
                 return (
@@ -470,8 +445,34 @@ export default function AdminListPage() {
               })}
             </div>
 
-            {/* Search Box */}
+            {/* Filter Dropdown (Mobile) */}
+            <div className="admin-filter-dropdown-wrapper">
+              <select
+                className="admin-filter-select"
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value as any);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="all">แสดงทั้งหมด</option>
+                <option value="active">แสดงเฉพาะบัญชีที่ถูกเปิดใช้งาน</option>
+                <option value="inactive">แสดงเฉพาะบัญชีที่รอเปิดใช้งาน</option>
+                <option value="superadmin">แสดงเฉพาะบัญชีที่เป็น Super Admin</option>
+              </select>
+            </div>
+
+            {/* Search Box & Add Button */}
             <div className="admin-search-wrapper">
+              <button
+                type="button"
+                className="admin-add-btn"
+                onClick={handleOpenCreate}
+              >
+                <Plus size={16} />
+                <span>เพิ่มแอดมินใหม่</span>
+              </button>
+
               <div className="admin-search-box">
                 <Search size={15} color="var(--ink-soft)" style={{ flexShrink: 0 }} />
                 <input
