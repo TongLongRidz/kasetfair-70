@@ -742,7 +742,7 @@ export default function MenuManagementPage() {
                 <Search size={15} color="var(--ink-soft)" style={{ flexShrink: 0 }} />
                 <input
                   type="text"
-                  placeholder="ค้นหาชื่อเมนู หรือคำอธิบาย..."
+                  placeholder="ค้นหาชื่อเมนู (ไทย/อังกฤษ)..."
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);

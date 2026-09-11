@@ -46,7 +46,7 @@ func (h *AppHandler) GetProducts(c *gin.Context) {
 
 	if searchQuery != "" {
 		likeQuery := "%" + searchQuery + "%"
-		query = query.Where("name_th ILIKE ? OR name_en ILIKE ? OR desc_th ILIKE ? OR desc_en ILIKE ?", likeQuery, likeQuery, likeQuery, likeQuery)
+		query = query.Where("name_th ILIKE ? OR name_en ILIKE ?", likeQuery, likeQuery)
 	}
 
 	if category == "combos" {

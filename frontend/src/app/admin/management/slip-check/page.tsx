@@ -23,6 +23,7 @@ import {
   Check,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
+import { getStoredToken } from "@/lib/auth";
 
 export type PaymentVerificationStatus = "verified" | "pending" | "fraud";
 export type PaymentMethod = "promptpay_qr" | "cash";
@@ -191,6 +192,68 @@ const INITIAL_SLIP_ORDERS: SlipOrderItem[] = [
 
 export default function SlipCheckManagementPage() {
   const { success, error: toastError, info, warning } = useToast();
+  // Slip upload requirement policy: "immediate" (ต้องอัพสลิปเลย) vs "later" (อัพสลิปทีหลังได้ / ให้ผ่านเลย)
+  const [slipUploadMode, setSlipUploadMode] = useState<"immediate" | "later">("immediate");
+
+  // Load slip policy from Backend API (with localStorage fallback)
+  useEffect(() => {
+    const fetchSetting = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+        const res = await fetch(`${apiUrl}/api/v1/settings/slip_upload_mode`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.value === "later" || data.value === "immediate") {
+            setSlipUploadMode(data.value);
+            localStorage.setItem("kaset_slip_upload_mode", data.value);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch slip setting from backend, using local:", err);
+      }
+      // Fallback
+      try {
+        const savedMode = localStorage.getItem("kaset_slip_upload_mode");
+        if (savedMode === "later" || savedMode === "immediate") {
+          setSlipUploadMode(savedMode);
+        }
+      } catch {}
+    };
+    fetchSetting();
+  }, []);
+
+  const handleToggleSlipMode = async (mode: "immediate" | "later") => {
+    setSlipUploadMode(mode);
+    try {
+      localStorage.setItem("kaset_slip_upload_mode", mode);
+    } catch {}
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const token = getStoredToken();
+      await fetch(`${apiUrl}/api/v1/settings/slip_upload_mode`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          value: mode,
+          description: "เงื่อนไขการแนบสลิป: immediate (ต้องอัพสลิปเลย) หรือ later (อัพสลิปทีหลังได้)",
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to update setting on backend:", err);
+    }
+
+    if (mode === "later") {
+      info("บันทึกการตั้งค่าลงระบบ: อัพสลิปทีหลังได้ (ให้ order ผ่านเลยโดยไม่ต้องแนบสลิปทันที)", "เงื่อนไขการแนบสลิป");
+    } else {
+      success("บันทึกการตั้งค่าลงระบบ: บังคับให้อัพโหลดสลิปทันทีก่อนยืนยันออเดอร์", "เงื่อนไขการแนบสลิป");
+    }
+  };
+
   const [orders, setOrders] = useState<SlipOrderItem[]>(INITIAL_SLIP_ORDERS);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | PaymentVerificationStatus>("all");
@@ -317,6 +380,70 @@ export default function SlipCheckManagementPage() {
             <h1 style={{ fontSize: "1.75rem", fontWeight: 800, lineHeight: 1.2, margin: 0 }}>
               การตรวจสอบการชำระเงิน
             </h1>
+            <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", marginTop: "0.25rem", margin: 0 }}>
+              จัดการและตรวจสอบความถูกต้องของสลิปโอนเงิน PromptPay และรายการเงินสด
+            </p>
+          </div>
+
+          {/* Slip Order Pass Requirement Toggle */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.75rem",
+              backgroundColor: "var(--card)",
+              padding: "0.45rem 0.75rem",
+              borderRadius: "1rem",
+              border: "1px solid rgba(50, 55, 65, 0.12)",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+            }}
+          >
+
+            <div style={{ display: "flex", gap: "0.25rem", backgroundColor: "var(--cream)", padding: "0.25rem", borderRadius: "0.75rem", border: "1px solid rgba(50,55,65,0.08)" }}>
+              <button
+                type="button"
+                onClick={() => handleToggleSlipMode("immediate")}
+                style={{
+                  padding: "0.35rem 0.75rem",
+                  borderRadius: "0.55rem",
+                  border: "none",
+                  backgroundColor: slipUploadMode === "immediate" ? "var(--teal)" : "transparent",
+                  color: slipUploadMode === "immediate" ? "#fff" : "var(--ink-soft)",
+                  fontSize: "0.775rem",
+                  fontWeight: slipUploadMode === "immediate" ? 700 : 500,
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.3rem",
+                }}
+              >
+                <CheckCircle2 size={13} />
+                <span>ให้อัพเลย (บังคับ)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleToggleSlipMode("later")}
+                style={{
+                  padding: "0.35rem 0.75rem",
+                  borderRadius: "0.55rem",
+                  border: "none",
+                  backgroundColor: slipUploadMode === "later" ? "var(--teal)" : "transparent",
+                  color: slipUploadMode === "later" ? "#fff" : "var(--ink-soft)",
+                  fontSize: "0.775rem",
+                  fontWeight: slipUploadMode === "later" ? 700 : 500,
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.3rem",
+                }}
+              >
+                <Clock size={13} />
+                <span>อัพที่หลังได้ (ให้ผ่าน)</span>
+              </button>
+            </div>
           </div>
         </div>
 

@@ -50,14 +50,19 @@ func ConnectPostgres(dsn string) (*PostgresDB, error) {
 		&model.Product{},
 		&model.Topping{},
 		&model.ProductComboRecipe{},
+		&model.Customer{},
+		&model.Promotion{},
+		&model.PromotionRedemption{},
+		&model.SystemSetting{},
 	); err != nil {
 		log.Printf("⚠️ AutoMigrate error: %v", err)
 	} else {
-		log.Println("✅ Database migration completed successfully (admins, products, toppings, product_combo_recipes tables ready)")
+		log.Println("✅ Database migration completed successfully (admin, product, topping, product_combo_recipe, customer, promotion, promotion_redemption, system_setting tables ready)")
 	}
 
-	// Seed Superadmin if not exists
+	// Seed Superadmin and Settings if not exists
 	seedSuperAdmin(db)
+	seedSettings(db)
 
 	return &PostgresDB{DB: db}, nil
 }
@@ -132,3 +137,26 @@ func seedSuperAdmin(db *gorm.DB) {
 	log.Println("⚠️ Please copy this password and change it upon first login!")
 	log.Println("==================================================================")
 }
+
+func seedSettings(db *gorm.DB) {
+	defaultSettings := []model.SystemSetting{
+		{
+			Key:         "slip_upload_mode",
+			Value:       "immediate",
+			Description: "เงื่อนไขการแนบสลิป: immediate (ต้องอัพสลิปเลย) หรือ later (อัพสลิปทีหลังได้)",
+			UpdatedAt:   time.Now(),
+		},
+	}
+
+	for _, setting := range defaultSettings {
+		var count int64
+		if err := db.Model(&model.SystemSetting{}).Where("key = ?", setting.Key).Count(&count).Error; err == nil && count == 0 {
+			if err := db.Create(&setting).Error; err != nil {
+				log.Printf("⚠️ Failed to seed default setting %s: %v", setting.Key, err)
+			} else {
+				log.Printf("✅ Seeded default system setting: %s = %s", setting.Key, setting.Value)
+			}
+		}
+	}
+}
+

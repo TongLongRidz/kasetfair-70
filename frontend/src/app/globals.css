@@ -665,6 +665,60 @@ html.lock-scroll {
   }
 }
 
+/* Responsive Promotions Grid */
+.promotions-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  justify-items: center;
+}
+
+.promotions-grid>article {
+  width: 80%;
+  max-width: 320px;
+}
+
+@media (min-width: 480px) {
+  .promotions-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.85rem;
+    justify-items: stretch;
+  }
+
+  .promotions-grid>article {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+@media (min-width: 640px) {
+  .promotions-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .promotions-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.1rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .promotions-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1.15rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .promotions-grid {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1.2rem;
+  }
+}
+
 /* Dashboard Charts Grid Responsive Layout */
 .admin-dashboard-middle-grid {
   display: grid;

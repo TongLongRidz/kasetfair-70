@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ShoppingBag, X, Plus, Minus, Trash2 } from "lucide-react";
+import { ShoppingBag, X, Plus, Minus, Trash2, Edit3 } from "lucide-react";
 
 export interface CartItemModel {
   cartId: string;
@@ -20,6 +20,8 @@ interface CartDrawerProps {
   onClose: () => void;
   cart: CartItemModel[];
   onUpdateQty: (cartId: string, delta: number) => void;
+  onDeleteItem?: (cartId: string) => void;
+  onEditItem?: (item: CartItemModel) => void;
   onCheckout?: () => void;
   title?: string;
   subtitle?: string;
@@ -33,6 +35,8 @@ export default function CartDrawer({
   onClose,
   cart,
   onUpdateQty,
+  onDeleteItem,
+  onEditItem,
   onCheckout,
   title = "ตะกร้าเครื่องดื่ม",
   subtitle,
@@ -42,6 +46,7 @@ export default function CartDrawer({
 }: CartDrawerProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<CartItemModel | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -74,310 +79,449 @@ export default function CartDrawer({
   const finalTotal = Math.max(0, rawTotal - discountAmount);
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 100,
-        backgroundColor: "rgba(0, 0, 0, 0.55)",
-        backdropFilter: "blur(4px)",
-        display: "flex",
-        justifyContent: "flex-end",
-        opacity: isVisible ? 1 : 0,
-        pointerEvents: isVisible ? "auto" : "none",
-        transition: "opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1)",
-      }}
-      onClick={onClose}
-    >
+    <>
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
-          width: "100%",
-          maxWidth: "460px",
-          height: "100vh",
-          backgroundColor: "var(--cream)",
+          position: "fixed",
+          inset: 0,
+          zIndex: 100,
+          backgroundColor: "rgba(0, 0, 0, 0.55)",
+          backdropFilter: "blur(4px)",
           display: "flex",
-          flexDirection: "column",
-          boxShadow: "-10px 0 35px rgba(0, 0, 0, 0.25)",
-          borderLeft: "1px solid rgba(50, 55, 65, 0.1)",
-          transform: isVisible ? "translateX(0)" : "translateX(100%)",
-          transition: "transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)",
+          justifyContent: "flex-end",
+          opacity: isVisible ? 1 : 0,
+          pointerEvents: isVisible ? "auto" : "none",
+          transition: "opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1)",
         }}
+        onClick={onClose}
       >
-        {/* Drawer Header */}
         <div
+          onClick={(e) => e.stopPropagation()}
           style={{
-            padding: "1.25rem 1.5rem",
-            borderBottom: "1px solid rgba(50, 55, 65, 0.1)",
-            backgroundColor: "var(--card)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-            <div
-              style={{
-                width: "38px",
-                height: "38px",
-                borderRadius: "50%",
-                backgroundColor: "rgba(75, 155, 140, 0.12)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--teal)",
-              }}
-            >
-              <ShoppingBag size={20} />
-            </div>
-            <div>
-              <h3 style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--ink)", lineHeight: 1.2 }}>
-                {title}
-              </h3>
-              <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)", marginTop: "2px" }}>
-                {subtitle || `ทั้งหมด ${totalCups} รายการ`}
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="ปิดตะกร้า"
-            style={{
-              width: "36px",
-              height: "36px",
-              borderRadius: "50%",
-              border: "1px solid rgba(50, 55, 65, 0.1)",
-              backgroundColor: "transparent",
-              color: "var(--ink-soft)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(50,55,65,0.06)";
-              e.currentTarget.style.color = "var(--ink)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-              e.currentTarget.style.color = "var(--ink-soft)";
-            }}
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Optional Extra Header (e.g. Loyalty Phone Lookup) */}
-        {extraHeaderContent && (
-          <div style={{ padding: "1rem 1.5rem 0.5rem 1.5rem" }}>
-            {extraHeaderContent}
-          </div>
-        )}
-
-        {/* Items List (Scrollable) */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "1rem 1.5rem",
+            width: "100%",
+            maxWidth: "460px",
+            height: "100vh",
+            backgroundColor: "var(--cream)",
             display: "flex",
             flexDirection: "column",
-            gap: "0.75rem",
+            boxShadow: "-10px 0 35px rgba(0, 0, 0, 0.25)",
+            borderLeft: "1px solid rgba(50, 55, 65, 0.1)",
+            transform: isVisible ? "translateX(0)" : "translateX(100%)",
+            transition: "transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)",
           }}
         >
-          {cart.length === 0 ? (
-            <div
-              style={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                textAlign: "center",
-                color: "var(--ink-soft)",
-                padding: "2rem 0",
-              }}
-            >
-              <div
-                style={{
-                  width: "64px",
-                  height: "64px",
-                  borderRadius: "50%",
-                  backgroundColor: "rgba(50, 55, 65, 0.05)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: "1rem",
-                  color: "var(--ink-soft)",
-                }}
-              >
-                <ShoppingBag size={32} opacity={0.6} />
-              </div>
-              <p style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--ink)" }}>ตะกร้ายังว่างอยู่</p>
-              <p style={{ fontSize: "0.85rem", marginTop: "0.25rem", maxWidth: "220px" }}>
-                เลือกเครื่องดื่มเมนูโปรดของคุณเพื่อเพิ่มลงในตะกร้า
-              </p>
-            </div>
-          ) : (
-            cart.map((item) => (
-              <div
-                key={item.cartId}
-                style={{
-                  borderRadius: "1rem",
-                  backgroundColor: "var(--card)",
-                  padding: "0.9rem 1rem",
-                  border: "1px solid rgba(50, 55, 65, 0.08)",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.03)",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "0.75rem",
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h4 style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {item.productName}
-                  </h4>
-                  <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "0.15rem" }}>
-                    {item.temperature === "iced" ? "เย็น" : "ร้อน"} · หวาน {item.sweetness}
-                  </p>
-                  {item.toppings.length > 0 && (
-                    <p style={{ fontSize: "0.75rem", color: "var(--teal)", marginTop: "0.1rem", fontWeight: 500 }}>
-                      + {item.toppings.map((t) => t.name).join(", ")}
-                    </p>
-                  )}
-                  {item.note && (
-                    <p style={{ fontSize: "0.72rem", color: "#f59e0b", marginTop: "0.1rem" }}>
-                      Note: {item.note}
-                    </p>
-                  )}
-                  <p style={{ marginTop: "0.3rem", fontSize: "1rem", fontWeight: 800, color: "var(--ink)" }}>
-                    {item.unitPrice * item.quantity}฿{" "}
-                    <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)", fontWeight: 400 }}>
-                      (@{item.unitPrice}฿)
-                    </span>
-                  </p>
-                </div>
-
-                {/* Quantity Control Pill */}
-                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", backgroundColor: "var(--cream)", padding: "0.25rem 0.4rem", borderRadius: "9999px", border: "1px solid rgba(50, 55, 65, 0.1)" }}>
-                  <button
-                    type="button"
-                    onClick={() => onUpdateQty(item.cartId, -1)}
-                    aria-label="ลดจำนวน"
-                    style={{
-                      width: "1.75rem",
-                      height: "1.75rem",
-                      borderRadius: "50%",
-                      border: "none",
-                      backgroundColor: item.quantity === 1 ? "rgba(220, 50, 50, 0.1)" : "#fff",
-                      color: item.quantity === 1 ? "#dc2626" : "var(--ink)",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      transition: "all 0.1s ease",
-                    }}
-                  >
-                    {item.quantity === 1 ? <Trash2 size={13} /> : <Minus size={13} />}
-                  </button>
-
-                  <span
-                    className="font-mono"
-                    style={{
-                      fontSize: "0.9rem",
-                      fontWeight: 700,
-                      minWidth: "1.2rem",
-                      textAlign: "center",
-                    }}
-                  >
-                    {item.quantity}
-                  </span>
-
-                  <button
-                    type="button"
-                    onClick={() => onUpdateQty(item.cartId, 1)}
-                    aria-label="เพิ่มจำนวน"
-                    style={{
-                      width: "1.75rem",
-                      height: "1.75rem",
-                      borderRadius: "50%",
-                      border: "none",
-                      backgroundColor: "var(--ink)",
-                      color: "var(--cream)",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      transition: "all 0.1s ease",
-                    }}
-                  >
-                    <Plus size={13} />
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Drawer Footer / Checkout Summary */}
-        {cart.length > 0 && (
+          {/* Drawer Header */}
           <div
             style={{
               padding: "1.25rem 1.5rem",
+              borderBottom: "1px solid rgba(50, 55, 65, 0.1)",
               backgroundColor: "var(--card)",
-              borderTop: "1px solid rgba(50, 55, 65, 0.1)",
-              boxShadow: "0 -4px 15px rgba(0, 0, 0, 0.04)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
             }}
           >
-            {discountAmount > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "#22c55e", fontWeight: 600, marginBottom: "0.4rem" }}>
-                <span>ส่วนลดแลกแต้ม</span>
-                <span>-{discountAmount}฿</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+              <div
+                style={{
+                  width: "38px",
+                  height: "38px",
+                  borderRadius: "50%",
+                  backgroundColor: "rgba(75, 155, 140, 0.12)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--teal)",
+                }}
+              >
+                <ShoppingBag size={20} />
               </div>
-            )}
-
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-              <span style={{ fontSize: "1rem", fontWeight: 700, color: "var(--ink)" }}>ยอดรวมทั้งหมด</span>
-              <span className="font-display" style={{ fontSize: "1.85rem", color: "var(--teal)", lineHeight: 1 }}>
-                {finalTotal}฿
-              </span>
+              <div>
+                <h3 style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--ink)", lineHeight: 1.2 }}>
+                  {title}
+                </h3>
+                <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)", marginTop: "2px" }}>
+                  {subtitle || `ทั้งหมด ${totalCups} รายการ`}
+                </p>
+              </div>
             </div>
 
             <button
               type="button"
-              onClick={onCheckout}
+              onClick={onClose}
+              aria-label="ปิดตะกร้า"
               style={{
-                width: "100%",
-                borderRadius: "9999px",
-                backgroundColor: "var(--teal)",
-                padding: "0.95rem",
-                fontSize: "1rem",
-                fontWeight: 700,
-                color: "var(--cream)",
-                border: "none",
-                cursor: "pointer",
-                boxShadow: "0 4px 15px rgba(75, 155, 140, 0.35)",
+                width: "36px",
+                height: "36px",
+                borderRadius: "50%",
+                border: "1px solid rgba(50, 55, 65, 0.1)",
+                backgroundColor: "transparent",
+                color: "var(--ink-soft)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "0.5rem",
-                transition: "transform 0.15s ease, filter 0.15s ease",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.filter = "brightness(1.05)")}
-              onMouseLeave={(e) => (e.currentTarget.style.filter = "brightness(1)")}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(50,55,65,0.06)";
+                e.currentTarget.style.color = "var(--ink)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+                e.currentTarget.style.color = "var(--ink-soft)";
+              }}
             >
-              <ShoppingBag size={18} />
-              <span>{checkoutButtonText} ({finalTotal}฿)</span>
+              <X size={20} />
             </button>
           </div>
-        )}
+
+          {/* Optional Extra Header (e.g. Loyalty Phone Lookup) */}
+          {extraHeaderContent && (
+            <div style={{ padding: "1rem 1.5rem 0.5rem 1.5rem" }}>
+              {extraHeaderContent}
+            </div>
+          )}
+
+          {/* Items List (Scrollable) */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "1rem 1.5rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.75rem",
+            }}
+          >
+            {cart.length === 0 ? (
+              <div
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  textAlign: "center",
+                  color: "var(--ink-soft)",
+                  padding: "2rem 0",
+                }}
+              >
+                <div
+                  style={{
+                    width: "64px",
+                    height: "64px",
+                    borderRadius: "50%",
+                    backgroundColor: "rgba(50, 55, 65, 0.05)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: "1rem",
+                    color: "var(--ink-soft)",
+                  }}
+                >
+                  <ShoppingBag size={32} opacity={0.6} />
+                </div>
+                <p style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--ink)" }}>ตะกร้ายังว่างอยู่</p>
+                <p style={{ fontSize: "0.85rem", marginTop: "0.25rem", maxWidth: "220px" }}>
+                  เลือกเครื่องดื่มเมนูโปรดของคุณเพื่อเพิ่มลงในตะกร้า
+                </p>
+              </div>
+            ) : (
+              cart.map((item) => (
+                <div
+                  key={item.cartId}
+                  style={{
+                    borderRadius: "1rem",
+                    backgroundColor: "var(--card)",
+                    padding: "0.9rem 1rem",
+                    border: "1px solid rgba(50, 55, 65, 0.08)",
+                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.03)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: "0.75rem",
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+                      <h4 style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {item.productName}
+                      </h4>
+                      {onEditItem && (
+                        <button
+                          type="button"
+                          onClick={() => onEditItem(item)}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.2rem",
+                            padding: "0.15rem 0.45rem",
+                            borderRadius: "0.4rem",
+                            border: "1px solid rgba(75, 155, 140, 0.3)",
+                            backgroundColor: "rgba(75, 155, 140, 0.08)",
+                            color: "var(--teal)",
+                            fontSize: "0.7rem",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(75, 155, 140, 0.2)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "rgba(75, 155, 140, 0.08)")}
+                        >
+                          <Edit3 size={10} />
+                          <span>แก้ไข</span>
+                        </button>
+                      )}
+                    </div>
+                    <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "0.15rem" }}>
+                      {item.temperature === "iced" ? "เย็น" : "ร้อน"} · หวาน {item.sweetness}
+                    </p>
+                    {item.toppings.length > 0 && (
+                      <p style={{ fontSize: "0.75rem", color: "var(--teal)", marginTop: "0.1rem", fontWeight: 500 }}>
+                        + {item.toppings.map((t) => t.name).join(", ")}
+                      </p>
+                    )}
+                    {item.note && (
+                      <p style={{ fontSize: "0.72rem", color: "#f59e0b", marginTop: "0.1rem" }}>
+                        Note: {item.note}
+                      </p>
+                    )}
+                    <p style={{ marginTop: "0.25rem", fontSize: "0.975rem", fontWeight: 800, color: "var(--ink)" }}>
+                      ฿{item.unitPrice * item.quantity}
+                    </p>
+                  </div>
+
+                  {/* Quantity Control Pill */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", backgroundColor: "var(--cream)", padding: "0.25rem 0.4rem", borderRadius: "9999px", border: "1px solid rgba(50, 55, 65, 0.1)" }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (item.quantity === 1) {
+                          setItemToDelete(item);
+                        } else {
+                          onUpdateQty(item.cartId, -1);
+                        }
+                      }}
+                      aria-label="ลดจำนวน"
+                      style={{
+                        width: "1.75rem",
+                        height: "1.75rem",
+                        borderRadius: "50%",
+                        border: "none",
+                        backgroundColor: item.quantity === 1 ? "rgba(220, 50, 50, 0.1)" : "#fff",
+                        color: item.quantity === 1 ? "#dc2626" : "var(--ink)",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "all 0.1s ease",
+                      }}
+                    >
+                      {item.quantity === 1 ? <Trash2 size={13} /> : <Minus size={13} />}
+                    </button>
+
+                    <span
+                      className="font-mono"
+                      style={{
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                        minWidth: "1.2rem",
+                        textAlign: "center",
+                      }}
+                    >
+                      {item.quantity}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => onUpdateQty(item.cartId, 1)}
+                      aria-label="เพิ่มจำนวน"
+                      style={{
+                        width: "1.75rem",
+                        height: "1.75rem",
+                        borderRadius: "50%",
+                        border: "none",
+                        backgroundColor: "var(--ink)",
+                        color: "var(--cream)",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "all 0.1s ease",
+                      }}
+                    >
+                      <Plus size={13} />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Drawer Footer / Checkout Summary */}
+          {cart.length > 0 && (
+            <div
+              style={{
+                padding: "1.25rem 1.5rem",
+                backgroundColor: "var(--card)",
+                borderTop: "1px solid rgba(50, 55, 65, 0.1)",
+                boxShadow: "0 -4px 15px rgba(0, 0, 0, 0.04)",
+              }}
+            >
+              {discountAmount > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "#22c55e", fontWeight: 600, marginBottom: "0.4rem" }}>
+                  <span>ส่วนลดแลกแต้ม</span>
+                  <span>-{discountAmount}฿</span>
+                </div>
+              )}
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                <span style={{ fontSize: "1rem", fontWeight: 700, color: "var(--ink)" }}>ยอดรวมทั้งหมด</span>
+                <span className="font-display" style={{ fontSize: "1.85rem", color: "var(--teal)", lineHeight: 1 }}>
+                  ฿{finalTotal}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={onCheckout}
+                style={{
+                  width: "100%",
+                  borderRadius: "9999px",
+                  backgroundColor: "var(--teal)",
+                  padding: "0.95rem",
+                  fontSize: "1rem",
+                  fontWeight: 700,
+                  color: "var(--cream)",
+                  border: "none",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 15px rgba(75, 155, 140, 0.35)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.5rem",
+                  transition: "transform 0.15s ease, filter 0.15s ease",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.filter = "brightness(1.05)")}
+                onMouseLeave={(e) => (e.currentTarget.style.filter = "brightness(1)")}
+              >
+                <ShoppingBag size={18} />
+                <span>{checkoutButtonText} (฿{finalTotal})</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Delete Confirmation Modal */}
+      {itemToDelete && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 200,
+            backgroundColor: "rgba(0, 0, 0, 0.55)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "1rem",
+          }}
+          onClick={() => setItemToDelete(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="animate-modal-pop"
+            style={{
+              backgroundColor: "var(--card)",
+              borderRadius: "1.25rem",
+              width: "100%",
+              maxWidth: "380px",
+              padding: "1.5rem",
+              boxShadow: "0 20px 40px rgba(0,0,0,0.25)",
+              border: "1px solid rgba(50, 55, 65, 0.1)",
+              textAlign: "center",
+            }}
+          >
+            <div
+              style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "50%",
+                backgroundColor: "rgba(220, 38, 38, 0.12)",
+                color: "#dc2626",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 1rem",
+              }}
+            >
+              <Trash2 size={24} />
+            </div>
+
+            <h3 style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--ink)", marginBottom: "0.4rem" }}>
+              ยืนยันการลบรายการ?
+            </h3>
+
+            <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", lineHeight: 1.4, marginBottom: "1.25rem" }}>
+              คุณต้องการลบรายการออกจากตะกร้าใช่หรือไม่?
+            </p>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
+              <button
+                type="button"
+                onClick={() => setItemToDelete(null)}
+                style={{
+                  padding: "0.65rem 0.85rem",
+                  borderRadius: "0.6rem",
+                  border: "1px solid rgba(50, 55, 65, 0.15)",
+                  backgroundColor: "var(--cream)",
+                  color: "var(--ink)",
+                  fontSize: "0.875rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: "'Kanit', sans-serif",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                ยกเลิก
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (itemToDelete) {
+                    if (onDeleteItem) {
+                      onDeleteItem(itemToDelete.cartId);
+                    } else {
+                      onUpdateQty(itemToDelete.cartId, -itemToDelete.quantity);
+                    }
+                    setItemToDelete(null);
+                  }
+                }}
+                style={{
+                  padding: "0.65rem 0.85rem",
+                  borderRadius: "0.6rem",
+                  border: "none",
+                  backgroundColor: "#dc2626",
+                  color: "#fff",
+                  fontSize: "0.875rem",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontFamily: "'Kanit', sans-serif",
+                  boxShadow: "0 2px 8px rgba(220, 38, 38, 0.25)",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                ลบรายการ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -67,11 +67,15 @@ func main() {
 		v1.POST("/auth/login", h.Login)
 		v1.POST("/admin/login", h.Login) // alias for convenience
 
-		// Public Menu & Topping Read (Customer or Public viewing)
+		// Public Menu, Topping & Promotion Read (Customer or Public viewing)
 		v1.GET("/products", h.GetProducts)
 		v1.GET("/products/:id", h.GetProductByID)
 		v1.GET("/toppings", h.GetToppings)
 		v1.GET("/toppings/:id", h.GetToppingByID)
+		v1.GET("/promotions", h.GetPromotions)
+		v1.GET("/promotions/:id", h.GetPromotionByID)
+		v1.GET("/settings", h.GetSettings)
+		v1.GET("/settings/:key", h.GetSettingByKey)
 
 		// Protected Admin Routes (Requires valid JWT and is_activate == true)
 		if postgresDB != nil && postgresDB.DB != nil {
@@ -96,6 +100,14 @@ func main() {
 				adminGroup.POST("/toppings", h.CreateTopping)
 				adminGroup.PUT("/toppings/:id", h.UpdateTopping)
 				adminGroup.DELETE("/toppings/:id", h.DeleteTopping)
+
+				// Admin Promotion Management
+				adminGroup.POST("/promotions", h.CreatePromotion)
+				adminGroup.PUT("/promotions/:id", h.UpdatePromotion)
+				adminGroup.DELETE("/promotions/:id", h.DeletePromotion)
+
+				// Admin System Settings Management
+				adminGroup.PUT("/settings/:key", h.UpdateSetting)
 
 				// Uploads (Images)
 				adminGroup.POST("/upload", h.UploadImage)

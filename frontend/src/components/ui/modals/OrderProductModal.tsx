@@ -38,12 +38,22 @@ export interface OrderItemResult {
   note: string;
 }
 
+export interface InitialOrderValues {
+  cartId?: string;
+  temperature?: "iced" | "hot";
+  sweetness?: "0%" | "25%" | "50%" | "75%" | "100%";
+  toppings?: (CustomizerTopping | { id: string | number; [key: string]: any })[];
+  quantity?: number;
+  note?: string;
+}
+
 interface OrderProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   product: CustomizerProduct | null;
   toppings: CustomizerTopping[];
-  onAddToCart: (result: OrderItemResult) => void;
+  initialValues?: InitialOrderValues | null;
+  onAddToCart: (result: OrderItemResult, editCartId?: string) => void;
 }
 
 export default function OrderProductModal({
@@ -51,6 +61,7 @@ export default function OrderProductModal({
   onClose,
   product,
   toppings,
+  initialValues,
   onAddToCart,
 }: OrderProductModalProps) {
   const [isMounted, setIsMounted] = useState(false);
@@ -72,11 +83,20 @@ export default function OrderProductModal({
 
       const hasIced = product.price_iced !== null && product.price_iced !== undefined;
       const initialTemp: "iced" | "hot" = hasIced ? "iced" : "hot";
-      setTemperature(initialTemp);
-      setSweetness("50%");
-      setSelectedToppings([]);
-      setQuantity(1);
-      setNote("");
+      setTemperature(initialValues?.temperature || initialTemp);
+      setSweetness(initialValues?.sweetness || "50%");
+
+      if (initialValues?.toppings && initialValues.toppings.length > 0) {
+        const matched = toppings.filter((t) =>
+          initialValues.toppings?.some((it) => String(it.id) === String(t.id))
+        );
+        setSelectedToppings(matched);
+      } else {
+        setSelectedToppings([]);
+      }
+
+      setQuantity(initialValues?.quantity && initialValues.quantity > 0 ? initialValues.quantity : 1);
+      setNote(initialValues?.note || "");
 
       const rAF = requestAnimationFrame(() => {
         setIsVisible(true);
@@ -95,7 +115,7 @@ export default function OrderProductModal({
         document.documentElement.classList.remove("lock-scroll");
       };
     }
-  }, [isOpen, product]);
+  }, [isOpen, product, initialValues, toppings]);
 
   if (!isMounted || !product) return null;
 
@@ -127,16 +147,19 @@ export default function OrderProductModal({
   };
 
   const handleConfirm = () => {
-    onAddToCart({
-      product,
-      temperature,
-      sweetness,
-      toppings: selectedToppings,
-      quantity,
-      unitPrice,
-      totalPrice,
-      note: note.trim(),
-    });
+    onAddToCart(
+      {
+        product,
+        temperature,
+        sweetness,
+        toppings: selectedToppings,
+        quantity,
+        unitPrice,
+        totalPrice,
+        note: note.trim(),
+      },
+      initialValues?.cartId
+    );
     onClose();
   };
 
@@ -163,10 +186,10 @@ export default function OrderProductModal({
         onClick={(e) => e.stopPropagation()}
         style={{
           backgroundColor: "var(--card)",
-          borderRadius: "1.5rem",
+          borderRadius: "1.25rem",
           width: "100%",
-          maxWidth: "480px",
-          maxHeight: "90vh",
+          maxWidth: "540px",
+          maxHeight: "92vh",
           display: "flex",
           flexDirection: "column",
           boxShadow: "0 25px 50px -12px rgba(0,0,0,0.35)",
@@ -179,7 +202,7 @@ export default function OrderProductModal({
         {/* Header */}
         <div
           style={{
-            padding: "1.25rem 1.5rem",
+            padding: "0.85rem 1.25rem",
             borderBottom: "1px solid rgba(50, 55, 65, 0.08)",
             display: "flex",
             justifyContent: "space-between",
@@ -187,11 +210,11 @@ export default function OrderProductModal({
           }}
         >
           <div>
-            <h3 style={{ fontSize: "1.25rem", fontWeight: 800, color: "var(--ink)", lineHeight: 1.2 }}>
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--ink)", lineHeight: 1.2 }}>
               {product.name_th}
             </h3>
             {product.name_en && (
-              <p className="font-mono" style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "0.15rem" }}>
+              <p className="font-mono" style={{ fontSize: "0.7rem", color: "var(--ink-soft)", marginTop: "0.1rem" }}>
                 {product.name_en}
               </p>
             )}
@@ -201,8 +224,8 @@ export default function OrderProductModal({
             onClick={onClose}
             aria-label="ปิด"
             style={{
-              width: "36px",
-              height: "36px",
+              width: "32px",
+              height: "32px",
               borderRadius: "50%",
               border: "1px solid rgba(50, 55, 65, 0.1)",
               backgroundColor: "transparent",
@@ -222,141 +245,142 @@ export default function OrderProductModal({
               e.currentTarget.style.color = "var(--ink-soft)";
             }}
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
 
-        {/* Scrollable Form Body */}
+        {/* Compact Form Body */}
         <div
           style={{
-            padding: "1.25rem 1.5rem",
+            padding: "0.85rem 1.25rem",
             overflowY: "auto",
             flex: 1,
             display: "flex",
             flexDirection: "column",
-            gap: "1.25rem",
+            gap: "0.75rem",
           }}
         >
-          {/* 1. Temperature Selection */}
-          <div>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)", marginBottom: "0.5rem" }}>
-              1. เลือกอุณหภูมิ (Temperature)
-            </label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
-              {product.price_iced !== null && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTemperature("iced");
-                    setSelectedToppings((prev) => prev.filter((t) => t.allow_iced !== false));
-                  }}
-                  style={{
-                    padding: "0.75rem 0.5rem",
-                    borderRadius: "0.85rem",
-                    border: temperature === "iced" ? "2px solid var(--teal)" : "1px solid rgba(50, 55, 65, 0.15)",
-                    backgroundColor: temperature === "iced" ? "rgba(75, 155, 140, 0.12)" : "var(--cream)",
-                    color: temperature === "iced" ? "var(--teal)" : "var(--ink)",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    fontSize: "0.875rem",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "0.4rem",
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  <Snowflake size={16} />
-                  <span>เย็น (Iced)</span>
-                  {product.price_iced !== null && (
-                    <span style={{ fontSize: "0.75rem", opacity: 0.85 }}>({product.price_iced}฿)</span>
-                  )}
-                </button>
-              )}
-              {product.price_hot !== null && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTemperature("hot");
-                    setSelectedToppings((prev) => prev.filter((t) => t.allow_hot !== false));
-                  }}
-                  style={{
-                    padding: "0.75rem 0.5rem",
-                    borderRadius: "0.85rem",
-                    border: temperature === "hot" ? "2px solid var(--warm)" : "1px solid rgba(50, 55, 65, 0.15)",
-                    backgroundColor: temperature === "hot" ? "rgba(220, 160, 50, 0.12)" : "var(--cream)",
-                    color: temperature === "hot" ? "var(--warm)" : "var(--ink)",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    fontSize: "0.875rem",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "0.4rem",
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  <Flame size={16} />
-                  <span>ร้อน (Hot)</span>
-                  {product.price_hot !== null && (
-                    <span style={{ fontSize: "0.75rem", opacity: 0.85 }}>({product.price_hot}฿)</span>
-                  )}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* 2. Sweetness Selector */}
-          <div>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)", marginBottom: "0.5rem" }}>
-              2. ระดับความหวาน (Sweetness)
-            </label>
-            <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
-              {(["0%", "25%", "50%", "75%", "100%"] as const).map((lvl) => {
-                const isSelected = sweetness === lvl;
-                return (
+          {/* Row 1: Temperature Selection & Sweetness Side-by-Side */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: "0.75rem", alignItems: "start" }}>
+            {/* 1. Temperature Selection (No price in button) */}
+            <div>
+              <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 700, color: "var(--ink)", marginBottom: "0.35rem" }}>
+                1. อุณหภูมิ
+              </label>
+              <div style={{ display: "grid", gridTemplateColumns: product.price_iced !== null && product.price_hot !== null ? "1fr 1fr" : "1fr", gap: "0.4rem" }}>
+                {product.price_iced !== null && (
                   <button
-                    key={lvl}
                     type="button"
-                    onClick={() => setSweetness(lvl)}
+                    onClick={() => {
+                      setTemperature("iced");
+                      setSelectedToppings((prev) => prev.filter((t) => t.allow_iced !== false));
+                    }}
                     style={{
-                      flex: 1,
-                      minWidth: "55px",
-                      padding: "0.55rem 0.2rem",
+                      padding: "0.45rem 0.4rem",
                       borderRadius: "0.65rem",
-                      border: isSelected ? "2px solid var(--ink)" : "1px solid rgba(50, 55, 65, 0.15)",
-                      backgroundColor: isSelected ? "var(--ink)" : "var(--cream)",
-                      color: isSelected ? "var(--cream)" : "var(--ink)",
+                      border: temperature === "iced" ? "1.5px solid var(--teal)" : "1.5px solid rgba(50, 55, 65, 0.15)",
+                      backgroundColor: temperature === "iced" ? "rgba(75, 155, 140, 0.12)" : "var(--cream)",
+                      color: temperature === "iced" ? "var(--teal)" : "var(--ink)",
                       fontWeight: 700,
-                      fontSize: "0.825rem",
                       cursor: "pointer",
-                      transition: "all 0.15s ease",
+                      fontSize: "0.8rem",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.3rem",
+                      transition: "background-color 0.15s ease, border-color 0.15s ease",
+                      whiteSpace: "nowrap",
+                      boxSizing: "border-box",
                     }}
                   >
-                    {lvl}
+                    <Snowflake size={14} />
+                    <span>เย็น</span>
                   </button>
-                );
-              })}
+                )}
+                {product.price_hot !== null && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTemperature("hot");
+                      setSelectedToppings((prev) => prev.filter((t) => t.allow_hot !== false));
+                    }}
+                    style={{
+                      padding: "0.45rem 0.4rem",
+                      borderRadius: "0.65rem",
+                      border: temperature === "hot" ? "1.5px solid var(--warm)" : "1.5px solid rgba(50, 55, 65, 0.15)",
+                      backgroundColor: temperature === "hot" ? "rgba(220, 160, 50, 0.12)" : "var(--cream)",
+                      color: temperature === "hot" ? "var(--warm)" : "var(--ink)",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontSize: "0.8rem",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.3rem",
+                      transition: "background-color 0.15s ease, border-color 0.15s ease",
+                      whiteSpace: "nowrap",
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    <Flame size={14} />
+                    <span>ร้อน</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* 2. Sweetness Selector */}
+            <div>
+              <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 700, color: "var(--ink)", marginBottom: "0.35rem" }}>
+                2. ระดับความหวาน
+              </label>
+              <div style={{ display: "flex", gap: "0.25rem" }}>
+                {(["0%", "25%", "50%", "75%", "100%"] as const).map((lvl) => {
+                  const isSelected = sweetness === lvl;
+                  return (
+                    <button
+                      key={lvl}
+                      type="button"
+                      onClick={() => setSweetness(lvl)}
+                      style={{
+                        flex: 1,
+                        padding: "0.45rem 0.1rem",
+                        borderRadius: "0.55rem",
+                        border: isSelected ? "1.5px solid var(--ink)" : "1px solid rgba(50, 55, 65, 0.15)",
+                        backgroundColor: isSelected ? "var(--ink)" : "var(--cream)",
+                        color: isSelected ? "var(--cream)" : "var(--ink)",
+                        fontWeight: 700,
+                        fontSize: "0.75rem",
+                        cursor: "pointer",
+                        transition: "all 0.15s ease",
+                        textAlign: "center",
+                      }}
+                    >
+                      {lvl}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          {/* 3. Toppings Checkbox Selector (Disabled/Hidden for Combo items) */}
+          {/* 3. Toppings Checkbox Selector (Compact 2 Columns) */}
           {product.category === "combos" ? (
             <div
               style={{
-                padding: "0.85rem 1rem",
-                borderRadius: "0.85rem",
+                padding: "0.6rem 0.85rem",
+                borderRadius: "0.75rem",
                 backgroundColor: "rgba(75, 155, 140, 0.08)",
                 border: "1px dashed var(--teal)",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.35rem" }}>
-                <Sparkles size={16} color="var(--teal)" />
-                <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--teal)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginBottom: "0.2rem" }}>
+                <Sparkles size={14} color="var(--teal)" />
+                <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--teal)" }}>
                   เซ็ตคอมโบพร้อมท็อปปิ้งในตัว
                 </span>
               </div>
-              <p style={{ fontSize: "0.775rem", color: "var(--ink-soft)", lineHeight: 1.4 }}>
+              <p style={{ fontSize: "0.725rem", color: "var(--ink-soft)", lineHeight: 1.35 }}>
                 {product.default_toppings && product.default_toppings.length > 0
                   ? `ประกอบด้วย: ${product.default_toppings.join(", ")}`
                   : product.desc || "เมนูนี้จัดเซ็ตคู่ท็อปปิ้งสูตรพิเศษมาให้เรียบร้อยแล้ว ไม่สามารถเพิ่ม/เปลี่ยนท็อปปิ้งได้"}
@@ -364,20 +388,20 @@ export default function OrderProductModal({
             </div>
           ) : toppings && toppings.length > 0 ? (
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-                <label style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)" }}>
-                  3. เลือกท็อปปิ้ง (Toppings)
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                <label style={{ fontSize: "0.775rem", fontWeight: 700, color: "var(--ink)" }}>
+                  3. เพิ่มท็อปปิ้ง (Toppings)
                 </label>
-                <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>เลือกได้หลายอย่าง</span>
+                <span style={{ fontSize: "0.7rem", color: "var(--ink-soft)" }}>เลือกได้หลายอย่าง</span>
               </div>
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1fr",
-                  gap: "0.45rem",
-                  maxHeight: "185px",
+                  gridTemplateColumns: "repeat(2, 1fr)",
+                  gap: "0.35rem",
+                  maxHeight: "155px",
                   overflowY: "auto",
-                  paddingRight: "0.25rem",
+                  paddingRight: "0.2rem",
                 }}
               >
                 {toppings.map((top) => {
@@ -394,34 +418,36 @@ export default function OrderProductModal({
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
-                        padding: "0.65rem 0.85rem",
-                        borderRadius: "0.75rem",
-                        border: isChecked ? "1.5px solid var(--teal)" : "1px solid rgba(50, 55, 65, 0.12)",
+                        padding: "0.35rem 0.55rem",
+                        borderRadius: "0.6rem",
+                        border: isChecked ? "1.5px solid var(--teal)" : "1.5px solid rgba(50, 55, 65, 0.12)",
                         backgroundColor: isChecked ? "rgba(75, 155, 140, 0.08)" : "var(--cream)",
                         cursor: isDisabled ? "not-allowed" : "pointer",
                         opacity: isDisabled ? 0.5 : 1,
-                        transition: "all 0.15s ease",
+                        transition: "background-color 0.15s ease, border-color 0.15s ease",
                         userSelect: "none",
+                        boxSizing: "border-box",
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", minWidth: 0, overflow: "hidden" }}>
                         {/* Custom Checkbox */}
                         <div
                           style={{
-                            width: "18px",
-                            height: "18px",
-                            borderRadius: "5px",
-                            border: isChecked ? "none" : "1.5px solid rgba(50, 55, 65, 0.3)",
+                            width: "15px",
+                            height: "15px",
+                            borderRadius: "4px",
+                            border: isChecked ? "1.5px solid var(--teal)" : "1.5px solid rgba(50, 55, 65, 0.3)",
                             backgroundColor: isChecked ? "var(--teal)" : "transparent",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             color: "#fff",
-                            transition: "all 0.15s ease",
+                            transition: "background-color 0.15s ease, border-color 0.15s ease",
                             flexShrink: 0,
+                            boxSizing: "border-box",
                           }}
                         >
-                          {isChecked && <Check size={13} strokeWidth={3} />}
+                          {isChecked && <Check size={11} strokeWidth={3} />}
                         </div>
                         <input
                           type="checkbox"
@@ -430,16 +456,16 @@ export default function OrderProductModal({
                           onChange={() => !isDisabled && handleToggleTopping(top)}
                           style={{ display: "none" }}
                         />
-                        <span style={{ fontSize: "0.85rem", fontWeight: isChecked ? 600 : 500, color: "var(--ink)" }}>
+                        <span style={{ fontSize: "0.775rem", fontWeight: isChecked ? 600 : 500, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {top.name_th}
                           {isDisabled && (
-                            <span style={{ fontSize: "0.7rem", color: "#dc2626", marginLeft: "0.35rem" }}>
-                              {top.is_sold_out ? "(หมด)" : temperature === "hot" ? "(เฉพาะเย็น)" : "(เฉพาะร้อน)"}
+                            <span style={{ fontSize: "0.65rem", color: "#dc2626", marginLeft: "0.2rem" }}>
+                              {top.is_sold_out ? "(หมด)" : "(ไม่รองรับ)"}
                             </span>
                           )}
                         </span>
                       </div>
-                      <span style={{ color: "var(--teal)", fontWeight: 700, fontSize: "0.85rem" }}>
+                      <span style={{ color: "var(--teal)", fontWeight: 700, fontSize: "0.75rem", flexShrink: 0, marginLeft: "0.25rem" }}>
                         +{top.price}฿
                       </span>
                     </label>
@@ -451,21 +477,21 @@ export default function OrderProductModal({
 
           {/* 4. Note Input */}
           <div>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)", marginBottom: "0.4rem" }}>
+            <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 700, color: "var(--ink)", marginBottom: "0.25rem" }}>
               หมายเหตุเพิ่มเติม (Optional)
             </label>
             <input
               type="text"
-              placeholder="เช่น แยกน้ำแข็ง, หวานน้อยเป็นพิเศษ..."
+              placeholder="เช่น แยกน้ำแข็ง ฯลฯ"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               style={{
                 width: "100%",
-                padding: "0.55rem 0.85rem",
-                borderRadius: "0.65rem",
+                padding: "0.4rem 0.65rem",
+                borderRadius: "0.55rem",
                 border: "1px solid rgba(50,55,65,0.15)",
                 backgroundColor: "var(--cream)",
-                fontSize: "0.85rem",
+                fontSize: "0.8rem",
                 fontFamily: "'Kanit', sans-serif",
                 outline: "none",
                 color: "var(--ink)",
@@ -477,25 +503,25 @@ export default function OrderProductModal({
         {/* Footer / Add to Cart CTA */}
         <div
           style={{
-            padding: "1.1rem 1.5rem",
+            padding: "0.85rem 1.25rem",
             borderTop: "1px solid rgba(50, 55, 65, 0.08)",
             backgroundColor: "var(--card)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            gap: "1rem",
+            gap: "0.85rem",
           }}
         >
           {/* Quantity Controls */}
-          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
             <button
               type="button"
               onClick={() => setQuantity((q) => Math.max(1, q - 1))}
               disabled={quantity <= 1}
               style={{
-                width: "32px",
-                height: "32px",
-                borderRadius: "0.5rem",
+                width: "28px",
+                height: "28px",
+                borderRadius: "0.45rem",
                 border: "1px solid rgba(50, 55, 65, 0.15)",
                 backgroundColor: "var(--cream)",
                 display: "flex",
@@ -506,18 +532,18 @@ export default function OrderProductModal({
                 color: "var(--ink)",
               }}
             >
-              <Minus size={14} />
+              <Minus size={13} />
             </button>
-            <span style={{ fontSize: "1rem", fontWeight: 700, minWidth: "24px", textAlign: "center", color: "var(--ink)" }}>
+            <span style={{ fontSize: "0.95rem", fontWeight: 700, minWidth: "22px", textAlign: "center", color: "var(--ink)" }}>
               {quantity}
             </span>
             <button
               type="button"
               onClick={() => setQuantity((q) => q + 1)}
               style={{
-                width: "32px",
-                height: "32px",
-                borderRadius: "0.5rem",
+                width: "28px",
+                height: "28px",
+                borderRadius: "0.45rem",
                 border: "1px solid rgba(50, 55, 65, 0.15)",
                 backgroundColor: "var(--cream)",
                 display: "flex",
@@ -527,7 +553,7 @@ export default function OrderProductModal({
                 color: "var(--ink)",
               }}
             >
-              <Plus size={14} />
+              <Plus size={13} />
             </button>
           </div>
 
@@ -539,8 +565,8 @@ export default function OrderProductModal({
               flex: 1,
               borderRadius: "9999px",
               backgroundColor: "var(--teal)",
-              padding: "0.75rem 1.25rem",
-              fontSize: "0.95rem",
+              padding: "0.65rem 1.15rem",
+              fontSize: "0.9rem",
               fontWeight: 700,
               color: "var(--cream)",
               border: "none",
@@ -548,13 +574,13 @@ export default function OrderProductModal({
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              boxShadow: "0 4px 15px rgba(75, 155, 140, 0.35)",
+              boxShadow: "0 4px 12px rgba(75, 155, 140, 0.3)",
               transition: "transform 0.15s ease",
             }}
             onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
             onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
           >
-            <span>เพิ่มลงตะกร้า</span>
+            <span>{initialValues?.cartId ? "บันทึกการแก้ไข" : "เพิ่มลงตะกร้า"}</span>
             <span style={{ fontWeight: 800 }}>฿{totalPrice}</span>
           </button>
         </div>

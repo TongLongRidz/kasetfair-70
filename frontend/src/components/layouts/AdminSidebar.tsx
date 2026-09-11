@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   Menu,
   X,
+  Wallet,
 } from "lucide-react";
 import { getStoredUser, clearAuthSession, AdminUser } from "@/lib/auth";
 
@@ -34,6 +35,7 @@ interface MenuItem {
 
 const managementSubItems: MenuItem[] = [
   { label: "แดชบอร์ดสรุปยอดขาย", path: "/admin/management/dashboard", icon: LayoutDashboard },
+  { label: "บันทึกรายรับ-รายจ่าย", path: "/admin/management/expense", icon: Wallet },
   { label: "ตรวจสอบการชำระเงิน", path: "/admin/management/slip-check", icon: Receipt },
   { label: "จัดการเมนูเครื่องดื่ม", path: "/admin/management/menu", icon: Coffee },
   { label: "จัดการท็อปปิ้ง", path: "/admin/management/toppings", icon: Candy },

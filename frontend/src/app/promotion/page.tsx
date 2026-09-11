@@ -147,7 +147,11 @@ export default function PromotionPage() {
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            {PROMOTIONS_DATA.map((promo, idx) => (
+            {PROMOTIONS_DATA.map((promo, idx) => {
+              const now = new Date();
+              const isExpired = promo.end_date ? new Date(promo.end_date) < now : false;
+
+              return (
               <div
                 key={promo.id}
                 className="animate-rise"
@@ -155,10 +159,10 @@ export default function PromotionPage() {
                   animationDelay: `${idx * 60}ms`,
                   borderRadius: "1.25rem",
                   backgroundColor: "var(--card)",
-                  border: promo.highlight ? "2px solid var(--teal)" : "1px solid rgba(50, 55, 65, 0.1)",
+                  border: promo.highlight && !isExpired ? "2px solid var(--teal)" : "1px solid rgba(50, 55, 65, 0.1)",
                   padding: "1.25rem",
-                  boxShadow: promo.highlight ? "0 4px 20px rgba(75, 155, 140, 0.12)" : "0 2px 8px rgba(0, 0, 0, 0.02)",
-                  opacity: promo.is_active ? 1 : 0.6,
+                  boxShadow: promo.highlight && !isExpired ? "0 4px 20px rgba(75, 155, 140, 0.12)" : "0 2px 8px rgba(0, 0, 0, 0.02)",
+                  opacity: !promo.is_active || isExpired ? 0.6 : 1,
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem" }}>
@@ -167,14 +171,22 @@ export default function PromotionPage() {
                       <span
                         style={{
                           borderRadius: "9999px",
-                          backgroundColor: promo.is_active ? "rgba(75, 155, 140, 0.15)" : "rgba(50, 55, 65, 0.1)",
-                          color: promo.is_active ? "var(--teal)" : "var(--ink-soft)",
+                          backgroundColor: isExpired
+                            ? "rgba(220, 38, 38, 0.12)"
+                            : promo.is_active
+                            ? "rgba(75, 155, 140, 0.15)"
+                            : "rgba(50, 55, 65, 0.1)",
+                          color: isExpired
+                            ? "#dc2626"
+                            : promo.is_active
+                            ? "var(--teal)"
+                            : "var(--ink-soft)",
                           padding: "0.2rem 0.65rem",
                           fontSize: "11px",
                           fontWeight: 700,
                         }}
                       >
-                        {promo.is_active ? "ใช้ได้เลย" : "หมดเขตแล้ว"}
+                        {isExpired ? "หมดเวลาใช้งาน" : promo.is_active ? "ใช้ได้เลย" : "ปิดใช้งาน"}
                       </span>
                       {promo.highlight && (
                         <span
@@ -219,7 +231,7 @@ export default function PromotionPage() {
                     <Clock size={13} />
                     <span>ระยะเวลา: {promo.start_date} ถึง {promo.end_date}</span>
                   </div>
-                  {promo.is_active && (
+                  {promo.is_active && !isExpired && (
                     <Link
                       href="/#menu"
                       style={{
@@ -237,7 +249,8 @@ export default function PromotionPage() {
                   )}
                 </div>
               </div>
-            ))}
+            );
+          })}
           </div>
         </section>
       </main>

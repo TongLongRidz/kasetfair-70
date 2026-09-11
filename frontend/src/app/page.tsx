@@ -420,21 +420,22 @@ export default function Home() {
             ].map((tab) => {
               const isSelected = activeTab === tab.id;
               return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  style={{
-                    borderRadius: "9999px",
-                    padding: "0.45rem 0.9rem",
-                    fontSize: "0.825rem",
-                    fontWeight: isSelected ? 700 : 500,
-                    cursor: "pointer",
-                    border: isSelected ? "none" : "1px solid rgba(50, 55, 65, 0.1)",
-                    backgroundColor: isSelected ? "var(--ink)" : "var(--card)",
-                    color: isSelected ? "var(--cream)" : "var(--ink-soft)",
-                    transition: "all 0.2s ease",
-                  }}
-                >
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    style={{
+                      borderRadius: "9999px",
+                      padding: "0.45rem 0.9rem",
+                      fontSize: "0.825rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      border: isSelected ? "1px solid var(--ink)" : "1px solid rgba(50, 55, 65, 0.12)",
+                      backgroundColor: isSelected ? "var(--ink)" : "var(--card)",
+                      color: isSelected ? "var(--cream)" : "var(--ink-soft)",
+                      boxShadow: isSelected ? "0 4px 12px rgba(0,0,0,0.12)" : "none",
+                      transition: "background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease",
+                    }}
+                  >
                   {tab.label}
                 </button>
               );

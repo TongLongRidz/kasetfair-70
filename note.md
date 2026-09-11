@@ -21,15 +21,16 @@
 | :--- | :--- | :--- | :--- | :---: |
 | 1 | Auth | `/admin/login` | หน้าล็อกอินผู้ดูแลระบบ (JWT Token) | ✅ เสร็จแล้ว |
 | 2 | Management | `/admin/management/administrator` | **จัดการแอดมิน**: เพิ่ม/แก้ไข/ลบ, ตั้ง Superadmin, เปิด/ปิดสถานะ | ✅ **เสร็จแล้ว** |
-| 3 | Management | `/admin/management/menu` | **จัดการเมนู**: เพิ่ม/แก้ไข/ลบ, อัปโหลด+Cropรูป 1:1, สลับลำดับ (Drag & Drop / Reorder), ราคาร้อน/เย็น, แนะนำ, ซ่อน, ขายหมด, **สูตรคอมโบ (`product_combo_recipes`)** เลือกเครื่องดื่มเบส + ท็อปปิ้งในเซ็ต, Pagination 5 รายการ/หน้า | ✅ **เสร็จแล้ว** |
+| 3 | Management | `/admin/management/menu` | **จัดการเมนู**: เพิ่ม/แก้ไข/ลบ, อัปโหลด+Cropรูป 1:1, สลับลำดับ (Drag & Drop / Reorder), ราคาร้อน/เย็น, แนะนำ, ซ่อน, ขายหมด, **สูตรคอมโบ (`product_combo_recipe`)** เลือกเครื่องดื่มเบส + ท็อปปิ้งในเซ็ต, Pagination 5 รายการ/หน้า | ✅ **เสร็จแล้ว** |
 | 4 | Management | `/admin/management/toppings` | **จัดการท็อปปิ้ง**: เพิ่ม/แก้ไข/ลบ, อัปโหลด+Cropรูป 1:1, สลับลำดับ (Reorder), เลือกร้อน/เย็น, ซ่อน, ขายหมด, Pagination 6 รายการ/หน้า | ✅ **เสร็จแล้ว** |
 | 5 | Management | `/admin/management/dashboard` | แดชบอร์ดสรุปยอดขาย รายรับ-รายจ่าย กราฟแนวโน้ม และสถิติ | ⏳ Pending |
-| 6 | Management | `/admin/management/slip-check` | ระบบตรวจสอบสลิปและอนุมัติออเดอร์ออนไลน์ | ⏳ Pending |
+| 6 | Management | `/admin/management/slip-check` | **ระบบตรวจสอบการชำระเงิน**: อนุมัติ/ปฏิเสธสลิป, ตรวจสอบสลิปเทียบกับยอดเงิน, **ตั้งค่าระบบเปิด/ปิดการให้ผ่านออเดอร์สำหรับ Slip (`slip_upload_mode`: ต้องอัพเลย vs อัพทีหลังได้)** บันทึกลง Database ส่วนกลาง | ✅ **เสร็จแล้ว** |
 | 7 | Management | `/admin/management/banner` | จัดการชุดแบนเนอร์และภาพประชาสัมพันธ์หน้าแรก | ⏳ Pending |
-| 8 | Management | `/admin/management/promotion` | จัดการโปรโมชั่นและเงื่อนไขการใช้แต้มสะสม | ⏳ Pending |
+| 8 | Management | `/admin/management/promotion` | **จัดการโปรโมชั่น**: เพิ่ม/แก้ไข/ลบ, กำหนดแต้มแลก, จำกัดโควตารวม/ต่อคน, ช่วงเวลา, เปิด/ปิดสถานะ, Pagination | ✅ **เสร็จแล้ว** |
 | 9 | Management | `/admin/management/customer` | ดูรายชื่อสมาชิก ประวัติแต้มสะสม และการแลกสิทธิ์ | ⏳ Pending |
-| 10 | POS | `/admin/pos/front-desk` | หน้าจอขายหน้าร้าน (POS Walk-in) คิดเงิน ออกคิว AXX | ⏳ Pending |
-| 11 | POS | `/admin/pos/kitchen` | หน้าจอบาร์น้ำ/ห้องครัว (Kitchen Display) จัดการสถานะคิว | ⏳ Pending |
+| 10 | POS | `/admin/pos/front-desk` | **หน้าจอขายหน้าร้าน (POS Walk-in)**: เลือกเมนู ปรับความหวาน ท็อปปิ้ง รถเข็นสินค้า | ✅ **เสร็จแล้ว** |
+| 11 | POS | `/admin/pos/payment` | **หน้าจอชำระเงินหน้าร้าน (POS Payment)**: เงินสด/เงินทอน, พร้อมเพย์ QR, อัพโหลดสลิป, ออกบัตรคิว, Responsive จอคอมและจอมือถือ, เชื่อมต่อเงื่อนไข Slip Policy จากระบบ | ✅ **เสร็จแล้ว** |
+| 12 | POS | `/admin/pos/kitchen` | หน้าจอบาร์น้ำ/ห้องครัว (Kitchen Display) จัดการสถานะคิว | ⏳ Pending |
 
 ---
 
@@ -128,6 +129,10 @@
   - สร้างออเดอร์พร้อมระบุ `method = 'walkin'` และออกหมายเลขคิว `AXX` ทันที
 - **ระบบตรวจสอบสลิปและอนุมัติออเดอร์ (Slip Verification):**
   - แสดงรายการออเดอร์ที่แนบสลิปเข้ามา ตรวจสอบรูปภาพสลิป ยอดเงิน วันเวลา
+  - **ระบบตั้งค่าเงื่อนไขการให้ผ่านออเดอร์สำหรับ Slip (`slip_upload_mode`):**
+    - **ให้อัพเลย (บังคับ / `immediate`):** บังคับให้ต้องแนบสลิปก่อนยืนยันออเดอร์เสมอ
+    - **อัพที่หลังได้ (ให้ผ่าน / `later`):** ให้ผ่านออเดอร์ได้ทันทีโดยไม่ต้องแนบสลิปหน้าเคาน์เตอร์ เพื่อความสะดวกรวดเร็ว และนำสลิปมาตรวจสอบย้อนหลัง
+    - บันทึกการตั้งค่าลงฐานข้อมูล PostgreSQL (`system_setting`) และเชื่อมต่อไปยังทุกหน้า/ทุกเครื่องในระบบแบบ Real-time
   - ปุ่มกด **"อนุมัติสลิป / ยืนยันยอดเงิน"** -> บันทึก `slip_verified_by` และ `slip_verified_at` พร้อมปรับสถานะออเดอร์เป็น `preparing`
   - ปุ่มกด **"ปฏิเสธ / ยกเลิกออเดอร์"** (`order_status = 'cancelled'`) พร้อมระบุเหตุผล
 
@@ -169,7 +174,7 @@
 
 ### 3.1 โครงสร้างตารางใน PostgreSQL (Relational & JSONB)
 
-#### 1. `admins` (ข้อมูลผู้ดูแลระบบ) ✅
+#### 1. `admin` (ข้อมูลผู้ดูแลระบบ) ✅
 | Column | Type | Attributes | Description |
 | :--- | :--- | :--- | :--- |
 | `id` | SERIAL | PRIMARY KEY | รหัส Admin |
@@ -182,7 +187,7 @@
 | `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สร้าง |
 | `updated_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่แก้ไขล่าสุด |
 
-#### 2. `products` (รายการสินค้า - ทั้งเมนูปกติและเซ็ตคอมโบ)
+#### 2. `product` (รายการสินค้า - ทั้งเมนูปกติและเซ็ตคอมโบ) ✅
 | Column | Type | Attributes | Description |
 | :--- | :--- | :--- | :--- |
 | `id` | SERIAL | PRIMARY KEY | รหัสสินค้า |
@@ -201,16 +206,16 @@
 | `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สร้าง |
 | `updated_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่แก้ไขล่าสุด |
 
-#### 3. `product_combo_recipes` (สูตรประกอบของเมนูเซ็ตคอมโบ)
+#### 3. `product_combo_recipe` (สูตรประกอบของเมนูเซ็ตคอมโบ) ✅
 | Column | Type | Attributes | Description |
 | :--- | :--- | :--- | :--- |
 | `id` | SERIAL | PRIMARY KEY | รหัสสูตรคอมโบ |
-| `combo_product_id` | INT | REFERENCES `products(id)` ON DELETE CASCADE | รหัสเมนูคอมโบหลัก (FK) |
-| `base_product_id` | INT | REFERENCES `products(id)` | รหัสเครื่องดื่มรสชาติต้นทางที่เป็นเบส (FK เช่น น้ำเต้าหู้มัทฉะ) |
-| `topping_id` | INT | REFERENCES `toppings(id)` | รหัสท็อปปิ้งที่ล็อกมาในเซ็ตคอมโบ (FK เช่น ไข่มุก, ถั่วแดง) |
+| `combo_product_id` | INT | REFERENCES `product(id)` ON DELETE CASCADE | รหัสเมนูคอมโบหลัก (FK) |
+| `base_product_id` | INT | REFERENCES `product(id)` | รหัสเครื่องดื่มรสชาติต้นทางที่เป็นเบส (FK เช่น น้ำเต้าหู้มัทฉะ) |
+| `topping_id` | INT | REFERENCES `topping(id)` | รหัสท็อปปิ้งที่ล็อกมาในเซ็ตคอมโบ (FK เช่น ไข่มุก, ถั่วแดง) |
 | `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สร้าง |
 
-#### 4. `toppings` (รายการท็อปปิ้งเสริม)
+#### 4. `topping` (รายการท็อปปิ้งเสริม) ✅
 | Column | Type | Attributes | Description |
 | :--- | :--- | :--- | :--- |
 | `id` | SERIAL | PRIMARY KEY | รหัสท็อปปิ้ง |
@@ -232,7 +237,7 @@
 | `id` | SERIAL | PRIMARY KEY | รหัสออเดอร์ |
 | `order_no` | VARCHAR(30) | UNIQUE, NOT NULL; INDEX | รหัสคำสั่งซื้อ/หมายเลขคิว รันเลขใหม่ในแต่ละวัน (ขึ้นต้นตามประเภท: `A` = หน้าร้าน/Walk-in เช่น `A001`, `B` = ออนไลน์/Online เช่น `B001`, `C` = ร้านค้า/Partner เช่น `C001`) |
 | `queue_no` | VARCHAR(10) | NOT NULL; INDEX | หมายเลขคิวแสดงบนหน้าจอ (เช่น `A001`, `B001`, `C001`) รันเลขใหม่แยกตามหมวดทุกวัน |
-| `method` | VARCHAR(20) | NOT NULL | ช่องทาง: `walkin` (A), `online` (B), `partner` (C) |
+| `method` | VARCHAR(20) | NOT NULL | ช่องทาง: `walk-in` (A), `online` (B), `nisit-shop` (C) |
 | `customer_phone` | VARCHAR(20) | NULL | เบอร์โทรศัพท์ลูกค้า |
 | `customer_nickname`| VARCHAR(100) | NULL | ชื่อเล่นลูกค้า |
 | `estimated_pickup_time` | TIMESTAMPTZ | NULL | เวลาที่ลูกค้าระบุว่าจะมารับ (สำหรับ online) |
@@ -278,7 +283,7 @@
 | `note` | TEXT | NULL | หมายเหตุเพิ่มเติม |
 | `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สร้าง |
 
-#### 9. `customers` (ข้อมูลสมาชิก/สะสมแต้ม)
+#### 9. `customer` (ข้อมูลสมาชิก/สะสมแต้ม)
 | Column | Type | Attributes | Description |
 | :--- | :--- | :--- | :--- |
 | `id` | SERIAL | PRIMARY KEY | รหัสสมาชิก |
@@ -289,7 +294,7 @@
 | `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สมัคร |
 | `latest_bought_at` | TIMESTAMPTZ | DEFAULT NOW() | วันเวลาที่สั่งซื้อล่าสุด |
 
-#### 10. `promotions` (โปรโมชั่น / การใช้แต้มแลก)
+#### 10. `promotion` (โปรโมชั่น / การใช้แต้มแลก)
 | Column | Type | Attributes | Description |
 | :--- | :--- | :--- | :--- |
 | `id` | SERIAL | PRIMARY KEY | รหัสโปรโมชั่น |
@@ -305,7 +310,7 @@
 | `is_active` | BOOLEAN | DEFAULT TRUE | สถานะเปิด/ปิดโปรโมชั่น |
 | `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สร้าง |
 
-#### 11. `promotion_redemptions` (ประวัติการแลกโปรโมชั่น)
+#### 11. `promotion_redemption` (ประวัติการแลกโปรโมชั่น)
 | Column | Type | Attributes | Description |
 | :--- | :--- | :--- | :--- |
 | `id` | SERIAL | PRIMARY KEY | รหัสการแลก |
@@ -334,15 +339,23 @@
 | `is_active` | BOOLEAN | DEFAULT TRUE | สถานะเปิด/ปิดการแสดงผล |
 | `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สร้าง |
 
+#### 14. `system_setting` (การตั้งค่าระบบส่วนกลาง) ✅
+| Column | Type | Attributes | Description |
+| :--- | :--- | :--- | :--- |
+| `key` | VARCHAR(100) | PRIMARY KEY | ชื่อคีย์การตั้งค่า (เช่น `slip_upload_mode`) |
+| `value` | TEXT | NOT NULL | ค่าการตั้งค่า (เช่น `immediate` หรือ `later`) |
+| `description` | VARCHAR(255) | NULL | คำอธิบายการตั้งค่า |
+| `updated_at` | TIMESTAMPTZ | DEFAULT NOW() | วันเวลาที่อัปเดตล่าสุด |
+
 ---
 
 ### 3.2 แผนภาพความสัมพันธ์ฐานข้อมูล (Database Relationship Diagram - ER Diagram)
 
 ```mermaid
 erDiagram
-    products ||--o{ product_combo_recipes : "is combo in"
-    products ||--o{ product_combo_recipes : "is base drink in"
-    toppings ||--o{ product_combo_recipes : "included in"
+    products ||--o{ product_combo_recipe : "is combo in"
+    products ||--o{ product_combo_recipe : "is base drink in"
+    toppings ||--o{ product_combo_recipe : "included in"
     
     admins ||--o{ orders : "verifies slip"
     admins ||--o{ expenses : "records"
@@ -373,7 +386,7 @@ erDiagram
         int sort_order
     }
 
-    product_combo_recipes {
+    product_combo_recipe {
         int id PK
         int combo_product_id FK
         int base_product_id FK

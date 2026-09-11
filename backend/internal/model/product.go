@@ -42,7 +42,7 @@ type ProductComboRecipe struct {
 }
 
 func (ProductComboRecipe) TableName() string {
-	return "product_combo_recipes"
+	return "product_combo_recipe"
 }
 
 // Topping represents optional add-on toppings
