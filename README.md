@@ -139,9 +139,40 @@ docker compose up -d --build
 ```bash
 docker compose ps       # ตรวจสอบสถานะการทำงาน
 docker compose logs -f  # ดู logs รวมแบบ real-time
-docker compose down     # หยุดการทำงานทั้งหมด
 docker compose down -v  # หยุดการทำงานและ reset ข้อมูล database
 ```
+
+---
+
+## 🗄️ วิธีการเชื่อมต่อ PostgreSQL ผ่าน DBeaver (Database Connection)
+
+หากต้องการเชื่อมต่อเพื่อดูข้อมูลและจัดการฐานข้อมูล PostgreSQL ในโปรเจกต์ผ่าน GUI Tool เช่น **DBeaver** สามารถตั้งค่าได้ดังนี้:
+
+### 📋 ข้อมูลการเชื่อมต่อ (Connection Settings)
+
+| รายการ (Setting) | ค่าที่ต้องระบุ (Value) | หมายเหตุ |
+| :--- | :--- | :--- |
+| **Connect Type / Driver** | `PostgreSQL` | เลือกไดรเวอร์ PostgreSQL |
+| **Host / Server** | `localhost` | หรือระบุ IP เช่น `192.168.1.xxx` หากผ่าน LAN |
+| **Port** | **`5488`** | *(⚠️ สำคัญ: ต้องเปลี่ยนจากพอร์ต default 5432 เป็น 5488)* |
+| **Database** | `kaset_db` | ชื่อฐานข้อมูลหลักของโปรเจกต์ |
+| **Username** | `kaset_user` | ผู้ใช้ฐานข้อมูล |
+| **Password** | `kaset_secret_pass` | รหัสผ่านฐานข้อมูล |
+| **SSL Mode** | `disable` | ปิดการใช้งาน SSL สำหรับ Local Development |
+
+### 🛠️ ขั้นตอนการเชื่อมต่อใน DBeaver (Step-by-Step)
+
+1. เปิดโปรแกรม **DBeaver** แล้วกดปุ่ม **New Connection** (ไอคอนปลั๊กไฟสีฟ้ามุมซ้ายบน) หรือกด `Ctrl + Shift + N`
+2. เลือกประเภทฐานข้อมูลเป็น **PostgreSQL** แล้วกด **Next**
+3. ในแท็บ **Main (General)** กรอกข้อมูลดังนี้:
+   - **Host**: `localhost`
+   - **Port**: `5488`
+   - **Database**: `kaset_db`
+   - **Username**: `kaset_user`
+   - **Password**: `kaset_secret_pass`
+4. หากต้องการปิด SSL ให้ไปที่แท็บ **Driver properties** หรือ **SSL** แล้วตั้งค่า `sslmode` เป็น `disable`
+5. กดปุ่ม **Test Connection** ด้านซ้ายล่าง (หาก DBeaver ร้องขอให้ดาวน์โหลด Driver ให้กด **Download**)
+6. เมื่อขึ้นข้อความ `Connected` ให้กด **Finish** เพื่อเริ่มจัดการตารางข้อมูล (`admins`, `products`, `toppings`, ฯลฯ) ได้ทันที
 
 ---
 

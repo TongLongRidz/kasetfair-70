@@ -38,11 +38,14 @@ func main() {
 		log.Printf("⚠️ Redis connection warning: %v (login rate limiting will be in-memory disabled)", err)
 	}
 
+	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 
 	// CORS Setup
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
+		AllowOriginFunc: func(origin string) bool {
+			return true
+		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},

@@ -700,3 +700,5 @@ classDiagram
 อาจมี Permission จะได้ Navbar ไม่รก (Super Admin, Barista, Front, Online, Account) -> เพิ่มหน้า Queue Manage แบบกดว่าใครพร้อม หรืออะไรยังไง
 
 เพิ่ม popup ตอนกดดูเมนู (ดูรายละเอียด)
+
+wjKU@RfNXxXE
