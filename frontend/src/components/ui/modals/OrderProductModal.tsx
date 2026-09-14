@@ -382,7 +382,7 @@ export default function OrderProductModal({
               </div>
               <p style={{ fontSize: "0.725rem", color: "var(--ink-soft)", lineHeight: 1.35 }}>
                 {product.default_toppings && product.default_toppings.length > 0
-                  ? `ประกอบด้วย: ${product.default_toppings.join(", ")}`
+                  ? `${product.default_toppings.join(", ")}`
                   : product.desc || "เมนูนี้จัดเซ็ตคู่ท็อปปิ้งสูตรพิเศษมาให้เรียบร้อยแล้ว ไม่สามารถเพิ่ม/เปลี่ยนท็อปปิ้งได้"}
               </p>
             </div>

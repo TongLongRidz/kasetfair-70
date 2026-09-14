@@ -44,20 +44,30 @@ func ConnectPostgres(dsn string) (*PostgresDB, error) {
 
 	log.Println("Successfully connected to PostgreSQL database")
 
+	// Drop ref_no / order_no column if exists from previous schema
+	db.Exec(`DO $$ BEGIN
+		IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'order' AND column_name = 'ref_no') THEN
+			ALTER TABLE "order" DROP COLUMN IF EXISTS ref_no CASCADE;
+		END IF;
+		IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'order' AND column_name = 'order_no') THEN
+			ALTER TABLE "order" DROP COLUMN IF EXISTS order_no CASCADE;
+		END IF;
+	END $$;`)
+
 	// Run AutoMigrate for models
 	if err := db.AutoMigrate(
 		&model.Admin{},
 		&model.Product{},
 		&model.Topping{},
 		&model.ProductComboRecipe{},
-		&model.Customer{},
-		&model.Promotion{},
-		&model.PromotionRedemption{},
+		&model.Order{},
+		&model.OrderItem{},
+		&model.OrderItemTopping{},
 		&model.SystemSetting{},
 	); err != nil {
 		log.Printf("⚠️ AutoMigrate error: %v", err)
 	} else {
-		log.Println("✅ Database migration completed successfully (admin, product, topping, product_combo_recipe, customer, promotion, promotion_redemption, system_setting tables ready)")
+		log.Println("✅ Database migration completed successfully (admin, product, topping, product_combo_recipe, order, order_item, order_item_topping, system_setting tables ready)")
 	}
 
 	// Seed Superadmin and Settings if not exists

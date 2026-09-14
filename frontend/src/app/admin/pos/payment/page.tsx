@@ -7,6 +7,8 @@ import Image from "next/image";
 import AdminSidebar from "@/components/layouts/AdminSidebar";
 import generatePayload from "promptpay-qr";
 import QRCode from "qrcode";
+import ConfirmPaymentModal from "./components/ConfirmPaymentModal";
+import OrderSuccessModal, { OrderSuccessData } from "./components/OrderSuccessModal";
 import {
   ArrowLeft,
   ShoppingBag,
@@ -14,7 +16,6 @@ import {
   QrCode,
   UploadCloud,
   CheckCircle2,
-  Printer,
   Clock,
   Sparkles,
   Trash2,
@@ -62,16 +63,11 @@ export default function POSPaymentPage() {
   // Slip upload mode: "immediate" (ต้องอัพสลิปเลย) vs "later" (อัพสลิปทีหลังได้)
   const [slipUploadMode, setSlipUploadMode] = useState<"immediate" | "later">("immediate");
 
+  // Confirm Payment Modal State
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+
   // Order Success Queue Modal
-  const [orderSuccessQueue, setOrderSuccessQueue] = useState<{
-    queueNumber: string;
-    orderId: number;
-    total: number;
-    paymentMethod: "cash" | "promptpay";
-    change: number;
-    itemsCount: number;
-    slipUrl?: string | null;
-  } | null>(null);
+  const [orderSuccessQueue, setOrderSuccessQueue] = useState<OrderSuccessData | null>(null);
 
   const CART_STORAGE_KEY = "kaset_pos_cart";
 
@@ -127,7 +123,7 @@ export default function POSPaymentPage() {
               return;
             }
           }
-        } catch {}
+        } catch { }
         const savedSlipMode = localStorage.getItem("kaset_slip_upload_mode");
         if (savedSlipMode === "later" || savedSlipMode === "immediate") {
           setSlipUploadMode(savedSlipMode);
@@ -198,36 +194,108 @@ export default function POSPaymentPage() {
 
   // Quick cash buttons
   const setExactCash = () => setCashReceived(String(grandTotal));
-  const addCash = (amount: number) => {
+  const adjustCash = (delta: number) => {
     const current = Number(cashReceived) || 0;
-    setCashReceived(String(current + amount));
+    const next = Math.max(0, current + delta);
+    setCashReceived(String(next));
   };
 
-  // 3. Confirm Payment and complete order (Mockup)
-  const handleConfirmOrder = () => {
+  // Open Confirm Payment Modal
+  const handleOpenConfirmModal = () => {
+    if (paymentMethod === "cash" && !isCashValid) return;
+    if (paymentMethod === "promptpay" && slipUploadMode === "immediate" && !slipImage) {
+      alert("กรุณาอัพโหลดรูปภาพสลิปโอนเงินก่อนยืนยันออเดอร์");
+      return;
+    }
+    setIsConfirmModalOpen(true);
+  };
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 3. Confirm Payment and complete order
+  const handleConfirmOrder = async () => {
     if (paymentMethod === "cash" && !isCashValid) return;
     if (paymentMethod === "promptpay" && slipUploadMode === "immediate" && !slipImage) {
       alert("กรุณาอัพโหลดรูปภาพสลิปโอนเงินก่อนยืนยันออเดอร์");
       return;
     }
 
-    const queueNumber = `A${Math.floor(10 + Math.random() * 90)}`;
-    const orderId = Math.floor(1000 + Math.random() * 9000);
+    setIsSubmitting(true);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
 
-    setOrderSuccessQueue({
-      queueNumber,
-      orderId,
-      total: grandTotal,
-      paymentMethod,
-      change: paymentMethod === "cash" ? change : 0,
-      itemsCount: totalCups,
-      slipUrl: slipImage,
-    });
-
-    // Clear cart from storage
     try {
-      localStorage.removeItem(CART_STORAGE_KEY);
-    } catch { }
+      const orderPayload = {
+        method: "walk-in",
+        total_amount: grandTotal,
+        payment_method: paymentMethod,
+        slip_url: slipImage || null,
+        note: null,
+        items: cart.map((c) => ({
+          product_id: Number(c.productId),
+          temperature: c.temperature,
+          sweetness_level: c.sweetness,
+          unit_price: c.unitPrice,
+          quantity: c.quantity,
+          note: c.note || null,
+          toppings: (c.toppings || []).map((t) => ({
+            topping_id: Number(t.id),
+            topping_price: Number(t.price),
+            is_included_in_combo: false,
+          })),
+        })),
+      };
+
+      const res = await fetch(`${apiUrl}/api/v1/orders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(orderPayload),
+      });
+
+      const json = await res.json();
+      if (res.ok && json.data) {
+        const created = json.data;
+        setOrderSuccessQueue({
+          queueNumber: created.queue_no,
+          orderId: created.id,
+          total: created.total_amount,
+          paymentMethod,
+          change: paymentMethod === "cash" ? change : 0,
+          itemsCount: totalCups,
+          slipUrl: created.slip_url,
+          orderUuid: created.uuid,
+        });
+
+        // Clear cart from storage
+        try {
+          localStorage.removeItem(CART_STORAGE_KEY);
+        } catch { }
+      } else {
+        alert(json.error || "ไม่สามารถสร้างออเดอร์ได้ กรุณาลองใหม่อีกครั้ง");
+      }
+    } catch (err) {
+      console.error("Failed to create order via API", err);
+      // Fallback in case backend is offline
+      const queueNumber = `A${String(Math.floor(1 + Math.random() * 999)).padStart(3, "0")}`;
+      const orderId = Math.floor(1000 + Math.random() * 9000);
+
+      setOrderSuccessQueue({
+        queueNumber,
+        orderId,
+        total: grandTotal,
+        paymentMethod,
+        change: paymentMethod === "cash" ? change : 0,
+        itemsCount: totalCups,
+        slipUrl: slipImage,
+      });
+
+      try {
+        localStorage.removeItem(CART_STORAGE_KEY);
+      } catch { }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!isLoaded || cart.length === 0) {
@@ -263,6 +331,49 @@ export default function POSPaymentPage() {
             grid-template-columns: 1fr 1.15fr;
             gap: 1.5rem;
             align-items: start;
+          }
+          .pos-cash-buttons-container {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            margin-top: 0.65rem;
+            flex-wrap: wrap;
+          }
+          .pos-cash-banknotes-group {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            flex-wrap: wrap;
+          }
+          .pos-cash-adjust-group {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            flex-wrap: wrap;
+          }
+          .pos-cash-divider {
+            width: 1px;
+            height: 24px;
+            background-color: rgba(50, 55, 65, 0.18);
+            flex-shrink: 0;
+          }
+          @media (max-width: 640px) {
+            .pos-cash-buttons-container {
+              flex-direction: column;
+              align-items: flex-start;
+              gap: 0.45rem;
+            }
+            .pos-cash-banknotes-group,
+            .pos-cash-adjust-group {
+              justify-content: flex-start;
+              width: 100%;
+              gap: 0.35rem;
+            }
+            .pos-cash-divider {
+              width: 100%;
+              height: 1px;
+              margin: 0.15rem 0;
+            }
           }
           @media (max-width: 900px) {
             .pos-payment-main {
@@ -476,7 +587,7 @@ export default function POSPaymentPage() {
                 <div style={{ textAlign: "left" }}>
                   <span>พร้อมเพย์ QR</span>
                   <span style={{ display: "block", fontSize: "0.7rem", fontWeight: 400, opacity: 0.8 }}>
-                    สแกนจ่าย + สลิป
+                    สแกนจ่าย
                   </span>
                 </div>
               </button>
@@ -518,9 +629,9 @@ export default function POSPaymentPage() {
                   <Banknote size={18} />
                 </div>
                 <div style={{ textAlign: "left" }}>
-                  <span>เงินสด (Cash)</span>
-                  <span style={{ display: "block", fontSize: "0.7rem", fontWeight: 400, opacity: 0.8 }}>
-                    รับเงิน & ทอนเงิน
+                  <span>เงินสด</span>
+                  <span style={{ display: "block", fontSize: "0.7rem", fontWeight: 400, opacity: 0.8, lineHeight: 1.25 }}>
+                    รับเงิน <br className="mobile-break" />& ทอนเงิน
                   </span>
                 </div>
               </button>
@@ -543,248 +654,283 @@ export default function POSPaymentPage() {
                       marginBottom: "1.25rem",
                     }}
                   >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem", marginBottom: "0.5rem" }}>
-                    <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--teal)" }}>
-                      {promptpayName}
-                    </span>
-                  </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem", marginBottom: "0.5rem" }}>
+                      <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--teal)" }}>
+                        {promptpayName}
+                      </span>
+                    </div>
 
-                  <div style={{ width: "200px", height: "200px", margin: "0 auto", position: "relative", backgroundColor: "#fff", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "0.5rem", overflow: "hidden", userSelect: "none" }}>
-                    {qrCodeDataUrl ? (
-                      <img
-                        src={qrCodeDataUrl}
-                        alt="PromptPay QR Code"
-                        draggable={false}
-                        style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none", userSelect: "none" }}
-                      />
-                    ) : (
-                      <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>กำลังสร้าง QR Code...</p>
-                    )}
-                  </div>
-
-                  <div style={{ display: "inline-block", marginTop: "0.35rem", padding: "0.25rem 0.75rem", borderRadius: "9999px", backgroundColor: "rgba(75, 155, 140, 0.12)", color: "var(--teal)", fontSize: "0.875rem", fontWeight: 800 }}>
-                    ยอดชำระ: ฿{grandTotal}
-                  </div>
-                </div>
-
-                {/* Slip Upload Area */}
-                <div>
-                  <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)", marginBottom: "0.4rem" }}>
-                    <span>
-                      อัพโหลดสลิปโอนเงิน (Transfer Slip){" "}
-                      {slipUploadMode === "immediate" ? (
-                        <span style={{ color: "#dc2626", fontWeight: 400, fontSize: "0.75rem" }}>(ต้องอัพโหลดตอนนี้)</span>
+                    <div style={{ width: "200px", height: "200px", margin: "0 auto", position: "relative", backgroundColor: "#fff", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "0.5rem", overflow: "hidden", userSelect: "none" }}>
+                      {qrCodeDataUrl ? (
+                        <img
+                          src={qrCodeDataUrl}
+                          alt="PromptPay QR Code"
+                          draggable={false}
+                          style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none", userSelect: "none" }}
+                        />
                       ) : (
-                        <span style={{ color: "var(--ink-soft)", fontWeight: 400, fontSize: "0.75rem" }}>(อัพโหลดภายหลังได้)</span>
+                        <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>กำลังสร้าง QR Code...</p>
                       )}
-                    </span>
-                    {slipUploadMode === "immediate" ? (
-                      <span style={{ fontSize: "0.7rem", backgroundColor: "rgba(220, 38, 38, 0.12)", color: "#dc2626", padding: "0.1rem 0.5rem", borderRadius: "9999px", fontWeight: 600 }}>
-                        ให้ผ่านโดยต้องแนบสลิป
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: "0.7rem", backgroundColor: "rgba(75, 155, 140, 0.15)", color: "var(--teal)", padding: "0.1rem 0.5rem", borderRadius: "9999px", fontWeight: 600 }}>
-                        ให้ผ่านโดยไม่ต้องแนบสลิป
-                      </span>
-                    )}
-                  </label>
-
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    style={{ display: "none" }}
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleFileChange(e.target.files[0]);
-                      }
-                    }}
-                  />
-
-                  {!slipImage ? (
-                    <div
-                      onClick={() => fileInputRef.current?.click()}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        setIsDragging(true);
-                      }}
-                      onDragLeave={() => setIsDragging(false)}
-                      onDrop={handleDrop}
-                      style={{
-                        border: isDragging ? "2px dashed var(--teal)" : "2px dashed rgba(50, 55, 65, 0.2)",
-                        backgroundColor: isDragging ? "rgba(75, 155, 140, 0.08)" : "var(--cream)",
-                        borderRadius: "0.85rem",
-                        padding: "1.5rem 1rem",
-                        textAlign: "center",
-                        cursor: "pointer",
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      <div style={{ width: "42px", height: "42px", borderRadius: "50%", backgroundColor: "rgba(75,155,140,0.12)", color: "var(--teal)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 0.6rem" }}>
-                        <UploadCloud size={22} />
-                      </div>
-                      <p style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--ink)" }}>
-                        คลิกเพื่อเลือกไฟล์ หรือลากรูปภาพมาวางที่นี่
-                      </p>
-                      <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "2px" }}>
-                        รองรับรูปภาพ JPG, PNG, WebP
-                      </p>
                     </div>
-                  ) : (
-                    /* Slip Preview Card */
-                    <div
-                      style={{
-                        backgroundColor: "var(--cream)",
-                        borderRadius: "0.85rem",
-                        padding: "0.75rem 1rem",
-                        border: "1px solid rgba(75, 155, 140, 0.3)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: "0.75rem",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
-                        <div style={{ width: "48px", height: "48px", borderRadius: "0.5rem", overflow: "hidden", flexShrink: 0, border: "1px solid rgba(0,0,0,0.1)" }}>
-                          <img src={slipImage} alt="Slip Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        </div>
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
-                            <CheckCircle2 size={14} color="#22c55e" />
-                            <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {slipFileName || "สลิปโอนเงิน"}
-                            </span>
-                          </div>
-                          <span style={{ fontSize: "0.725rem", color: "#22c55e", fontWeight: 600 }}>
-                            อัพโหลดสลิปเรียบร้อยแล้ว
-                          </span>
-                        </div>
-                      </div>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSlipImage(null);
-                          setSlipFileName("");
-                        }}
-                        style={{
-                          border: "none",
-                          backgroundColor: "rgba(220, 38, 38, 0.1)",
-                          color: "#dc2626",
-                          padding: "0.35rem 0.6rem",
-                          borderRadius: "0.4rem",
-                          fontSize: "0.75rem",
-                          fontWeight: 600,
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "0.2rem",
-                        }}
-                      >
-                        <Trash2 size={12} />
-                        <span>เปลี่ยนรูป</span>
-                      </button>
+                    <div style={{ display: "inline-block", marginTop: "0.35rem", padding: "0.25rem 0.75rem", borderRadius: "9999px", backgroundColor: "rgba(75, 155, 140, 0.12)", color: "var(--teal)", fontSize: "0.875rem", fontWeight: 800 }}>
+                      ยอดชำระ: ฿{grandTotal}
                     </div>
-                  )}
-                </div>
-              </div>
-            )}
+                  </div>
 
-            {/* PAYMENT VIEW: CASH */}
-            {paymentMethod === "cash" && (
-              <div className="animate-fade-in">
-                <div
-                  style={{
-                    backgroundColor: "var(--cream)",
-                    borderRadius: "1rem",
-                    padding: "1.25rem",
-                    border: "1px solid rgba(50, 55, 65, 0.1)",
-                    marginBottom: "1rem",
-                  }}
-                >
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)", marginBottom: "0.4rem" }}>
-                    จำนวนเงินที่รับจากลูกค้า (บาท)
-                  </label>
+                  {/* Slip Upload Area */}
+                  <div>
+                    <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)", marginBottom: "0.4rem" }}>
+                      <span>
+                        อัพโหลดสลิปโอนเงิน{" "}
+                        {slipUploadMode === "immediate" ? (
+                          <span style={{ color: "#dc2626", fontWeight: 400, fontSize: "0.75rem" }}>(ต้องอัพโหลดตอนนี้)</span>
+                        ) : (
+                          <span style={{ color: "var(--ink-soft)", fontWeight: 400, fontSize: "0.75rem" }}>(อัพโหลดภายหลังได้)</span>
+                        )}
+                      </span>
+                      {slipUploadMode === "immediate" ? (
+                        <span style={{ fontSize: "0.7rem", backgroundColor: "rgba(220, 38, 38, 0.12)", color: "#dc2626", padding: "0.1rem 0.5rem", borderRadius: "9999px", fontWeight: 600 }}>
+                          ให้ผ่านโดยต้องแนบสลิป
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: "0.7rem", backgroundColor: "rgba(75, 155, 140, 0.15)", color: "var(--teal)", padding: "0.1rem 0.5rem", borderRadius: "9999px", fontWeight: 600 }}>
+                          ให้ผ่านโดยไม่ต้องแนบสลิป
+                        </span>
+                      )}
+                    </label>
 
-                  <div style={{ position: "relative" }}>
                     <input
-                      type="number"
-                      placeholder={`เช่น ${grandTotal}`}
-                      value={cashReceived}
-                      onChange={(e) => setCashReceived(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "0.75rem 1rem",
-                        borderRadius: "0.75rem",
-                        border: isCashValid ? "2px solid var(--teal)" : "1px solid rgba(50,55,65,0.2)",
-                        fontSize: "1.25rem",
-                        fontWeight: 800,
-                        outline: "none",
-                        backgroundColor: "#fff",
-                        color: "var(--ink)",
-                        fontFamily: "'Kanit', sans-serif",
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleFileChange(e.target.files[0]);
+                        }
                       }}
                     />
-                    <button
-                      type="button"
-                      onClick={setExactCash}
-                      style={{
-                        position: "absolute",
-                        right: "8px",
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        padding: "0.35rem 0.65rem",
-                        borderRadius: "0.45rem",
-                        backgroundColor: "var(--teal)",
-                        color: "#fff",
-                        border: "none",
-                        fontSize: "0.75rem",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                      }}
-                    >
-                      จ่ายพอดี (฿{grandTotal})
-                    </button>
-                  </div>
 
-                  {/* Quick Cash Buttons */}
-                  <div style={{ display: "flex", gap: "0.35rem", marginTop: "0.6rem", flexWrap: "wrap" }}>
-                    {[20, 50, 100, 500, 1000].map((amt) => (
-                      <button
-                        key={amt}
-                        type="button"
-                        onClick={() => setCashReceived(String(amt))}
+                    {!slipImage ? (
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setIsDragging(true);
+                        }}
+                        onDragLeave={() => setIsDragging(false)}
+                        onDrop={handleDrop}
                         style={{
-                          padding: "0.3rem 0.55rem",
-                          borderRadius: "0.5rem",
-                          border: "1px solid rgba(50, 55, 65, 0.15)",
-                          backgroundColor: "#fff",
-                          fontSize: "0.75rem",
-                          fontWeight: 600,
+                          border: isDragging ? "2px dashed var(--teal)" : "2px dashed rgba(50, 55, 65, 0.2)",
+                          backgroundColor: isDragging ? "rgba(75, 155, 140, 0.08)" : "var(--cream)",
+                          borderRadius: "0.85rem",
+                          padding: "1.5rem 1rem",
+                          textAlign: "center",
                           cursor: "pointer",
-                          color: "var(--ink)",
+                          transition: "all 0.15s ease",
                         }}
                       >
-                        +{amt}฿
-                      </button>
-                    ))}
-                  </div>
+                        <div style={{ width: "42px", height: "42px", borderRadius: "50%", backgroundColor: "rgba(75,155,140,0.12)", color: "var(--teal)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 0.6rem" }}>
+                          <UploadCloud size={22} />
+                        </div>
+                        <p style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--ink)" }}>
+                          คลิกเพื่อเลือกไฟล์ หรือลากรูปภาพมาวางที่นี่
+                        </p>
+                        <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "2px" }}>
+                          รองรับรูปภาพ JPG, PNG, WebP
+                        </p>
+                      </div>
+                    ) : (
+                      /* Slip Preview Card */
+                      <div
+                        style={{
+                          backgroundColor: "var(--cream)",
+                          borderRadius: "0.85rem",
+                          padding: "0.75rem 1rem",
+                          border: "1px solid rgba(75, 155, 140, 0.3)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: "0.75rem",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
+                          <div style={{ width: "48px", height: "48px", borderRadius: "0.5rem", overflow: "hidden", flexShrink: 0, border: "1px solid rgba(0,0,0,0.1)" }}>
+                            <img src={slipImage} alt="Slip Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                              <CheckCircle2 size={14} color="#22c55e" />
+                              <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {slipFileName || "สลิปโอนเงิน"}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: "0.725rem", color: "#22c55e", fontWeight: 600 }}>
+                              อัพโหลดสลิปเรียบร้อยแล้ว
+                            </span>
+                          </div>
+                        </div>
 
-                  {/* Change Display */}
-                  <div style={{ marginTop: "1rem", paddingTop: "0.85rem", borderTop: "1px dashed rgba(50, 55, 65, 0.12)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--ink)" }}>เงินทอน</span>
-                      <span className="font-display" style={{ fontSize: "1.65rem", fontWeight: 900, color: isCashValid ? "var(--teal)" : "var(--ink-soft)" }}>
-                        ฿{isCashValid ? change : 0}
-                      </span>
-                    </div>
-                    <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "2px" }}>
-                      *พนักงานหน้าร้านตรวจนับเงินสดและทอนเงินให้ลูกค้าเรียบร้อย
-                    </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSlipImage(null);
+                            setSlipFileName("");
+                          }}
+                          style={{
+                            border: "none",
+                            backgroundColor: "rgba(220, 38, 38, 0.1)",
+                            color: "#dc2626",
+                            padding: "0.35rem 0.6rem",
+                            borderRadius: "0.4rem",
+                            fontSize: "0.75rem",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.2rem",
+                          }}
+                        >
+                          <Trash2 size={12} />
+                          <span>เปลี่ยนรูป</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+
+              {/* PAYMENT VIEW: CASH */}
+              {paymentMethod === "cash" && (
+                <div className="animate-fade-in">
+                  <div
+                    style={{
+                      backgroundColor: "var(--cream)",
+                      borderRadius: "1rem",
+                      padding: "1.25rem",
+                      border: "1px solid rgba(50, 55, 65, 0.1)",
+                      marginBottom: "1rem",
+                    }}
+                  >
+                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)", marginBottom: "0.4rem" }}>
+                      จำนวนเงินที่รับจากลูกค้า (บาท)
+                    </label>
+
+                    <div style={{ position: "relative" }}>
+                      <input
+                        type="number"
+                        placeholder={`เช่น ${grandTotal}`}
+                        value={cashReceived}
+                        onChange={(e) => setCashReceived(e.target.value)}
+                        style={{
+                          width: "100%",
+                          padding: "0.75rem 1rem",
+                          borderRadius: "0.75rem",
+                          border: isCashValid ? "2px solid var(--teal)" : "1px solid rgba(50,55,65,0.2)",
+                          fontSize: "1.25rem",
+                          fontWeight: 800,
+                          outline: "none",
+                          backgroundColor: "#fff",
+                          color: "var(--ink)",
+                          fontFamily: "'Kanit', sans-serif",
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={setExactCash}
+                        style={{
+                          position: "absolute",
+                          right: "8px",
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          padding: "0.35rem 0.65rem",
+                          borderRadius: "0.45rem",
+                          backgroundColor: "var(--teal)",
+                          color: "#fff",
+                          border: "none",
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        จ่ายพอดี (฿{grandTotal})
+                      </button>
+                    </div>
+
+                    {/* Quick Cash & Adjustment Buttons Row with Divider */}
+                    <div className="pos-cash-buttons-container">
+                      {/* Banknote Buttons */}
+                      <div className="pos-cash-banknotes-group">
+                        {[20, 50, 100, 500, 1000].map((amt) => (
+                          <button
+                            key={amt}
+                            type="button"
+                            onClick={() => setCashReceived(String(amt))}
+                            style={{
+                              padding: "0.3rem 0.5rem",
+                              borderRadius: "0.5rem",
+                              border: "1px solid rgba(50, 55, 65, 0.15)",
+                              backgroundColor: "#fff",
+                              fontSize: "0.75rem",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              color: "var(--ink)",
+                              textAlign: "center",
+                            }}
+                          >
+                            {amt}฿
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Divider (Vertical on Desktop, Horizontal on Mobile) */}
+                      <div className="pos-cash-divider" />
+
+                      {/* Adjustment Buttons (+-1, +-5, +-10) */}
+                      <div className="pos-cash-adjust-group">
+                        {[-10, -5, -1, 1, 5, 10].map((delta) => {
+                          const isPositive = delta > 0;
+                          return (
+                            <button
+                              key={delta}
+                              type="button"
+                              onClick={() => adjustCash(delta)}
+                              style={{
+                                padding: "0.25rem 0.45rem",
+                                borderRadius: "0.5rem",
+                                border: "1px solid rgba(50, 55, 65, 0.15)",
+                                backgroundColor: "#fff",
+                                fontSize: "0.75rem",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                color: "var(--ink)",
+                                textAlign: "center",
+                              }}
+                              title={`ปรับยอด ${isPositive ? `+${delta}` : delta} บาท`}
+                            >
+                              {isPositive ? `+${delta}` : delta}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Change Display */}
+                    <div style={{ marginTop: "1rem", paddingTop: "0.85rem", borderTop: "1px dashed rgba(50, 55, 65, 0.12)" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--ink)" }}>เงินทอน</span>
+                        <span className="font-display" style={{ fontSize: "1.65rem", fontWeight: 900, color: isCashValid ? "var(--teal)" : "var(--ink-soft)" }}>
+                          ฿{isCashValid ? change : 0}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "2px", lineHeight: 1.35 }}>
+                        *พนักงานหน้าร้านตรวจนับเงินสด<br className="mobile-break" />และทอนเงินให้ลูกค้าเรียบร้อย
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Submit CTA Button */}
@@ -794,10 +940,19 @@ export default function POSPaymentPage() {
                 const isCashReady = paymentMethod === "cash" && isCashValid;
                 const isReady = isCashReady || isPromptPayReady;
 
+                // Determine button label based on status
+                let buttonText = "ยืนยันการชำระเงิน";
+                if (paymentMethod === "cash" && !isCashValid) {
+                  const shortage = grandTotal - cashNum;
+                  buttonText = cashNum > 0 ? `ยังไม่ครบจำนวน (ขาดอีก ฿${shortage})` : "ยังไม่ครบจำนวน";
+                } else if (paymentMethod === "promptpay" && slipUploadMode === "immediate" && !slipImage) {
+                  buttonText = "กรุณาอัพโหลดสลิป";
+                }
+
                 return (
                   <button
                     type="button"
-                    onClick={handleConfirmOrder}
+                    onClick={handleOpenConfirmModal}
                     disabled={!isReady}
                     style={{
                       width: "100%",
@@ -817,8 +972,8 @@ export default function POSPaymentPage() {
                       transition: "all 0.15s ease",
                     }}
                   >
-                    <CheckCircle2 size={18} />
-                    <span>ยืนยันการชำระเงิน</span>
+                    {isReady ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+                    <span>{buttonText}</span>
                   </button>
                 );
               })()}
@@ -827,107 +982,30 @@ export default function POSPaymentPage() {
         </div>
       </main>
 
-      {/* Order Success Ticket Modal */}
-      {orderSuccessQueue && (
-        <div
-          className="animate-fade-in"
-          style={{
-            position: "fixed",
-            inset: 0,
-            backgroundColor: "rgba(0,0,0,0.6)",
-            backdropFilter: "blur(4px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 200,
-            padding: "1rem",
-          }}
-        >
-          <div
-            className="animate-modal-pop"
-            style={{
-              backgroundColor: "var(--card)",
-              borderRadius: "1.5rem",
-              width: "100%",
-              maxWidth: "420px",
-              padding: "2rem 1.75rem",
-              textAlign: "center",
-              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.35)",
-              border: "1px solid rgba(50, 55, 65, 0.1)",
-            }}
-          >
-            <div style={{ width: "60px", height: "60px", borderRadius: "50%", backgroundColor: "rgba(34, 197, 94, 0.15)", color: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1rem" }}>
-              <CheckCircle2 size={36} />
-            </div>
+      {/* Confirm Payment Modal */}
+      <ConfirmPaymentModal
+        isOpen={isConfirmModalOpen}
+        isLoading={isSubmitting}
+        onClose={() => setIsConfirmModalOpen(false)}
+        onConfirm={async () => {
+          await handleConfirmOrder();
+          setIsConfirmModalOpen(false);
+        }}
+        paymentMethod={paymentMethod}
+        totalAmount={grandTotal}
+        totalCups={totalCups}
+        cart={cart}
+        cashReceived={cashNum}
+        change={change}
+        slipImage={slipImage}
+        slipUploadMode={slipUploadMode}
+      />
 
-            <h3 style={{ fontSize: "1.35rem", fontWeight: 800, color: "var(--ink)" }}>
-              บันทึกออเดอร์สำเร็จ!
-            </h3>
-            <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", marginTop: "2px" }}>
-              ออเดอร์ #{orderSuccessQueue.orderId} (ชำระผ่าน {orderSuccessQueue.paymentMethod === "promptpay" ? "พร้อมเพย์" : "เงินสด"})
-            </p>
-
-            {/* Ticket Card */}
-            <div style={{ marginTop: "1.25rem", padding: "1.25rem", backgroundColor: "var(--cream)", borderRadius: "1rem", border: "2px dashed var(--teal)" }}>
-              <span style={{ fontSize: "0.85rem", color: "var(--ink-soft)", fontWeight: 600 }}>หมายเลขคิวของคุณ</span>
-              <p className="font-mono" style={{ fontSize: "3rem", fontWeight: 900, color: "var(--teal)", lineHeight: 1.1, marginTop: "4px" }}>
-                {orderSuccessQueue.queueNumber}
-              </p>
-
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "var(--ink)", marginTop: "0.75rem", paddingTop: "0.75rem", borderTop: "1px solid rgba(50,55,65,0.08)" }}>
-                <span>ยอดชำระ: <strong>฿{orderSuccessQueue.total}</strong> ({orderSuccessQueue.itemsCount} แก้ว)</span>
-                {orderSuccessQueue.paymentMethod === "cash" && (
-                  <span>เงินทอน: <strong>฿{orderSuccessQueue.change}</strong></span>
-                )}
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.5rem" }}>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                style={{
-                  padding: "0.75rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid rgba(50,55,65,0.15)",
-                  backgroundColor: "var(--cream)",
-                  color: "var(--ink)",
-                  fontWeight: 600,
-                  fontSize: "0.875rem",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.4rem",
-                }}
-              >
-                <Printer size={16} />
-                <span>พิมพ์ใบเสร็จ</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => router.push("/admin/pos/front-desk")}
-                style={{
-                  flex: 1,
-                  padding: "0.75rem",
-                  borderRadius: "0.75rem",
-                  border: "none",
-                  backgroundColor: "var(--teal)",
-                  color: "#fff",
-                  fontWeight: 700,
-                  fontSize: "0.95rem",
-                  cursor: "pointer",
-                  boxShadow: "0 4px 12px rgba(75,155,140,0.3)",
-                }}
-              >
-                รับออเดอร์ถัดไป
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Order Success Ticket Modal Component */}
+      <OrderSuccessModal
+        data={orderSuccessQueue}
+        onNextOrder={() => router.push("/admin/pos/front-desk")}
+      />
     </div>
   );
 }

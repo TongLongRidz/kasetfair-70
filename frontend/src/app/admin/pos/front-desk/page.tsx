@@ -599,68 +599,7 @@ export default function POSFrontDeskPage() {
             </div>
           </section>
 
-          {/* Toppings Showcase Section (matches page.tsx style) */}
-          {toppings.length > 0 && (
-            <section id="toppings" style={{ marginTop: "2.5rem" }}>
-              <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
-                <div>
-                  <h2 style={{ fontSize: "1.35rem", fontWeight: 700, color: "var(--ink)" }}>ท็อปปิ้ง (Toppings)</h2>
-                  <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)", marginTop: "0.15rem" }}>
-                    เพิ่มความอร่อยให้เครื่องดื่มของคุณ
-                  </p>
-                </div>
-              </div>
 
-              <div
-                className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5 sm:gap-3"
-                style={{ marginTop: "0.85rem" }}
-              >
-                {toppings.map((topping) => (
-                  <div
-                    key={topping.id}
-                    style={{
-                      borderRadius: "1rem",
-                      backgroundColor: "var(--card)",
-                      border: "1px solid rgba(50, 55, 65, 0.1)",
-                      padding: "0.85rem 0.75rem",
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                      minHeight: "85px",
-                    }}
-                  >
-                    <div>
-                      <p style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)", lineHeight: 1.25 }}>
-                        {topping.name_th}
-                      </p>
-                      {topping.allow_iced && !topping.allow_hot && (
-                        <span
-                          style={{
-                            display: "inline-block",
-                            marginTop: "0.25rem",
-                            fontSize: "9px",
-                            color: "var(--teal)",
-                            fontWeight: 600,
-                            backgroundColor: "rgba(75, 155, 140, 0.15)",
-                            padding: "0.1rem 0.4rem",
-                            borderRadius: "4px",
-                          }}
-                        >
-                          เฉพาะเมนูเย็น
-                        </span>
-                      )}
-                    </div>
-                    <p
-                      className="font-display"
-                      style={{ marginTop: "0.4rem", fontSize: "1.15rem", color: "var(--teal)", lineHeight: 1 }}
-                    >
-                      +{topping.price}฿
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
 
           {/* Floating Cart Button */}
           <button

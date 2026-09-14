@@ -629,7 +629,7 @@ export default function ToppingsManagementPage() {
               >
                 <option value="all">ทั้งหมด</option>
                 <option value="available">พร้อมขาย</option>
-                <option value="soldout">ขายหมด (Sold out)</option>
+                <option value="soldout">ขายหมด</option>
                 <option value="hidden">ซ่อนอยู่</option>
               </select>
             </div>

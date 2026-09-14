@@ -52,7 +52,7 @@ export default function Footer() {
                     display: "block",
                   }}
                 >
-                  Taothong Soy Milk
+                  Thuathong Soy Milk
                 </span>
               </div>
             </div>

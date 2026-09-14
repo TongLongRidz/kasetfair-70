@@ -721,7 +721,7 @@ export default function MenuManagementPage() {
                   setCurrentPage(1);
                 }}
               >
-                <option value="all">ทั้งหมด</option>
+                <option value="all">ทุกเมนู</option>
                 <option value="flavours">รสชาติหลัก</option>
                 <option value="combos">เมนูคอมโบ</option>
               </select>

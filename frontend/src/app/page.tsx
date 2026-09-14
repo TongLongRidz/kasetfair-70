@@ -224,16 +224,6 @@ const BANNERS: BannerSlide[] = [
     image: "/images/drink-matcha.jpg",
     bgColor: "#3E6B5C",
   },
-  {
-    tag: "MEMBER REWARDS",
-    title: "สะสมแต้มถั่วทอง",
-    highlight: "ซื้อ 10 แต้มแลกฟรี",
-    desc: "กรอกเบอร์โทรศัพท์เพื่อสะสมแต้มทุกแก้ว และแลกรับส่วนลดสุดพิเศษในงาน",
-    ctaText: "ดูโปรโมชั่น & แลกแต้ม",
-    ctaLink: "/promotion",
-    image: "/images/drink-pearl.jpg",
-    bgColor: "#634832",
-  },
 ];
 
 export default function Home() {

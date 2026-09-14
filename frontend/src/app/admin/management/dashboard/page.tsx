@@ -698,7 +698,7 @@ export default function AdminDashboardPage() {
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
           <div>
             <h1 style={{ fontSize: "1.75rem", fontWeight: 800, lineHeight: 1.2 }}>
-              แดชบอร์ดสรุปยอดขาย
+              แดชบอร์ด
             </h1>
           </div>
 
@@ -979,43 +979,61 @@ export default function AdminDashboardPage() {
             <ScrollableChartWrapper>
               <div
                 key={`trend-chart-${range}-${chartType}-${trendWeek}`}
-                className={trendView.isInView ? "animate-wipe-left" : ""}
                 style={{ minWidth: "500px" }}
               >
                 {chartType === "bar" ? (
                   /* Bar visualization with scroll-triggered left-to-right animation */
                   <div style={{ display: "flex", height: "220px", alignItems: "flex-end", gap: "0.75rem" }}>
-                    {currentWeekTrend.map((t, idx) => (
-                      <div key={t.d} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: "0.5rem", height: "100%" }}>
-                        <div style={{ display: "flex", width: "100%", height: "100%", alignItems: "flex-end", justifyContent: "center", gap: "0.35rem", borderBottom: "1px solid rgba(50, 55, 65, 0.08)", paddingBottom: "2px" }}>
-                          <div
-                            title={`รายรับ: ฿${t.rev.toLocaleString()}`}
-                            className={trendView.isInView ? "animate-bar-grow" : ""}
-                            style={{
-                              width: "36%",
-                              borderRadius: "4px 4px 0 0",
-                              backgroundColor: "var(--teal)",
-                              height: `${(t.rev / maxBar) * 100}%`,
-                              animationDelay: `${idx * 90}ms`,
-                              transition: "height 0.5s ease",
-                            }}
-                          />
-                          <div
-                            title={`รายจ่าย: ฿${t.exp.toLocaleString()}`}
-                            className={trendView.isInView ? "animate-bar-grow" : ""}
-                            style={{
-                              width: "36%",
-                              borderRadius: "4px 4px 0 0",
-                              backgroundColor: "var(--warm)",
-                              height: `${(t.exp / maxBar) * 100}%`,
-                              animationDelay: `${idx * 90 + 45}ms`,
-                              transition: "height 0.5s ease",
-                            }}
-                          />
+                    {currentWeekTrend.map((t, idx) => {
+                      const delayMs = idx * 60;
+                      return (
+                        <div
+                          key={t.d}
+                          className={trendView.isInView ? "animate-rise" : ""}
+                          style={{
+                            flex: 1,
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "flex-end",
+                            gap: "0.5rem",
+                            height: "100%",
+                            animationDelay: `${delayMs}ms`,
+                            animationFillMode: "both",
+                          }}
+                        >
+                          <div style={{ display: "flex", width: "100%", height: "100%", alignItems: "flex-end", justifyContent: "center", gap: "0.35rem", borderBottom: "1px solid rgba(50, 55, 65, 0.08)", paddingBottom: "2px" }}>
+                            <div
+                              title={`รายรับ: ฿${t.rev.toLocaleString()}`}
+                              className={trendView.isInView ? "animate-bar-grow" : ""}
+                              style={{
+                                width: "36%",
+                                borderRadius: "4px 4px 0 0",
+                                backgroundColor: "var(--teal)",
+                                height: `${(t.rev / maxBar) * 100}%`,
+                                animationDelay: `${delayMs}ms`,
+                                animationFillMode: "both",
+                                transition: "height 0.5s ease",
+                              }}
+                            />
+                            <div
+                              title={`รายจ่าย: ฿${t.exp.toLocaleString()}`}
+                              className={trendView.isInView ? "animate-bar-grow" : ""}
+                              style={{
+                                width: "36%",
+                                borderRadius: "4px 4px 0 0",
+                                backgroundColor: "var(--warm)",
+                                height: `${(t.exp / maxBar) * 100}%`,
+                                animationDelay: `${delayMs + 30}ms`,
+                                animationFillMode: "both",
+                                transition: "height 0.5s ease",
+                              }}
+                            />
+                          </div>
+                          <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 500, whiteSpace: "nowrap" }}>{t.d}</span>
                         </div>
-                        <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 500, whiteSpace: "nowrap" }}>{t.d}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   /* Line visualization with scroll-triggered SVG drawing animation */
@@ -1044,7 +1062,7 @@ export default function AdminDashboardPage() {
                     }
                     const expTotal = expCum[expCum.length - 1] || 600;
 
-                    const lineDurationMs = 550;
+                    const lineDurationMs = 850;
                     const expDelayMs = 45;
 
                     const revKeyframes = revPts
@@ -1198,11 +1216,26 @@ export default function AdminDashboardPage() {
 
                         {/* Day Labels along bottom */}
                         <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid rgba(50, 55, 65, 0.08)", paddingTop: "0.5rem", marginTop: "0.25rem" }}>
-                          {currentWeekTrend.map((t) => (
-                            <span key={t.d} style={{ fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 500, textAlign: "center", width: "45px" }}>
-                              {t.d}
-                            </span>
-                          ))}
+                          {currentWeekTrend.map((t, idx) => {
+                            const delayMs = Math.round((idx / (currentWeekTrend.length - 1)) * lineDurationMs);
+                            return (
+                              <span
+                                key={t.d}
+                                className={trendView.isInView ? "animate-rise" : ""}
+                                style={{
+                                  fontSize: "0.75rem",
+                                  color: "var(--ink-soft)",
+                                  fontWeight: 500,
+                                  textAlign: "center",
+                                  width: "45px",
+                                  animationDelay: `${delayMs}ms`,
+                                  animationFillMode: "both",
+                                }}
+                              >
+                                {t.d}
+                              </span>
+                            );
+                          })}
                         </div>
                       </div>
                     );
@@ -1503,7 +1536,6 @@ export default function AdminDashboardPage() {
               <ScrollableChartWrapper>
                 <div
                   key={`hourly-chart-${range}-${hourlyDayIndex}`}
-                  className={hourlyView.isInView ? "animate-wipe-left" : ""}
                   style={{
                     display: "grid",
                     gridTemplateColumns: `repeat(${currentHourlyData.slots.length}, 1fr)`,
@@ -1521,10 +1553,12 @@ export default function AdminDashboardPage() {
                     const isPeak = slot.cups === Math.max(...currentHourlyData.slots.map((s) => s.cups));
                     const onlinePct = slot.cups > 0 ? (slot.online / slot.cups) * 100 : 50;
                     const walkinPct = 100 - onlinePct;
+                    const delayMs = slotIdx * 45;
 
                     return (
                       <div
                         key={slot.time}
+                        className={hourlyView.isInView ? "animate-rise" : ""}
                         style={{
                           display: "flex",
                           flexDirection: "column",
@@ -1536,6 +1570,8 @@ export default function AdminDashboardPage() {
                           padding: "0.35rem 0.15rem",
                           border: isPeak ? "1px solid rgba(235, 148, 93, 0.3)" : "1px solid transparent",
                           position: "relative",
+                          animationDelay: `${delayMs}ms`,
+                          animationFillMode: "both",
                           transition: "all 0.2s ease",
                         }}
                       >
@@ -1590,7 +1626,8 @@ export default function AdminDashboardPage() {
                             flexDirection: "column-reverse",
                             boxShadow: isPeak ? "0 6px 20px rgba(235, 148, 93, 0.35)" : "0 2px 6px rgba(0,0,0,0.04)",
                             border: isPeak ? "2px solid var(--warm)" : "1px solid rgba(50, 55, 65, 0.08)",
-                            animationDelay: `${slotIdx * 90}ms`,
+                            animationDelay: `${delayMs}ms`,
+                            animationFillMode: "both",
                             transition: "height 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.2s ease",
                             backgroundColor: "rgba(50, 55, 65, 0.06)",
                             transform: isPeak ? "scale(1.03)" : "none",
@@ -1680,7 +1717,14 @@ export default function AdminDashboardPage() {
             <div style={{ marginTop: "1rem", display: "flex", flexDirection: "column", gap: "0.85rem" }}>
 
               {topProducts.map((p, i) => (
-                <div key={p.name}>
+                <div
+                  key={p.name}
+                  className={topProductsView.isInView ? "animate-rise" : ""}
+                  style={{
+                    animationDelay: `${i * 60}ms`,
+                    animationFillMode: "both",
+                  }}
+                >
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.825rem" }}>
                     <span style={{ fontWeight: 600 }}>
                       <span className="font-mono" style={{ marginRight: "0.35rem", color: "var(--ink-soft)", fontSize: "0.75rem" }}>
@@ -1699,8 +1743,8 @@ export default function AdminDashboardPage() {
                           borderRadius: "9999px",
                           backgroundColor: "var(--teal)",
                           width: `${p.pct}%`,
-                          animationDelay: `${i * 100}ms`,
-                          transition: "width 0.5s ease",
+                          animationDelay: `${i * 90}ms`,
+                          animationFillMode: "both",
                         }}
                       />
                     </div>

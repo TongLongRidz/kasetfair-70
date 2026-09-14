@@ -11,6 +11,8 @@ interface QueueItem {
   order_id: string;
   method: "walkin" | "online" | "merchant";
   status: "preparing" | "ready" | "completed";
+  raw_created_at: string;
+  raw_updated_at?: string;
   ordered_at: string;
   called_at?: string;
 }
@@ -23,6 +25,7 @@ const MOCK_ONLINE_QUEUES: QueueItem[] = [
     order_id: "ORD-8943",
     method: "online",
     status: "ready",
+    raw_created_at: new Date().toISOString(),
     ordered_at: "11:24",
     called_at: "11:30",
   },
@@ -32,6 +35,7 @@ const MOCK_ONLINE_QUEUES: QueueItem[] = [
     order_id: "ORD-8939",
     method: "online",
     status: "ready",
+    raw_created_at: new Date().toISOString(),
     ordered_at: "11:18",
     called_at: "11:26",
   },
@@ -41,6 +45,7 @@ const MOCK_ONLINE_QUEUES: QueueItem[] = [
     order_id: "ORD-8935",
     method: "online",
     status: "ready",
+    raw_created_at: new Date().toISOString(),
     ordered_at: "11:15",
     called_at: "11:22",
   },
@@ -50,6 +55,7 @@ const MOCK_ONLINE_QUEUES: QueueItem[] = [
     order_id: "ORD-8946",
     method: "online",
     status: "preparing",
+    raw_created_at: new Date().toISOString(),
     ordered_at: "11:32",
   },
   {
@@ -58,6 +64,7 @@ const MOCK_ONLINE_QUEUES: QueueItem[] = [
     order_id: "ORD-8949",
     method: "online",
     status: "preparing",
+    raw_created_at: new Date().toISOString(),
     ordered_at: "11:35",
   },
   {
@@ -66,6 +73,7 @@ const MOCK_ONLINE_QUEUES: QueueItem[] = [
     order_id: "ORD-8952",
     method: "online",
     status: "preparing",
+    raw_created_at: new Date().toISOString(),
     ordered_at: "11:38",
   },
   {
@@ -74,12 +82,44 @@ const MOCK_ONLINE_QUEUES: QueueItem[] = [
     order_id: "ORD-8955",
     method: "online",
     status: "preparing",
+    raw_created_at: new Date().toISOString(),
     ordered_at: "11:40",
   },
 ];
 
 export default function QueuePage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [queues, setQueues] = useState<QueueItem[]>([]);
+
+  const fetchQueues = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const res = await fetch(`${apiUrl}/api/v1/orders?status=new_order,preparing,ready&page_size=200`);
+      const json = await res.json();
+      if (res.ok && json.data) {
+        const mapped: QueueItem[] = json.data.map((o: any) => ({
+          id: o.id,
+          queue_number: o.queue_no,
+          order_id: o.queue_no,
+          method: o.method === "online" ? "online" : "walkin",
+          status: o.order_status === "new_order" ? "preparing" : o.order_status,
+          raw_created_at: o.created_at,
+          raw_updated_at: o.updated_at,
+          ordered_at: new Date(o.created_at).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }),
+          called_at: o.updated_at ? new Date(o.updated_at).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) : undefined,
+        }));
+        setQueues(mapped);
+      }
+    } catch (err) {
+      console.error("Failed to fetch queue list", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchQueues();
+    const interval = setInterval(fetchQueues, 4000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Sync fullscreen change events (e.g. user presses Esc)
   useEffect(() => {
@@ -105,13 +145,25 @@ export default function QueuePage() {
     }
   };
 
-  // Ready queues (คิวที่เรียก / พร้อมรับ - ออนไลน์)
-  const readyQueues = MOCK_ONLINE_QUEUES.filter((q) => q.status === "ready");
-  const latestCalledQueue = readyQueues[0] || null; // คิวล่าสุดที่เรียกตัวใหญ่สุด
+  // Ready queues (คิวที่พร้อมเสิร์ฟ: เรียงคิวที่พร้อมเสิร์ฟก่อนขึ้นก่อน)
+  const readyQueues = queues
+    .filter((q) => q.status === "ready")
+    .sort((a, b) => {
+      const timeA = new Date(a.raw_updated_at || a.raw_created_at).getTime() || a.id;
+      const timeB = new Date(b.raw_updated_at || b.raw_created_at).getTime() || b.id;
+      return timeA - timeB; // คิวที่พร้อมก่อนขึ้นก่อน (FIFO)
+    });
+  const latestCalledQueue = readyQueues[0] || null;
   const otherReadyQueues = readyQueues.slice(1);
 
-  // Preparing queues (คิวที่กำลังทำ - ออนไลน์)
-  const preparingQueues = MOCK_ONLINE_QUEUES.filter((q) => q.status === "preparing");
+  // Preparing queues (คิวที่กำลังทำ: เรียงคิวเก่าสุดขึ้นก่อน)
+  const preparingQueues = queues
+    .filter((q) => q.status === "preparing")
+    .sort((a, b) => {
+      const timeA = new Date(a.raw_created_at).getTime() || a.id;
+      const timeB = new Date(b.raw_created_at).getTime() || b.id;
+      return timeA - timeB; // คิวเก่าสุดขึ้นก่อน (FIFO)
+    });
 
   return (
     <div
@@ -121,10 +173,8 @@ export default function QueuePage() {
         color: "var(--ink)",
         fontFamily: "'Kanit', sans-serif",
         position: "relative",
-        display: isFullscreen ? "flex" : "block",
+        display: "flex",
         flexDirection: "column",
-        justifyContent: isFullscreen ? "center" : "initial",
-        alignItems: isFullscreen ? "center" : "initial",
       }}
     >
       {/* Hide Navbar completely when in Fullscreen Mode */}
@@ -182,10 +232,11 @@ export default function QueuePage() {
 
       <main
         style={{
+          flex: 1,
           width: "100%",
           maxWidth: isFullscreen ? "1080px" : "680px",
           margin: "0 auto",
-          padding: isFullscreen ? "1.5rem 2rem" : "1.5rem 1rem 3rem 1rem",
+          padding: isFullscreen ? "1.5rem 2rem 3rem" : "1.5rem 1rem 3rem 1rem",
           transition: "max-width 0.3s ease, padding 0.3s ease",
           boxSizing: "border-box",
         }}

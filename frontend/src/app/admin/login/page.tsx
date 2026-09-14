@@ -349,7 +349,7 @@ export default function AdminLoginPage() {
           color: "var(--ink-soft)",
         }}
       >
-        <span className="font-mono">TAOTHONG ADMIN</span>
+        <span className="font-mono">THUATHONG ADMIN</span>
       </footer>
 
       {/* Spinner animation definition */}

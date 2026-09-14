@@ -34,20 +34,19 @@ interface MenuItem {
 }
 
 const managementSubItems: MenuItem[] = [
-  { label: "แดชบอร์ดสรุปยอดขาย", path: "/admin/management/dashboard", icon: LayoutDashboard },
+  { label: "แดชบอร์ด", path: "/admin/management/dashboard", icon: LayoutDashboard },
   { label: "บันทึกรายรับ-รายจ่าย", path: "/admin/management/expense", icon: Wallet },
   { label: "ตรวจสอบการชำระเงิน", path: "/admin/management/slip-check", icon: Receipt },
   { label: "จัดการเมนูเครื่องดื่ม", path: "/admin/management/menu", icon: Coffee },
   { label: "จัดการท็อปปิ้ง", path: "/admin/management/toppings", icon: Candy },
-  { label: "จัดการโปรโมชั่น", path: "/admin/management/promotion", icon: Tag },
-  { label: "สมาชิกและแต้ม", path: "/admin/management/customer", icon: Users },
   { label: "จัดการแบนเนอร์", path: "/admin/management/banner", icon: ImageIcon },
   { label: "จัดการบัญชีแอดมิน", path: "/admin/management/administrator", icon: UserCog },
 ];
 
 const posSubItems: MenuItem[] = [
-  { label: "หน้าร้าน (POS Walk-in)", path: "/admin/pos/front-desk", icon: ShoppingBag },
-  { label: "หลังร้าน (Kitchen Queue)", path: "/admin/pos/kitchen", icon: ChefHat },
+  { label: "หน้าร้าน", path: "/admin/pos/front-desk", icon: ShoppingBag },
+  { label: "ครัว", path: "/admin/pos/kitchen", icon: ChefHat },
+  { label: "คิว", path: "/admin/pos/queue", icon: MonitorCheck },
 ];
 
 // Module-level persistent state across client-side page transitions
@@ -169,7 +168,7 @@ export default function AdminSidebar() {
       cachedCollapsed = next;
       try {
         localStorage.setItem("admin_sidebar_collapsed", String(next));
-      } catch {}
+      } catch { }
       return next;
     });
   };
@@ -180,7 +179,7 @@ export default function AdminSidebar() {
       cachedManagementOpen = next;
       try {
         localStorage.setItem("admin_sidebar_mgmt_open", String(next));
-      } catch {}
+      } catch { }
       return next;
     });
   };
@@ -191,7 +190,7 @@ export default function AdminSidebar() {
       cachedPosOpen = next;
       try {
         localStorage.setItem("admin_sidebar_pos_open", String(next));
-      } catch {}
+      } catch { }
       return next;
     });
   };
@@ -279,7 +278,7 @@ export default function AdminSidebar() {
                       color: "var(--ink-soft)",
                     }}
                   >
-                    Taothong Soy Milk
+                    Thuathong Soy Milk
                   </span>
                 </span>
               </div>
@@ -397,7 +396,7 @@ export default function AdminSidebar() {
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
                       <FolderCog size={18} />
-                      <span style={{ fontFamily: "'Kanit', sans-serif" }}>การจัดการ (Management)</span>
+                      <span style={{ fontFamily: "'Kanit', sans-serif" }}>การจัดการ</span>
                     </div>
                     {isManagementOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                   </button>
@@ -471,7 +470,7 @@ export default function AdminSidebar() {
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
                       <MonitorCheck size={18} />
-                      <span style={{ fontFamily: "'Kanit', sans-serif" }}>ระบบขาย (POS & Kitchen)</span>
+                      <span style={{ fontFamily: "'Kanit', sans-serif" }}>POS</span>
                     </div>
                     {isPosOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                   </button>
@@ -627,7 +626,7 @@ export default function AdminSidebar() {
                   color: "var(--ink-soft)",
                 }}
               >
-                Taothong Soy Milk
+                Thuathong Soy Milk
               </span>
             </span>
           </Link>
@@ -685,7 +684,7 @@ export default function AdminSidebar() {
                   }}
                 >
                   <FolderCog size={14} />
-                  การจัดการ (Management)
+                  การจัดการ
                 </p>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.25rem" }}>
                   {managementSubItems.map((sub) => {
@@ -734,7 +733,7 @@ export default function AdminSidebar() {
                   }}
                 >
                   <MonitorCheck size={14} />
-                  ระบบขาย (POS & Kitchen)
+                  ระบบขาย
                 </p>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.25rem" }}>
                   {posSubItems.map((sub) => {

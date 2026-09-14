@@ -114,7 +114,7 @@ export default function Navbar() {
                 color: "var(--ink-soft)",
               }}
             >
-              Taothong Soy Milk
+              Thuathong Soy Milk
             </span>
           </span>
         </Link>
@@ -271,30 +271,6 @@ export default function Navbar() {
                   <span>{lang === "th" ? "ท็อปปิ้ง" : "Toppings"}</span>
                 </a>
 
-                <Link
-                  href="/promotion"
-                  onClick={() => setIsOpen(false)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    padding: "8px 10px",
-                    borderRadius: "8px",
-                    color: "var(--ink)",
-                    textDecoration: "none",
-                    fontSize: "0.8rem",
-                    fontWeight: 600,
-                    transition: "background-color 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.04)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                  }}
-                >
-                  <span>{lang === "th" ? "โปรโมชั่น" : "Promotions"}</span>
-                </Link>
 
                 {/* Divider */}
                 <div style={{ height: "1px", backgroundColor: "rgba(50, 55, 65, 0.08)", margin: "4px 2px" }} />
