@@ -1,6 +1,6 @@
 # Kaset Fair - Next.js + Golang + PostgreSQL Architecture
 
-ระบบสั่งเครื่องดื่ม Fullstack (Storefront + Admin POS & Queue System) ที่ใช้ **Next.js (Frontend)**, **Golang (Backend API)** และ **PostgreSQL 16 (Single DB with JSONB)** บน **Custom Ports (ขยับพอร์ต ไม่ใช้ default)**
+ระบบสั่งเครื่องดื่ม Fullstack (Storefront + Admin POS & Kitchen & Queue System) ที่ใช้ **Next.js 14 (Frontend)**, **Golang (Backend API)** และ **PostgreSQL 16 (Relational DB)** บน **Custom Ports (ขยับพอร์ต ไม่ใช้ default)**
 
 ---
 
@@ -14,6 +14,34 @@
 
 ---
 
+## 🧭 แผนผังหน้าและฟีเจอร์ระบบ (System Routes & Features)
+
+### 👤 ฝั่งลูกค้า (Customer / Storefront)
+- **`/` (Storefront / Menu)**: หน้าหลักเลือกลิสต์เมนูเครื่องดื่ม, ปรับระดับความหวาน, เลือกท็อปปิ้ง และใส่ตะกร้าสินค้า
+- **`/order` (Cart & Checkout)**: หน้ารถเข็น ตรวจสอบรายการ สรุปยอดเงิน และเลือกช่องทางชำระเงิน
+- **`/order/[uuid]` (Receipt & Live Tracking)**: ใบเสร็จรับเงินแอนิเมชันเครื่องพิมพ์ความร้อน (Thermal POS Printer), QR Code ตรวจสอบสถานะ, บันทึกใบเสร็จเป็นรูปภาพ PNG และ Auto-poll อัปเดตสถานะคิว Real-time
+- **`/payment/[uuid]` (Payment & Slip Upload)**: หน้าแสดง QR Code พร้อมเพย์ และอัปโหลดสลิปโอนเงิน
+- **`/queue` (Live Queue Board)**: หน้าจอแสดงผลสถานะคิวรวมสำหรับลูกค้า (Fullscreen Mode, แยกคิวที่กำลังทำ Preparing และคิวที่เรียกรับ Ready แบบ FIFO)
+- **`/about-us`**: หน้าเกี่ยวกับร้านและช่องทางติดต่อ
+
+### 🛠️ ฝั่งแอดมินและพนักงาน (Admin Portal - `/admin`)
+- **`/admin/login`**: หน้าล็อกอินเข้าระบบผู้ดูแล (JWT Token)
+- **Management**:
+  - **`/admin/management/administrator`**: จัดการแอดมิน (เพิ่ม/แก้ไข/ลบ, กำหนด Superadmin, เปิด/ปิดสถานะ)
+  - **`/admin/management/menu`**: จัดการเมนู (เพิ่ม/ลบ/แก้ไข, ครอปรูป 1:1, สลับลำดับ Drag & Drop, เซ็ตสูตรคอมโบ `product_combo_recipe`, ร้อน/เย็น, แนะนำ/ขายหมด)
+  - **`/admin/management/toppings`**: จัดการท็อปปิ้ง (เพิ่ม/ลบ/แก้ไข, ครอปรูป 1:1, สลับลำดับ, ร้อน/เย็น, ขายหมด)
+  - **`/admin/management/slip-check`**: ตรวจสอบและอนุมัติสลิปโอนเงิน พร้อมสวิตช์ตั้งค่า Slip Policy (`slip_upload_mode`: ต้องอัปโหลดทันที vs ให้อัปโหลดทีหลังได้)
+  - **`/admin/management/dashboard`**: แดชบอร์ดสรุปยอดขาย รายรับ-รายจ่าย สถิติ (กำลังพัฒนา)
+  - **`/admin/management/expense`**: บันทึกรายจ่ายและต้นทุนประจำวัน (กำลังพัฒนา)
+  - **`/admin/management/banner`**: จัดการแบนเนอร์ประชาสัมพันธ์ (กำลังพัฒนา)
+- **POS & Kitchen Bar**:
+  - **`/admin/pos/front-desk`**: หน้าจอแคชเชียร์ขายหน้าร้าน (Walk-in POS) เลือกเมนู/ท็อปปิ้ง/ความหวานลงตะกร้า
+  - **`/admin/pos/payment`**: หน้าจอชำระเงินหน้าร้าน (คำนวณเงินสด/เงินทอน, QR พร้อมเพย์, บัตรคิว, ผูกเงื่อนไข Slip Policy)
+  - **`/admin/pos/kitchen`**: หน้าจอบาร์น้ำ/ห้องครัว (Kitchen Display System - KDS) แสดงการ์ดออเดอร์ตามลำดับ FIFO, ป้าย Combo Recipe & Toppings, สรุปเวลาออเดอร์ล่าสุด
+  - **`/admin/pos/queue`**: หน้าจอจัดการคิว & ส่งมอบเครื่องดื่ม (สแกน QR Code จากใบเสร็จลูกค้าผ่านกล้องหรือเครื่องสแกนเนอร์ USB, กรอกเลขคิวค้นหา, ตรวจสอบสถานะก่อนส่งมอบ, ปุ่มกดเรียกคิว/ยืนยันส่งมอบ)
+
+---
+
 ## 📁 โครงสร้างโปรเจกต์ (Project Structure)
 
 ```
@@ -21,12 +49,15 @@
 ├── backend/
 │   ├── cmd/
 │   │   └── api/
-│   │       └── main.go           # Go API Entrypoint & CORS setup
+│   │       └── main.go           # Go API Entrypoint, Routing & CORS setup
 │   ├── internal/
 │   │   ├── config/config.go      # .env loader & config struct
 │   │   ├── database/
 │   │   │   └── postgres.go       # PostgreSQL GORM connection & Auto Migration
-│   │   └── handler/health.go     # Health check & system stats
+│   │   ├── handler/              # API Handlers (admin, product, topping, order, setting, etc.)
+│   │   ├── middleware/           # JWT Auth & Security Middlewares
+│   │   ├── model/                # GORM Database Models
+│   │   └── repository/           # Database Queries & Business Logic
 │   ├── .env.example
 │   ├── .env
 │   ├── Dockerfile                # Multi-stage Golang Alpine build
@@ -34,17 +65,21 @@
 │   └── go.sum
 ├── frontend/
 │   ├── src/
-│   │   └── app/
-│   │       ├── layout.tsx
-│   │       ├── page.tsx          # Real-time dashboard status
-│   │       └── globals.css       # Dark glassmorphic modern styling
+│   │   ├── app/
+│   │   │   ├── (storefront)/     # Customer routes: /, /order, /order/[uuid], /payment/[uuid], /queue, /about-us
+│   │   │   └── admin/            # Admin routes: /admin/login, /admin/management/*, /admin/pos/*
+│   │   ├── components/           # UI Components (Navbar, AdminSidebar, Modals, Forms, Receipt, etc.)
+│   │   ├── lib/                  # Utilities, API client, Hooks
+│   │   ├── layout.tsx
+│   │   └── globals.css           # Modern styling & Glassmorphic UI
 │   ├── .env.example
 │   ├── .env.local
 │   ├── Dockerfile                # Multi-stage Next.js production build
 │   ├── package.json              # Scripts bind to port 3050
 │   └── tsconfig.json
 ├── docker-compose.yml            # PostgreSQL + Go Backend + Next.js orchestration
-├── note.md                       # Requirements & Database Schema Specification
+├── Makefile                      # One-click developer command runner
+├── note.md                       # Full Requirements, Flow & Database Schema Specification
 └── README.md
 ```
 
