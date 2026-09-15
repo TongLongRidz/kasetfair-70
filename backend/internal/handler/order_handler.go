@@ -244,6 +244,7 @@ func (h *AppHandler) CreateOrder(c *gin.Context) {
 		EstimatedPickupTime: req.EstimatedPickupTime,
 		TotalAmount:         req.TotalAmount,
 		PaymentMethod:       req.PaymentMethod,
+		ReceivedAmount:      req.ReceivedAmount,
 		SlipURL:             req.SlipURL,
 		OrderStatus:         "new_order",
 		Note:                req.Note,
@@ -400,22 +401,52 @@ func (h *AppHandler) VerifyOrderSlip(c *gin.Context) {
 	}
 
 	now := time.Now()
-	if req.IsVerified {
+	// Determine status: from req.Status or req.IsVerified
+	status := "pending"
+	if req.Status != nil && *req.Status != "" {
+		switch *req.Status {
+		case "verified", "fraud", "pending":
+			status = *req.Status
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid verification status. Must be 'verified', 'pending', or 'fraud'"})
+			return
+		}
+	} else if req.IsVerified != nil {
+		if *req.IsVerified {
+			status = "verified"
+		} else {
+			status = "pending"
+		}
+	}
+
+	order.SlipVerificationStatus = status
+
+	if status == "verified" || status == "fraud" {
 		order.SlipVerifiedBy = adminID
 		order.SlipVerifiedAt = &now
 	} else {
+		// pending: reset verifier
 		order.SlipVerifiedBy = nil
 		order.SlipVerifiedAt = nil
 	}
 
+	if req.CheckNote != nil {
+		order.CheckNote = req.CheckNote
+	}
 	if req.Note != nil {
 		order.Note = req.Note
+		if req.CheckNote == nil {
+			order.CheckNote = req.Note
+		}
 	}
 
 	if err := h.DB.DB.Save(&order).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update slip verification", "details": err.Error()})
 		return
 	}
+
+	// Reload with SlipAdmin
+	h.DB.DB.Preload("SlipAdmin").First(&order, id)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -462,6 +493,9 @@ func (h *AppHandler) UpdateOrder(c *gin.Context) {
 	}
 	if req.PaymentMethod != nil {
 		order.PaymentMethod = *req.PaymentMethod
+	}
+	if req.ReceivedAmount != nil {
+		order.ReceivedAmount = req.ReceivedAmount
 	}
 	if req.SlipURL != nil {
 		order.SlipURL = req.SlipURL

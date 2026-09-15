@@ -44,13 +44,16 @@ func ConnectPostgres(dsn string) (*PostgresDB, error) {
 
 	log.Println("Successfully connected to PostgreSQL database")
 
-	// Drop ref_no / order_no column if exists from previous schema
+	// Drop ref_no / order_no / change column if exists from previous schema
 	db.Exec(`DO $$ BEGIN
 		IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'order' AND column_name = 'ref_no') THEN
 			ALTER TABLE "order" DROP COLUMN IF EXISTS ref_no CASCADE;
 		END IF;
 		IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'order' AND column_name = 'order_no') THEN
 			ALTER TABLE "order" DROP COLUMN IF EXISTS order_no CASCADE;
+		END IF;
+		IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'order' AND column_name = 'change') THEN
+			ALTER TABLE "order" DROP COLUMN IF EXISTS change CASCADE;
 		END IF;
 	END $$;`)
 
@@ -153,7 +156,13 @@ func seedSettings(db *gorm.DB) {
 		{
 			Key:         "slip_upload_mode",
 			Value:       "immediate",
-			Description: "เงื่อนไขการแนบสลิป: immediate (ต้องอัพสลิปเลย) หรือ later (อัพสลิปทีหลังได้)",
+			Description: "เงื่อนไขการแนบสลิป PromptPay: immediate (ต้องอัพสลิปเลย) หรือ later (อัพสลิปทีหลังได้)",
+			UpdatedAt:   time.Now(),
+		},
+		{
+			Key:         "cash_upload_mode",
+			Value:       "later",
+			Description: "เงื่อนไขการถ่ายรูปเงินสด: immediate (ต้องถ่ายรูป/อัพรูป) หรือ later (ไม่ต้องถ่ายรูป)",
 			UpdatedAt:   time.Now(),
 		},
 	}

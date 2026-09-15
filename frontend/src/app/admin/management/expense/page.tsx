@@ -371,79 +371,100 @@ export default function AdminExpensePage() {
           {/* ============================================================== */}
           {activeTab === "records" && (
             <div className="animate-fade-in" style={{ marginTop: "1.25rem" }}>
-              {/* Summary Stats Cards */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
+              {/* Summary Stats Cards (อ้างอิงขนาดและ responsive ตามหน้า dashboard) */}
+              <div className="admin-kpi-grid" style={{ marginBottom: "1.25rem" }}>
                 {/* 1. Income Card */}
                 <div
+                  className="admin-kpi-card animate-rise"
                   style={{
                     backgroundColor: "var(--card)",
-                    borderRadius: "1.25rem",
-                    padding: "1.25rem",
-                    border: "1px solid rgba(50, 55, 65, 0.08)",
-                    boxShadow: "0 4px 16px -2px rgba(0,0,0,0.03)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "1rem",
+                    padding: "1.25rem 1.35rem",
+                    border: "1px solid rgba(50, 55, 65, 0.09)",
+                    boxShadow: "0 2px 12px -2px rgba(0,0,0,0.03)",
                   }}
                 >
-                  <div style={{ width: "48px", height: "48px", borderRadius: "0.85rem", backgroundColor: "rgba(34, 197, 94, 0.12)", color: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <TrendingUp size={24} />
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", fontWeight: 500, margin: 0 }}>
+                      รายรับรวม (Income)
+                    </p>
+                    <div style={{ width: "32px", height: "32px", borderRadius: "0.65rem", backgroundColor: "rgba(34, 197, 94, 0.12)", color: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <TrendingUp size={18} />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: "0.5rem", marginBottom: "0.35rem" }}>
+                    <p className="font-display" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#22c55e", margin: 0, lineHeight: 1.15 }}>
+                      +฿{totalIncome.toLocaleString()}
+                    </p>
                   </div>
                   <div>
-                    <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>รายรับรวม (Income)</span>
-                    <p className="font-display" style={{ fontSize: "1.5rem", fontWeight: 800, color: "#22c55e", marginTop: "2px" }}>
-                      +฿{totalIncome.toLocaleString()}
+                    <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 400, lineHeight: 1.3, margin: 0 }}>
+                      บันทึก {transactions.filter((t) => t.type === "income").length} รายการ
                     </p>
                   </div>
                 </div>
 
                 {/* 2. Expense Card */}
                 <div
+                  className="admin-kpi-card animate-rise"
                   style={{
                     backgroundColor: "var(--card)",
-                    borderRadius: "1.25rem",
-                    padding: "1.25rem",
-                    border: "1px solid rgba(50, 55, 65, 0.08)",
-                    boxShadow: "0 4px 16px -2px rgba(0,0,0,0.03)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "1rem",
+                    padding: "1.25rem 1.35rem",
+                    border: "1px solid rgba(50, 55, 65, 0.09)",
+                    boxShadow: "0 2px 12px -2px rgba(0,0,0,0.03)",
                   }}
                 >
-                  <div style={{ width: "48px", height: "48px", borderRadius: "0.85rem", backgroundColor: "rgba(220, 38, 38, 0.12)", color: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <TrendingDown size={24} />
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", fontWeight: 500, margin: 0 }}>
+                      รายจ่ายรวม (Expenses)
+                    </p>
+                    <div style={{ width: "32px", height: "32px", borderRadius: "0.65rem", backgroundColor: "rgba(220, 38, 38, 0.12)", color: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <TrendingDown size={18} />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: "0.5rem", marginBottom: "0.35rem" }}>
+                    <p className="font-display" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#dc2626", margin: 0, lineHeight: 1.15 }}>
+                      -฿{totalExpense.toLocaleString()}
+                    </p>
                   </div>
                   <div>
-                    <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>รายจ่ายรวม (Expenses)</span>
-                    <p className="font-display" style={{ fontSize: "1.5rem", fontWeight: 800, color: "#dc2626", marginTop: "2px" }}>
-                      -฿{totalExpense.toLocaleString()}
+                    <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 400, lineHeight: 1.3, margin: 0 }}>
+                      บันทึก {transactions.filter((t) => t.type === "expense").length} รายการ
                     </p>
                   </div>
                 </div>
 
                 {/* 3. Net Profit Card */}
                 <div
+                  className="admin-kpi-card animate-rise"
                   style={{
                     backgroundColor: "var(--card)",
-                    borderRadius: "1.25rem",
-                    padding: "1.25rem",
-                    border: "1px solid rgba(50, 55, 65, 0.08)",
-                    boxShadow: "0 4px 16px -2px rgba(0,0,0,0.03)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "1rem",
+                    padding: "1.25rem 1.35rem",
+                    border: "1px solid rgba(50, 55, 65, 0.09)",
+                    boxShadow: "0 2px 12px -2px rgba(0,0,0,0.03)",
                   }}
                 >
-                  <div style={{ width: "48px", height: "48px", borderRadius: "0.85rem", backgroundColor: "rgba(75, 155, 140, 0.12)", color: "var(--teal)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <DollarSign size={24} />
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", fontWeight: 500, margin: 0 }}>
+                      ยอดคงเหลือ / กำไรสุทธิ
+                    </p>
+                    <div style={{ width: "32px", height: "32px", borderRadius: "0.65rem", backgroundColor: "rgba(75, 155, 140, 0.12)", color: "var(--teal)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <DollarSign size={18} />
+                    </div>
                   </div>
-                  <div>
-                    <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>ยอดคงเหลือ / กำไรสุทธิ</span>
-                    <p className="font-display" style={{ fontSize: "1.5rem", fontWeight: 900, color: netBalance >= 0 ? "var(--teal)" : "#dc2626", marginTop: "2px" }}>
+                  <div style={{ marginTop: "0.5rem", marginBottom: "0.35rem" }}>
+                    <p className="font-display" style={{ fontSize: "1.85rem", fontWeight: 900, color: netBalance >= 0 ? "var(--teal)" : "#dc2626", margin: 0, lineHeight: 1.15 }}>
                       ฿{netBalance.toLocaleString()}
                     </p>
                   </div>
+                  <div>
+                    <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 400, lineHeight: 1.3, margin: 0 }}>
+                      คำนวณสุทธิจากรายรับและรายจ่าย
+                    </p>
+                  </div>
                 </div>
+
+                {/* Ghost card for row balancing on mobile (2 cols) and wide screens (6 cols) */}
+                <div className="admin-kpi-card admin-kpi-card-ghost" aria-hidden="true" />
               </div>
 
               {/* Control & Search Bar */}
@@ -781,7 +802,6 @@ export default function AdminExpensePage() {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem", marginBottom: "0.4rem" }}>
-                  <Sparkles size={18} color="var(--teal)" />
                   <h3 style={{ fontSize: "1.1rem", fontWeight: 700 }}>ตัวอย่าง QR Code (Live Preview)</h3>
                 </div>
                 <p style={{ fontSize: "0.775rem", color: "var(--ink-soft)", marginBottom: "1rem" }}>

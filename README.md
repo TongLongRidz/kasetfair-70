@@ -30,7 +30,7 @@
   - **`/admin/management/administrator`**: จัดการแอดมิน (เพิ่ม/แก้ไข/ลบ, กำหนด Superadmin, เปิด/ปิดสถานะ)
   - **`/admin/management/menu`**: จัดการเมนู (เพิ่ม/ลบ/แก้ไข, ครอปรูป 1:1, สลับลำดับ Drag & Drop, เซ็ตสูตรคอมโบ `product_combo_recipe`, ร้อน/เย็น, แนะนำ/ขายหมด)
   - **`/admin/management/toppings`**: จัดการท็อปปิ้ง (เพิ่ม/ลบ/แก้ไข, ครอปรูป 1:1, สลับลำดับ, ร้อน/เย็น, ขายหมด)
-  - **`/admin/management/slip-check`**: ตรวจสอบและอนุมัติสลิปโอนเงิน พร้อมสวิตช์ตั้งค่า Slip Policy (`slip_upload_mode`: ต้องอัปโหลดทันที vs ให้อัปโหลดทีหลังได้)
+  - **`/admin/management/slip-check`**: ตรวจสอบและอนุมัติสลิปโอนเงิน (Modal เลือกสถานะผ่าน Dropdown + ระบุเหตุผลปฏิเสธสลิป) พร้อมสวิตช์เปิด/ปิดตั้งค่าเงื่อนไขรูปภาพการชำระเงิน (`slip_upload_mode` สำหรับ PromptPay QR และ `cash_upload_mode` สำหรับ เงินสด)
   - **`/admin/management/dashboard`**: แดชบอร์ดสรุปยอดขาย รายรับ-รายจ่าย สถิติ (กำลังพัฒนา)
   - **`/admin/management/expense`**: บันทึกรายจ่ายและต้นทุนประจำวัน (กำลังพัฒนา)
   - **`/admin/management/banner`**: จัดการแบนเนอร์ประชาสัมพันธ์ (กำลังพัฒนา)

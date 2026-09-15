@@ -78,12 +78,10 @@ func main() {
 		v1.GET("/settings", h.GetSettings)
 		v1.GET("/settings/:key", h.GetSettingByKey)
 
-		// Public Orders (Create Walk-in/Online order, Track Order / Queue by ID or QueueNo)
-		v1.GET("/orders/stats/kitchen", h.GetKitchenStats)
+		// Public Orders & Queue Tracking (Display screens, Customer order/receipt/queue tracking)
 		v1.GET("/orders", h.GetOrders)
 		v1.GET("/orders/:id", h.GetOrderByID)
 		v1.POST("/orders", h.CreateOrder)
-		v1.PATCH("/orders/:id/status", h.UpdateOrderStatus)
 
 		// Protected Admin Routes (Requires valid JWT and is_activate == true)
 		if postgresDB != nil && postgresDB.DB != nil {
@@ -109,7 +107,9 @@ func main() {
 				adminGroup.PUT("/toppings/:id", h.UpdateTopping)
 				adminGroup.DELETE("/toppings/:id", h.DeleteTopping)
 
-				// Admin Order Management (Update, Verify Slip, Delete)
+				// POS & Admin Order Operations (Requires Admin Login)
+				adminGroup.PATCH("/orders/:id/status", h.UpdateOrderStatus)
+				adminGroup.GET("/orders/stats/kitchen", h.GetKitchenStats)
 				adminGroup.PUT("/orders/:id", h.UpdateOrder)
 				adminGroup.POST("/orders/:id/verify-slip", h.VerifyOrderSlip)
 				adminGroup.DELETE("/orders/:id", h.DeleteOrder)

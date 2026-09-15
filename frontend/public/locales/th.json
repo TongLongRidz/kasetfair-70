@@ -1,0 +1,40 @@
+{
+  "order": {
+    "receipt": {
+      "brand_sub": "Thuathong SoyMilk",
+      "location": "เกษตรแฟร์ มหาวิทยาลัยเกษตรศาสตร์ บางเขน",
+      "date": "วันที่",
+      "payment_method": "วิธีชำระเงิน",
+      "payment_promptpay": "พร้อมเพย์ QR",
+      "payment_cash": "เงินสด",
+      "channel": "ช่องทาง",
+      "channel_online": "สั่งออนไลน์",
+      "channel_walkin": "Walk-in หน้าร้าน",
+      "queue_number": "หมายเลขคิว",
+      "scan_queue": "สแกนติดตามคิว",
+      "order_cancelled": "ยกเลิกคำสั่งซื้อ",
+      "order_cancelled_desc": "ออเดอร์นี้ถูกยกเลิกแล้ว",
+      "step_new_order": "รับออเดอร์",
+      "step_preparing": "กำลังทำ",
+      "step_ready": "พร้อมรับ",
+      "step_completed": "เสร็จสิ้น",
+      "order_items": "รายการสั่งซื้อ",
+      "cups": "แก้ว",
+      "item_singular": "แก้ว",
+      "item_plural": "แก้ว",
+      "price_thb": "ราคา (บาท)",
+      "drink": "เครื่องดื่ม",
+      "topping": "ท็อปปิ้ง",
+      "iced": "เย็น",
+      "hot": "ร้อน",
+      "sweet": "หวาน",
+      "cash_received": "รับเงินสดมา",
+      "change": "เงินทอน",
+      "total_amount": "ยอดรวมสุทธิ",
+      "thank_you": "ขอบคุณที่อุดหนุนร้านถั่วทอง 🙏",
+      "save_receipt": "บันทึกรูปภาพ",
+      "switch_language": "เปลี่ยนภาษา",
+      "more_options": "ตัวเลือกเพิ่มเติม"
+    }
+  }
+}

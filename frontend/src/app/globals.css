@@ -682,20 +682,89 @@ html.lock-scroll {
     line-height: 1.25 !important;
   }
 
-  /* Responsive KPI Cards on Mobile */
+  /* Responsive KPI Cards on Mobile (2 columns max) */
   .admin-kpi-grid {
     grid-template-columns: repeat(2, 1fr) !important;
-    gap: 0.75rem !important;
+    gap: 0.65rem !important;
   }
 
   .admin-kpi-card {
-    padding: 1rem 1.15rem !important;
+    padding: 0.9rem 1rem !important;
+    border-radius: 1rem !important;
+    min-height: 124px !important;
+    height: 100% !important;
+  }
+
+  .admin-kpi-card p[style*="fontSize: 1.85rem"],
+  .admin-kpi-card .kpi-value {
+    font-size: 1.45rem !important;
   }
 }
 
+/* Base admin-kpi-grid for tablet / standard desktop: 3 columns */
+.admin-kpi-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.85rem;
+}
+
+/* Wide screens: max 6 columns */
 @media (min-width: 1400px) {
   .admin-kpi-grid {
     grid-template-columns: repeat(6, 1fr) !important;
+  }
+}
+
+/* Standard KPI card style (ยึดตามขนาดและความสูงของหน้า Dashboard) */
+.admin-kpi-card {
+  border-radius: 1.25rem;
+  background-color: var(--card);
+  padding: 1.25rem 1.35rem;
+  border: 1px solid rgba(50, 55, 65, 0.09);
+  box-shadow: 0 2px 12px -2px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  justifyContent: space-between;
+  box-sizing: border-box;
+  min-height: 136px;
+  height: 100%;
+  transition: all 0.15s ease;
+}
+
+/* Invisible / Ghost Placeholder Card */
+.admin-kpi-card-ghost {
+  visibility: hidden;
+  pointer-events: none;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  min-height: 1px;
+}
+
+/* Hide ghost cards when screen is between mobile and wide (i.e. standard 3-column tablet/desktop) */
+@media (min-width: 769px) and (max-width: 1399px) {
+  .admin-kpi-card-ghost {
+    display: none !important;
+  }
+}
+
+/* POS Fullscreen Mobile Mode: โฟกัสเฉพาะ filter bar และรายการ order (ซ่อน KPI grid และ title บนมือถือ) */
+@media (max-width: 768px) {
+  .pos-fullscreen-mobile .admin-kpi-grid {
+    display: none !important;
+  }
+
+  .pos-fullscreen-mobile .pos-header-title {
+    display: none !important;
+  }
+
+  .pos-fullscreen-mobile .pos-header-section {
+    margin-bottom: 0.75rem !important;
+  }
+
+  .pos-fullscreen-mobile {
+    padding: 0.75rem 0.75rem 2rem 0.75rem !important;
   }
 }
 

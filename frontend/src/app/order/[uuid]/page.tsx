@@ -10,8 +10,12 @@ import {
   QrCode as QrIcon,
   Download,
   Image as ImageIcon,
+  Loader2,
+  Languages,
 } from "lucide-react";
 import NotFound from "@/app/not-found";
+import { useTranslation } from "@/hooks/useTranslation";
+import { OrderActionMenu } from "./components/OrderActionMenu";
 
 interface OrderItemTopping {
   id: number;
@@ -47,6 +51,8 @@ interface OrderDetail {
   method: string;
   total_amount: number;
   payment_method: string;
+  received_amount?: number;
+  change?: number;
   order_status: "new_order" | "ready" | "completed" | "cancelled";
   created_at: string;
   estimated_pickup_time?: string;
@@ -57,6 +63,7 @@ interface OrderDetail {
 export default function OrderTrackingPage() {
   const params = useParams();
   const uuid = params?.uuid as string;
+  const { lang, setLang, t } = useTranslation();
 
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,7 +115,7 @@ export default function OrderTrackingPage() {
     // Initial timer
     resetInactivityTimer();
 
-    const events = ["mousemove", "mousedown", "touchstart", "touchmove", "scroll", "keydown"];
+    const events = ["mousedown", "mousemove", "keydown", "scroll", "touchstart"];
     events.forEach((event) => {
       window.addEventListener(event, resetInactivityTimer, { passive: true });
     });
@@ -143,24 +150,70 @@ export default function OrderTrackingPage() {
     if (!receiptRef.current) return;
     try {
       setSavingImage(true);
+
+      if (typeof document !== "undefined" && document.fonts) {
+        await document.fonts.ready;
+      }
+
       const { toPng } = await import("html-to-image");
-      const dataUrl = await toPng(receiptRef.current, {
-        pixelRatio: 2,
-        backgroundColor: "#FFFDF9",
-        cacheBust: true,
-        skipFonts: true,
-        filter: (node) => {
-          if (
-            node instanceof HTMLElement &&
-            (node.id === "save-receipt-image-btn" || node.classList?.contains("no-export"))
-          ) {
-            return false;
-          }
-          return true;
-        },
+      const element = receiptRef.current;
+
+      // Temporarily hide elements that should not be exported so the container measures natural scroll height
+      const noExportElements = element.querySelectorAll<HTMLElement>(".no-export, [data-no-export=\"true\"], #save-receipt-image-btn");
+      const originalDisplays: string[] = [];
+      noExportElements.forEach((el) => {
+        originalDisplays.push(el.style.display);
+        el.style.display = "none";
       });
 
-      const fileName = `receipt-${order?.queue_no || "order"}.png`;
+      // Calculate actual full bounds without the excluded elements
+      const rect = element.getBoundingClientRect();
+      const targetWidth = Math.round(rect.width) || element.offsetWidth || 420;
+      const targetHeight = element.scrollHeight;
+
+      let dataUrl = "";
+      try {
+        dataUrl = await toPng(element, {
+          pixelRatio: 2,
+          backgroundColor: "#FFFDF9",
+          cacheBust: true,
+          width: targetWidth,
+          height: targetHeight,
+          fontEmbedCSS: `@import url('https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500;600;700&family=Kanit:wght@300;400;500;600;700;800;900&family=Mitr:wght@300;400;500;600;700&display=swap');`,
+          style: {
+            fontFamily: "'Kanit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+            animation: "none",
+            transform: "none",
+            boxShadow: "none",
+            width: `${targetWidth}px`,
+            maxWidth: `${targetWidth}px`,
+            height: `${targetHeight}px`,
+            maxHeight: "none",
+            boxSizing: "border-box",
+          },
+          filter: (node) => {
+            if (
+              node instanceof HTMLElement &&
+              (node.id === "save-receipt-image-btn" ||
+                node.classList?.contains("no-export") ||
+                node.getAttribute("data-no-export") === "true")
+            ) {
+              return false;
+            }
+            return true;
+          },
+        });
+      } finally {
+        // Restore elements display for the user view
+        noExportElements.forEach((el, i) => {
+          el.style.display = originalDisplays[i];
+        });
+      }
+
+      const qNo = order?.queue_no || "order";
+      const rawUuid = order?.uuid || uuid || "";
+      const uuidPart = rawUuid ? rawUuid.replace(/-/g, "").slice(0, 8) : "";
+      const fileName = uuidPart ? `${qNo}_${uuidPart}.png` : `${qNo}.png`;
 
       // Try native file sharing for mobile if supported
       try {
@@ -169,8 +222,8 @@ export default function OrderTrackingPage() {
         if (typeof navigator !== "undefined" && navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({
             files: [file],
-            title: `ใบเสร็จคิว ${order?.queue_no || ""}`,
-            text: `ใบเสร็จคำสั่งซื้อ คิว #${order?.queue_no || ""}`,
+            title: `ใบเสร็จคิว ${qNo}`,
+            text: `ใบเสร็จคำสั่งซื้อ คิว #${qNo}`,
           });
           return;
         }
@@ -301,6 +354,16 @@ export default function OrderTrackingPage() {
     if (!isoString) return "";
     try {
       const d = new Date(isoString);
+      if (lang === "en") {
+        return d.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        });
+      }
       const formatted = d.toLocaleDateString("th-TH", {
         year: "numeric",
         month: "short",
@@ -398,43 +461,18 @@ export default function OrderTrackingPage() {
                   backgroundColor: "#FFFDF9",
                   border: "1px solid rgba(50, 55, 65, 0.08)",
                   overflow: "hidden",
+                  boxSizing: "border-box",
+                  fontFamily: "'Kanit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
                 }}
               >
-                {/* Save Image Button (Top Right of Receipt - Circular Light Blue Icon with Inactivity Fade) */}
-                <button
-                  id="save-receipt-image-btn"
-                  className="no-export"
-                  onClick={handleSaveImage}
-                  disabled={savingImage}
-                  title="บันทึกใบเสร็จเป็นรูปภาพ"
-                  aria-label="บันทึกใบเสร็จเป็นรูปภาพ"
-                  style={{
-                    position: "absolute",
-                    top: "1.1rem",
-                    right: "1.1rem",
-                    zIndex: 10,
-                    width: "38px",
-                    height: "38px",
-                    borderRadius: "50%",
-                    backgroundColor: "#E0F2FE",
-                    color: "#0284c7",
-                    border: "1px solid rgba(2, 132, 199, 0.2)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: savingImage ? "not-allowed" : "pointer",
-                    boxShadow: "0 2px 8px rgba(2, 132, 199, 0.12)",
-                    opacity: showSaveBtn || savingImage ? 1 : 0,
-                    pointerEvents: showSaveBtn && !savingImage ? "auto" : savingImage ? "auto" : "none",
-                    transform: showSaveBtn || savingImage ? "scale(1)" : "scale(0.85)",
-                    transition: "opacity 0.45s ease, transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1)",
-                    padding: 0,
-                  }}
-                >
-                  <Download size={18} strokeWidth={2.4} />
-                </button>
+                {/* Kebab Action Menu (Language Switcher & Save Image) */}
+                <OrderActionMenu
+                  onSaveImage={handleSaveImage}
+                  savingImage={savingImage}
+                  showButton={showSaveBtn}
+                />
 
-                <div style={{ padding: "1.5rem" }}>
+                <div style={{ padding: "1.5rem", boxSizing: "border-box", width: "100%" }}>
                   {/* 1. STORE LOGO & BRAND HEADER */}
                   <div
                     style={{
@@ -496,13 +534,13 @@ export default function OrderTrackingPage() {
                             marginTop: "2px",
                           }}
                         >
-                          Thuathong Soy Milk
+                          {t("order.receipt.brand_sub")}
                         </span>
                       </div>
                     </div>
 
-                    <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "0.5rem", textAlign: "center" }}>
-                      เกษตรแฟร์ มหาวิทยาลัยเกษตรศาสตร์ บางเขน
+                    <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "0.5rem", textAlign: "center", whiteSpace: "nowrap" }}>
+                      {t("order.receipt.location")}
                     </p>
                   </div>
 
@@ -511,29 +549,31 @@ export default function OrderTrackingPage() {
                     style={{
                       display: "flex",
                       flexDirection: "column",
-                      gap: "0.4rem",
+                      gap: "0.45rem",
                       width: "100%",
                       marginTop: "1rem",
                       fontSize: "0.8rem",
                       color: "var(--ink-soft)",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <span>วันที่</span>
-                      <span style={{ fontWeight: 600, color: "var(--ink)" }}>{formatDate(order.created_at)}</span>
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <span>วิธีชำระเงิน</span>
-                      <span style={{ fontWeight: 700, color: "var(--ink)" }}>
-                        {order.payment_method === "promptpay" ? "พร้อมเพย์ QR Code" : "เงินสด (Cash)"}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", lineHeight: 1.5 }}>
+                      <span>{t("order.receipt.date")}</span>
+                      <span style={{ fontWeight: 600, color: "var(--ink)", textAlign: "right", whiteSpace: "nowrap" }}>
+                        {formatDate(order.created_at)}
                       </span>
                     </div>
 
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <span>ช่องทาง</span>
-                      <span style={{ fontWeight: 600, color: "var(--ink)" }}>
-                        {order.method === "online" ? "สั่งออนไลน์" : "Walk-in หน้าร้าน"}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", lineHeight: 1.5 }}>
+                      <span>{t("order.receipt.payment_method")}</span>
+                      <span style={{ fontWeight: 700, color: "var(--ink)", textAlign: "right", whiteSpace: "nowrap" }}>
+                        {order.payment_method === "promptpay" ? t("order.receipt.payment_promptpay") : t("order.receipt.payment_cash")}
+                      </span>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", lineHeight: 1.5 }}>
+                      <span>{t("order.receipt.channel")}</span>
+                      <span style={{ fontWeight: 600, color: "var(--ink)", textAlign: "right", whiteSpace: "nowrap" }}>
+                        {order.method === "online" ? t("order.receipt.channel_online") : t("order.receipt.channel_walkin")}
                       </span>
                     </div>
                   </div>
@@ -565,7 +605,7 @@ export default function OrderTrackingPage() {
                       }}
                     >
                       <span style={{ fontSize: "0.82rem", color: "var(--ink-soft)", fontWeight: 600 }}>
-                        หมายเลขคิว
+                        {t("order.receipt.queue_number")}
                       </span>
 
                       <p
@@ -631,11 +671,12 @@ export default function OrderTrackingPage() {
                     </div>
                   </div>
 
-                  {/* 3. ORDER STATUS TRACKER (Horizontal Stepper) */}
+                  {/* 3. ORDER STATUS TRACKER (Horizontal Stepper - Filtered automatically during image export) */}
                   {(() => {
                     if (order.order_status === "cancelled") {
                       return (
                         <div
+                          className="no-export"
                           style={{
                             marginBottom: "1.25rem",
                             padding: "1rem",
@@ -650,8 +691,8 @@ export default function OrderTrackingPage() {
                         >
                           <AlertCircle size={28} color="#dc3545" />
                           <div>
-                            <div style={{ fontWeight: 800, fontSize: "0.95rem" }}>ยกเลิกคำสั่งซื้อ</div>
-                            <div style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>ออเดอร์นี้ถูกยกเลิกแล้ว</div>
+                            <div style={{ fontWeight: 800, fontSize: "0.95rem" }}>{t("order.receipt.order_cancelled")}</div>
+                            <div style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>{t("order.receipt.order_cancelled_desc")}</div>
                           </div>
                         </div>
                       );
@@ -661,22 +702,22 @@ export default function OrderTrackingPage() {
                       {
                         key: "new_order",
                         num: 1,
-                        label: "รับออเดอร์",
+                        label: t("order.receipt.step_new_order"),
                       },
                       {
                         key: "preparing",
                         num: 2,
-                        label: "กำลังทำ",
+                        label: t("order.receipt.step_preparing"),
                       },
                       {
                         key: "ready",
                         num: 3,
-                        label: "พร้อมรับ",
+                        label: t("order.receipt.step_ready"),
                       },
                       {
                         key: "completed",
                         num: 4,
-                        label: "เสร็จสิ้น",
+                        label: t("order.receipt.step_completed"),
                       },
                     ];
 
@@ -701,6 +742,7 @@ export default function OrderTrackingPage() {
 
                     return (
                       <div
+                        className="no-export"
                         style={{
                           marginBottom: "0.85rem",
                           padding: "0.75rem 0.85rem",
@@ -895,16 +937,24 @@ export default function OrderTrackingPage() {
                       }}
                     >
                       <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--ink)" }}>
-                        รายการสั่งซื้อ ({totalCups} แก้ว)
+                        {t("order.receipt.order_items")} ({totalCups}{" "}
+                        {totalCups === 1
+                          ? t("order.receipt.item_singular", "item")
+                          : t("order.receipt.item_plural", "items")})
                       </span>
-                      <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>
-                        ราคา (บาท)
+                      <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)", whiteSpace: "nowrap" }}>
+                        {t("order.receipt.price_thb")}
                       </span>
                     </div>
 
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                       {order.order_items?.map((item, idx) => {
                         const itemTotal = item.unit_price * item.quantity;
+                        const productName =
+                          lang === "en"
+                            ? item.product?.name_en || item.product?.name_th || t("order.receipt.drink")
+                            : item.product?.name_th || item.product?.name_en || t("order.receipt.drink");
+
                         return (
                           <div
                             key={item.id || idx}
@@ -913,19 +963,26 @@ export default function OrderTrackingPage() {
                               justifyContent: "space-between",
                               alignItems: "flex-start",
                               fontSize: "0.85rem",
-                              lineHeight: 1.35,
+                              lineHeight: 1.45,
                             }}
                           >
-                            <div style={{ paddingRight: "0.5rem" }}>
-                              <div style={{ fontWeight: 700, color: "var(--ink)" }}>
-                                {item.quantity}x {item.product?.name_th || "เครื่องดื่ม"}
+                            <div style={{ paddingRight: "0.5rem", flex: 1 }}>
+                              <div style={{ fontWeight: 700, color: "var(--ink)", lineHeight: 1.45 }}>
+                                {item.quantity}x {productName}
                               </div>
-                              <div style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "1px" }}>
-                                {item.temperature === "iced" ? "เย็น" : "ร้อน"} • หวาน {item.sweetness_level}
+                              <div style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "2px", lineHeight: 1.4 }}>
+                                {item.temperature === "iced" ? t("order.receipt.iced") : t("order.receipt.hot")} • {t("order.receipt.sweet")} {item.sweetness_level}
                               </div>
                               {item.order_item_toppings && item.order_item_toppings.length > 0 && (
-                                <div style={{ fontSize: "0.75rem", color: "var(--teal)", fontWeight: 600, marginTop: "2px" }}>
-                                  + {item.order_item_toppings.map((t) => t.topping?.name_th || "ท็อปปิ้ง").join(", ")}
+                                <div style={{ fontSize: "0.75rem", color: "var(--teal)", fontWeight: 600, marginTop: "2px", lineHeight: 1.4 }}>
+                                  +{" "}
+                                  {item.order_item_toppings
+                                    .map((tItem) =>
+                                      lang === "en"
+                                        ? tItem.topping?.name_en || tItem.topping?.name_th || t("order.receipt.topping")
+                                        : tItem.topping?.name_th || tItem.topping?.name_en || t("order.receipt.topping")
+                                    )
+                                    .join(", ")}
                                 </div>
                               )}
                             </div>
@@ -947,6 +1004,44 @@ export default function OrderTrackingPage() {
                       borderTop: "2px dashed rgba(50, 55, 65, 0.15)",
                     }}
                   >
+                    {order.payment_method === "cash" && (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "0.45rem",
+                          marginBottom: "0.5rem",
+                          fontSize: "0.9rem",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
+                        >
+                          <span style={{ fontWeight: 600, color: "var(--ink-soft)" }}>{t("order.receipt.cash_received")}</span>
+                          <span className="font-mono" style={{ fontWeight: 700, color: "var(--ink)" }}>
+                            ฿{(order.received_amount ?? order.total_amount).toLocaleString()}
+                          </span>
+                        </div>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
+                        >
+                          <span style={{ fontWeight: 600, color: "var(--ink-soft)" }}>{t("order.receipt.change")}</span>
+                          <span className="font-mono" style={{ fontWeight: 700, color: "var(--ink)" }}>
+                            ฿{(order.received_amount ? Math.max(0, order.received_amount - order.total_amount) : 0).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
                     <div
                       style={{
                         display: "flex",
@@ -955,7 +1050,7 @@ export default function OrderTrackingPage() {
                       }}
                     >
                       <span style={{ fontSize: "1rem", fontWeight: 800, color: "var(--ink)" }}>
-                        ยอดรวมสุทธิ
+                        {t("order.receipt.total_amount")}
                       </span>
                       <span
                         className="font-mono"
@@ -976,7 +1071,7 @@ export default function OrderTrackingPage() {
                     }}
                   >
                     <p style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--ink)" }}>
-                      ขอบคุณที่อุดหนุนร้านถั่วทอง 🙏
+                      {t("order.receipt.thank_you")}
                     </p>
                     {/* Barcode Generated from UUID */}
                     <div style={{ marginTop: "1rem", display: "flex", justifyContent: "center" }}>

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import AdminSidebar from "@/components/layouts/AdminSidebar";
+import { getStoredToken } from "@/lib/auth";
 import {
   Bell,
   CheckCircle2,
@@ -227,9 +228,13 @@ export default function QueuePickupPage() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const token = getStoredToken();
       await fetch(`${apiUrl}/api/v1/orders/${orderId}/status`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ order_status: nextStatus }),
       });
       fetchOrders();
@@ -542,6 +547,7 @@ export default function QueuePickupPage() {
       {!isFullscreen && <AdminSidebar />}
 
       <main
+        className={isFullscreen ? "pos-fullscreen-mobile" : ""}
         style={{
           flex: 1,
           padding: isFullscreen ? "1.5rem 2rem" : "1.75rem 2.5rem",
@@ -551,6 +557,7 @@ export default function QueuePickupPage() {
       >
         {/* Header Section */}
         <div
+          className="pos-header-section"
           style={{
             display: "flex",
             justifyContent: "space-between",
@@ -559,7 +566,7 @@ export default function QueuePickupPage() {
             gap: "0.75rem",
           }}
         >
-          <div>
+          <div className="pos-header-title">
             <h1 style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--ink)", lineHeight: 1.2, margin: 0 }}>
               คิว
             </h1>
@@ -588,21 +595,21 @@ export default function QueuePickupPage() {
                 padding: "0.55rem 1.05rem",
                 borderRadius: "9999px",
                 border: "none",
-                backgroundColor: "#16a34a",
+                backgroundColor: "var(--teal)",
                 color: "#fff",
                 fontSize: "0.875rem",
                 fontWeight: 700,
                 cursor: "pointer",
-                boxShadow: "0 2px 10px rgba(22, 163, 74, 0.28)",
+                boxShadow: "0 2px 10px rgba(75, 155, 140, 0.28)",
                 transition: "all 0.2s ease",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "scale(1.03)";
-                e.currentTarget.style.backgroundColor = "#15803d";
+                e.currentTarget.style.filter = "brightness(0.92)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = "scale(1)";
-                e.currentTarget.style.backgroundColor = "#16a34a";
+                e.currentTarget.style.filter = "none";
               }}
             >
               <Scan size={17} />
@@ -690,13 +697,11 @@ export default function QueuePickupPage() {
           </div>
         </div>
 
-        {/* 3 KPI Cards Grid (เหมือนหน้าครัว: ออเดอร์ใหม่, พร้อมรับ, เสร็จสิ้น สลับ วันนี้/ทั้งงาน ได้) */}
+        {/* 3 KPI Cards Grid (เหมือนหน้าครัวและหน้า dashboard: สลับ วันนี้/ทั้งงาน ได้) */}
         <div
+          className="admin-kpi-grid"
           style={{
             marginTop: "1.5rem",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "0.85rem",
             marginBottom: "1.5rem",
           }}
         >
@@ -830,7 +835,7 @@ export default function QueuePickupPage() {
                   fontSize: "1.85rem",
                   fontWeight: 800,
                   fontFamily: "'Kanit', sans-serif",
-                  color: "#16a34a",
+                  color: "#000000ff",
                   letterSpacing: "-0.01em",
                   lineHeight: 1.15,
                   margin: 0,
@@ -845,9 +850,12 @@ export default function QueuePickupPage() {
               </p>
             </div>
           </div>
+
+          {/* Ghost card for row balancing on mobile (2 cols) and wide screens (6 cols) */}
+          <div className="admin-kpi-card admin-kpi-card-ghost" aria-hidden="true" />
         </div>
 
-        {/* Filter Bar: เหมือน toppings (Desktop Tabs + Mobile Select, ไม่มีตัวเลขในข้อความ) */}
+        {/* Filter Bar: Desktop Tabs + Mobile Select พร้อมแสดงจำนวน (...) */}
         <div
           style={{
             backgroundColor: "var(--card)",
@@ -862,10 +870,10 @@ export default function QueuePickupPage() {
             {/* Left Side: Filter Tabs (Desktop) */}
             <div className="admin-filter-tabs">
               {[
-                { id: "active", label: "ยังไม่เสร็จสิ้น" },
-                { id: "new_order", label: "ออเดอร์ใหม่" },
-                { id: "ready", label: "พร้อมรับ" },
-                { id: "completed", label: "เสร็จสิ้น" },
+                { id: "active", label: `ยังไม่เสร็จสิ้น (${activeCount})` },
+                { id: "new_order", label: `ออเดอร์ใหม่ (${newOrderCount})` },
+                { id: "ready", label: `พร้อมรับ (${readyCount})` },
+                { id: "completed", label: `เสร็จสิ้น (${completedCount})` },
               ].map((tab) => {
                 const isSelected = activeTab === tab.id;
                 return (
@@ -907,10 +915,10 @@ export default function QueuePickupPage() {
                   setPage(1);
                 }}
               >
-                <option value="active">ยังไม่เสร็จสิ้น</option>
-                <option value="new_order">ออเดอร์ใหม่</option>
-                <option value="ready">พร้อมรับ</option>
-                <option value="completed">เสร็จสิ้น</option>
+                <option value="active">ยังไม่เสร็จสิ้น ({activeCount})</option>
+                <option value="new_order">ออเดอร์ใหม่ ({newOrderCount})</option>
+                <option value="ready">พร้อมรับ ({readyCount})</option>
+                <option value="completed">เสร็จสิ้น ({completedCount})</option>
               </select>
             </div>
           </div>
@@ -939,11 +947,12 @@ export default function QueuePickupPage() {
                     style={{
                       backgroundColor: "var(--card)",
                       borderRadius: "1rem",
+                      boxSizing: "border-box",
                       border: isReady
                         ? "2px solid var(--teal)"
                         : isCompleted
-                        ? "1px solid rgba(22, 163, 74, 0.3)"
-                        : "1px solid rgba(50,55,65,0.12)",
+                        ? "2px solid rgba(22, 163, 74, 0.3)"
+                        : "2px solid rgba(50,55,65,0.12)",
                       padding: "1.1rem",
                       boxShadow: isReady
                         ? "0 4px 16px rgba(75, 155, 140, 0.15)"
@@ -984,7 +993,7 @@ export default function QueuePickupPage() {
                           position: "absolute",
                           top: 0,
                           right: 0,
-                          backgroundColor: "#16a34a",
+                          backgroundColor: "var(--teal)",
                           color: "#fff",
                           fontSize: "0.7rem",
                           fontWeight: 800,
@@ -1291,7 +1300,7 @@ export default function QueuePickupPage() {
                               padding: "0.65rem",
                               borderRadius: "0.65rem",
                               border: "none",
-                              backgroundColor: "#16a34a",
+                              backgroundColor: "var(--teal)",
                               color: "#fff",
                               fontWeight: 700,
                               fontSize: "0.9rem",
@@ -1300,7 +1309,7 @@ export default function QueuePickupPage() {
                               alignItems: "center",
                               justifyContent: "center",
                               gap: "0.4rem",
-                              boxShadow: "0 4px 12px rgba(22, 163, 74, 0.2)",
+                              boxShadow: "0 4px 12px rgba(75, 155, 140, 0.2)",
                             }}
                           >
                             <CheckCheck size={16} />
@@ -1485,7 +1494,7 @@ export default function QueuePickupPage() {
                     width: "36px",
                     height: "36px",
                     borderRadius: "0.5rem",
-                    backgroundColor: "#16a34a",
+                    backgroundColor: "var(--teal)",
                     color: "#fff",
                     display: "grid",
                     placeItems: "center",
@@ -1586,7 +1595,7 @@ export default function QueuePickupPage() {
                     }}
                   >
                     <Camera size={34} style={{ opacity: 0.6 }} />
-                    <span style={{ fontSize: "0.85rem" }}>กล้องไม่ได้เปิด หรือใช้อุปกรณ์สแกนเนอร์ USB ยิงได้ทันที</span>
+                    <span style={{ fontSize: "0.85rem" }}>เปิดการอนุญาตใช้กล้องเพื่อใช้งาน</span>
                     <button
                       type="button"
                       onClick={startCamera}
@@ -1673,7 +1682,7 @@ export default function QueuePickupPage() {
                       padding: "0.65rem 1.25rem",
                       borderRadius: "0.65rem",
                       border: "none",
-                      backgroundColor: manualCode.trim() ? "#16a34a" : "rgba(50, 55, 65, 0.2)",
+                      backgroundColor: manualCode.trim() ? "var(--teal)" : "rgba(50, 55, 65, 0.2)",
                       color: "#fff",
                       fontSize: "0.9rem",
                       fontWeight: 700,
@@ -1714,9 +1723,9 @@ export default function QueuePickupPage() {
                         style={{
                           padding: "0.3rem 0.65rem",
                           borderRadius: "0.45rem",
-                          border: "1px solid #16a34a",
-                          backgroundColor: "#f0fdf4",
-                          color: "#16a34a",
+                          border: "1px solid var(--teal)",
+                          backgroundColor: "rgba(75, 155, 140, 0.08)",
+                          color: "var(--teal)",
                           fontSize: "0.8rem",
                           fontWeight: 700,
                           cursor: "pointer",
@@ -1789,7 +1798,7 @@ export default function QueuePickupPage() {
                     width: "36px",
                     height: "36px",
                     borderRadius: "0.5rem",
-                    backgroundColor: confirmModal.targetStatus === "completed" ? "#16a34a" : "var(--teal)",
+                    backgroundColor: "var(--teal)",
                     color: "#fff",
                     display: "grid",
                     placeItems: "center",
@@ -1834,7 +1843,7 @@ export default function QueuePickupPage() {
                   padding: "1rem",
                   borderRadius: "0.85rem",
                   backgroundColor: "var(--cream)",
-                  border: `2px dashed ${confirmModal.targetStatus === "completed" ? "#16a34a" : "var(--teal)"}`,
+                  border: "2px dashed var(--teal)",
                   textAlign: "center",
                 }}
               >
@@ -1847,7 +1856,7 @@ export default function QueuePickupPage() {
                     margin: "0.2rem 0 0 0",
                     fontSize: "2.75rem",
                     fontWeight: 900,
-                    color: confirmModal.targetStatus === "completed" ? "#16a34a" : "var(--teal)",
+                    color: "var(--teal)",
                     lineHeight: 1,
                   }}
                 >
@@ -1870,46 +1879,7 @@ export default function QueuePickupPage() {
                 </span>
               </div>
 
-              {/* Order Items Summary */}
-              {confirmModal.order.items && confirmModal.order.items.length > 0 && (
-                <div>
-                  <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.8rem", fontWeight: 700, color: "var(--ink-soft)" }}>
-                    รายการเครื่องดื่ม ({confirmModal.order.items.reduce((s, it) => s + (it.quantity || 1), 0)} แก้ว):
-                  </p>
-                  <div
-                    style={{
-                      maxHeight: "150px",
-                      overflowY: "auto",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "0.35rem",
-                    }}
-                  >
-                    {confirmModal.order.items.map((it, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          padding: "0.45rem 0.65rem",
-                          backgroundColor: "var(--cream)",
-                          borderRadius: "0.5rem",
-                          fontSize: "0.85rem",
-                        }}
-                      >
-                        <div>
-                          <span style={{ fontWeight: 700, color: "var(--ink)" }}>{it.product_name_th}</span>
-                          <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginLeft: "0.4rem" }}>
-                            (หวาน {it.sweetness})
-                          </span>
-                        </div>
-                        <span style={{ fontWeight: 800, color: "var(--teal)" }}>x{it.quantity}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+
 
               {/* Action Buttons */}
               <div style={{ display: "flex", gap: "0.6rem", marginTop: "0.5rem" }}>
@@ -1939,7 +1909,7 @@ export default function QueuePickupPage() {
                     padding: "0.75rem",
                     borderRadius: "0.75rem",
                     border: "none",
-                    backgroundColor: confirmModal.targetStatus === "completed" ? "#16a34a" : "var(--teal)",
+                    backgroundColor: "var(--teal)",
                     color: "#fff",
                     fontSize: "0.95rem",
                     fontWeight: 800,
@@ -1948,10 +1918,7 @@ export default function QueuePickupPage() {
                     alignItems: "center",
                     justifyContent: "center",
                     gap: "0.45rem",
-                    boxShadow:
-                      confirmModal.targetStatus === "completed"
-                        ? "0 4px 14px rgba(22, 163, 74, 0.3)"
-                        : "0 4px 14px rgba(75, 155, 140, 0.3)",
+                    boxShadow: "0 4px 14px rgba(75, 155, 140, 0.3)",
                   }}
                 >
                   {confirmModal.targetStatus === "completed" ? <CheckCheck size={18} /> : <Bell size={18} />}

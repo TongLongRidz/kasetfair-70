@@ -1,0 +1,39 @@
+{
+    "order": {
+        "receipt": {
+            "brand_sub": "Thuathong SoyMilk",
+            "location": "Kaset Fair @Kasetsart University Bangkhen",
+            "date": "Date",
+            "payment_method": "Payment Method",
+            "payment_promptpay": "PromptPay QR",
+            "payment_cash": "Cash",
+            "channel": "Channel",
+            "channel_online": "Online Order",
+            "channel_walkin": "Walk-in Store",
+            "queue_number": "Queue No.",
+            "scan_queue": "Scan to Track Queue",
+            "order_cancelled": "Order Cancelled",
+            "order_cancelled_desc": "This order has been cancelled",
+            "step_new_order": "Received",
+            "step_preparing": "Preparing",
+            "step_ready": "Ready",
+            "step_completed": "Completed",
+            "order_items": "Order Items",
+            "item_singular": "item",
+            "item_plural": "items",
+            "price_thb": "Price (THB)",
+            "drink": "Beverage",
+            "topping": "Topping",
+            "iced": "Iced",
+            "hot": "Hot",
+            "sweet": "Sweetness",
+            "cash_received": "Cash Received",
+            "change": "Change",
+            "total_amount": "Total Amount",
+            "thank_you": "Thank you for supporting Thuathong! 🙏",
+            "save_receipt": "Save as Image",
+            "switch_language": "Change Language",
+            "more_options": "More Options"
+        }
+    }
+}

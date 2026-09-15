@@ -13,10 +13,13 @@ type Order struct {
 	EstimatedPickupTime *time.Time  `gorm:"type:timestamptz" json:"estimated_pickup_time"`
 	TotalAmount         int         `gorm:"type:int;default:0;not null" json:"total_amount"`
 	PaymentMethod       string      `gorm:"type:varchar(20);not null" json:"payment_method"` // promptpay, cash
-	SlipURL             *string     `gorm:"type:varchar(255)" json:"slip_url"`
-	SlipVerifiedBy      *uint       `gorm:"type:int" json:"slip_verified_by"`
-	SlipVerifiedAt      *time.Time  `gorm:"type:timestamptz" json:"slip_verified_at"`
-	OrderStatus         string      `gorm:"type:varchar(20);index;not null;default:'new_order'" json:"order_status"` // new_order, preparing, ready, completed, cancelled
+	ReceivedAmount      *int        `gorm:"type:int" json:"received_amount"`
+	SlipURL                *string    `gorm:"type:varchar(255)" json:"slip_url"`
+	SlipVerificationStatus string     `gorm:"type:varchar(20);index;not null;default:'pending'" json:"slip_verification_status"` // pending, verified, fraud
+	SlipVerifiedBy         *uint      `gorm:"type:int" json:"slip_verified_by"`
+	SlipVerifiedAt         *time.Time `gorm:"type:timestamptz" json:"slip_verified_at"`
+	CheckNote              *string    `gorm:"type:text" json:"check_note"` // หมายเหตุการตรวจสอบสลิป/การชำระเงิน
+	OrderStatus            string     `gorm:"type:varchar(20);index;not null;default:'new_order'" json:"order_status"` // new_order, preparing, ready, completed, cancelled
 	Note                *string     `gorm:"type:text" json:"note"`
 	CreatedAt           time.Time   `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt           time.Time   `gorm:"autoUpdateTime" json:"updated_at"`
@@ -90,6 +93,7 @@ type CreateOrderRequest struct {
 	EstimatedPickupTime *time.Time               `json:"estimated_pickup_time"`
 	TotalAmount         int                      `json:"total_amount" binding:"required,min=0"`
 	PaymentMethod       string                   `json:"payment_method" binding:"required,oneof=promptpay cash"`
+	ReceivedAmount      *int                     `json:"received_amount"`
 	SlipURL             *string                  `json:"slip_url"`
 	Note                *string                  `json:"note"`
 	Items               []CreateOrderItemRequest `json:"items" binding:"required,min=1"`
@@ -100,14 +104,17 @@ type UpdateOrderStatusRequest struct {
 }
 
 type VerifyOrderSlipRequest struct {
-	IsVerified bool    `json:"is_verified"` // true = verified, false = rejected/unverified
+	Status     *string `json:"status"`      // "verified", "pending", "fraud"
+	IsVerified *bool   `json:"is_verified"` // backward compatibility: true = verified, false = pending/rejected
 	Note       *string `json:"note"`
+	CheckNote  *string `json:"check_note"` // หมายเหตุการตรวจสอบสลิป
 }
 
 type UpdateOrderRequest struct {
 	EstimatedPickupTime *time.Time `json:"estimated_pickup_time"`
 	TotalAmount         *int       `json:"total_amount"`
 	PaymentMethod       *string    `json:"payment_method"`
+	ReceivedAmount      *int       `json:"received_amount"`
 	SlipURL             *string    `json:"slip_url"`
 	OrderStatus         *string    `json:"order_status"`
 	Note                *string    `json:"note"`

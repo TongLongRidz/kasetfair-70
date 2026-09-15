@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import AdminSidebar from "@/components/layouts/AdminSidebar";
+import { getStoredToken } from "@/lib/auth";
 import {
   Clock,
   Coffee,
@@ -44,6 +45,7 @@ export default function POSKitchenPage() {
   const [range, setRange] = useState<"วันนี้" | "ทั้งงาน">("วันนี้");
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"new_order" | "preparing" | "ready" | "completed">("new_order");
   const [page, setPage] = useState<number>(1);
   const pageSize = 10;
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -80,7 +82,12 @@ export default function POSKitchenPage() {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
       const dateQuery = range === "วันนี้" ? "today" : "all";
-      const res = await fetch(`${apiUrl}/api/v1/orders/stats/kitchen?date=${dateQuery}`);
+      const token = getStoredToken();
+      const res = await fetch(`${apiUrl}/api/v1/orders/stats/kitchen?date=${dateQuery}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       if (res.ok) {
         const json = await res.json();
         setApiCompletedStats({
@@ -243,9 +250,13 @@ export default function POSKitchenPage() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const token = getStoredToken();
       await fetch(`${apiUrl}/api/v1/orders/${orderId}/status`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ order_status: nextStatus }),
       });
       fetchStats();
@@ -324,17 +335,44 @@ export default function POSKitchenPage() {
     ? formatTimeOnly(latestCompletedOrder.raw_updated_at || latestCompletedOrder.raw_created_at)
     : "-";
 
-  // Filter all new_order (and preparing) for the kitchen and sort by oldest first (FIFO)
-  const kitchenActiveOrders = rangeFilteredOrders
-    .filter((o) => o.order_status === "new_order" || o.order_status === "preparing")
-    .sort((a, b) => {
-      const timeA = new Date(a.raw_created_at).getTime() || a.id;
-      const timeB = new Date(b.raw_created_at).getTime() || b.id;
-      return timeA - timeB; // เก่าสุดขึ้นก่อน (FIFO)
-    });
+  // Status counts for filter bar tabs
+  const newOrderOrders = rangeFilteredOrders.filter((o) => o.order_status === "new_order");
+  const preparingOrders = rangeFilteredOrders.filter((o) => o.order_status === "preparing");
+  const readyOrders = rangeFilteredOrders.filter((o) => o.order_status === "ready");
+  const completedOrdersList = rangeFilteredOrders.filter((o) => o.order_status === "completed");
 
-  const totalPages = Math.max(1, Math.ceil(kitchenActiveOrders.length / pageSize));
-  const paginatedOrders = kitchenActiveOrders.slice((page - 1) * pageSize, page * pageSize);
+  const newOrderCount = newOrderOrders.length;
+  const preparingCount = preparingOrders.length;
+  const readyCount = readyOrders.length;
+  const completedTabCount = completedOrdersList.length;
+  const allKitchenCount = pendingOrders.length; // รวม new_order + preparing ที่ต้องทำในครัว
+
+  // Tab Filtering & FIFO sorting
+  const tabFilteredOrders = rangeFilteredOrders.filter((o) => {
+    if (activeTab === "new_order") {
+      return o.order_status === "new_order";
+    }
+    if (activeTab === "preparing") {
+      return o.order_status === "preparing";
+    }
+    if (activeTab === "ready") {
+      return o.order_status === "ready";
+    }
+    if (activeTab === "completed") {
+      return o.order_status === "completed";
+    }
+    return true;
+  }).sort((a, b) => {
+    const timeA = new Date(a.raw_created_at).getTime() || a.id;
+    const timeB = new Date(b.raw_created_at).getTime() || b.id;
+    if (activeTab === "completed" || activeTab === "ready") {
+      return timeB - timeA; // เสร็จแล้ว / พร้อมรับ แสดงล่าสุดก่อน
+    }
+    return timeA - timeB; // เก่าสุดขึ้นก่อน (FIFO สำหรับคิวครัว)
+  });
+
+  const totalPages = Math.max(1, Math.ceil(tabFilteredOrders.length / pageSize));
+  const paginatedOrders = tabFilteredOrders.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div
@@ -349,6 +387,7 @@ export default function POSKitchenPage() {
       {!isFullscreen && <AdminSidebar />}
 
       <main
+        className={isFullscreen ? "pos-fullscreen-mobile" : ""}
         style={{
           flex: 1,
           padding: isFullscreen ? "1.5rem 2rem" : "1.75rem 2.5rem",
@@ -358,6 +397,7 @@ export default function POSKitchenPage() {
       >
         {/* Header Section */}
         <div
+          className="pos-header-section"
           style={{
             display: "flex",
             flexWrap: "wrap",
@@ -366,7 +406,7 @@ export default function POSKitchenPage() {
             gap: "0.75rem",
           }}
         >
-          <div>
+          <div className="pos-header-title">
             <h1 style={{ fontSize: "1.75rem", fontWeight: 800, lineHeight: 1.2, margin: 0 }}>
               ครัว
             </h1>
@@ -464,17 +504,19 @@ export default function POSKitchenPage() {
 
         {/* KPI Cards Grid (Dashboard clean style - 3 cards) */}
         <div
+          className="admin-kpi-grid"
           style={{
             marginTop: "1.5rem",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "0.85rem",
             marginBottom: "1.5rem",
           }}
         >
           {/* Card 1: ออเดอร์ที่ค้างอยู่ */}
           <div
             className="admin-kpi-card animate-rise"
+            onClick={() => {
+              setActiveTab("new_order");
+              setPage(1);
+            }}
             style={{
               borderRadius: "1.25rem",
               backgroundColor: "var(--card)",
@@ -485,6 +527,8 @@ export default function POSKitchenPage() {
               flexDirection: "column",
               justifyContent: "space-between",
               boxSizing: "border-box",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
             }}
           >
             <div>
@@ -517,6 +561,10 @@ export default function POSKitchenPage() {
           {/* Card 2: ออเดอร์ที่ทำเสร็จ */}
           <div
             className="admin-kpi-card animate-rise"
+            onClick={() => {
+              setActiveTab("completed");
+              setPage(1);
+            }}
             style={{
               animationDelay: "45ms",
               borderRadius: "1.25rem",
@@ -528,6 +576,8 @@ export default function POSKitchenPage() {
               flexDirection: "column",
               justifyContent: "space-between",
               boxSizing: "border-box",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
             }}
           >
             <div>
@@ -599,10 +649,82 @@ export default function POSKitchenPage() {
               </p>
             </div>
           </div>
+
+          {/* Ghost card for row balancing on mobile (2 cols) and wide screens (6 cols) */}
+          <div className="admin-kpi-card admin-kpi-card-ghost" aria-hidden="true" />
         </div>
 
-        {/* Kitchen Orders Cards Grid (แสดงสถานะ new_order หรือ preparing ทีละ 10 ออเดอร์) */}
-        {kitchenActiveOrders.length > 0 ? (
+        {/* Filter Bar: เหมือนหน้าคิว (Desktop Tabs + Mobile Select พร้อมแสดงจำนวน (...)) */}
+        <div
+          style={{
+            backgroundColor: "var(--card)",
+            padding: "1rem 1.25rem",
+            borderRadius: "1.25rem",
+            border: "1px solid rgba(50, 55, 65, 0.1)",
+            boxShadow: "0 4px 20px -2px rgba(0,0,0,0.03)",
+            marginBottom: "1.25rem",
+          }}
+        >
+          <div className="admin-controls-bar" style={{ marginBottom: 0 }}>
+            {/* Left Side: Filter Tabs (Desktop) */}
+            <div className="admin-filter-tabs">
+              {[
+                { id: "new_order", label: `ออเดอร์ใหม่ (${newOrderCount})` },
+                { id: "preparing", label: `กำลังทำ (${preparingCount})` },
+                { id: "ready", label: `พร้อมรับ (${readyCount})` },
+                { id: "completed", label: `เสร็จสิ้น (${completedTabCount})` },
+              ].map((tab) => {
+                const isSelected = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(tab.id as any);
+                      setPage(1);
+                    }}
+                    style={{
+                      padding: "0.4rem 0.85rem",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.8rem",
+                      fontWeight: isSelected ? 700 : 500,
+                      fontFamily: "'Kanit', sans-serif",
+                      border: "none",
+                      cursor: "pointer",
+                      backgroundColor: isSelected ? "var(--ink)" : "transparent",
+                      color: isSelected ? "var(--cream)" : "var(--ink-soft)",
+                      transition: "all 0.15s ease",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Left Side: Filter Dropdown (Mobile) */}
+            <div className="admin-filter-dropdown-wrapper">
+              <select
+                className="admin-filter-select"
+                value={activeTab}
+                onChange={(e) => {
+                  setActiveTab(e.target.value as any);
+                  setPage(1);
+                }}
+              >
+                <option value="new_order">ออเดอร์ใหม่ ({newOrderCount})</option>
+                <option value="preparing">กำลังทำ ({preparingCount})</option>
+                <option value="ready">พร้อมรับ ({readyCount})</option>
+                <option value="completed">เสร็จสิ้น ({completedTabCount})</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Kitchen Orders Cards Grid */}
+        {tabFilteredOrders.length > 0 ? (
           <>
             <div
               style={{
@@ -888,7 +1010,7 @@ export default function POSKitchenPage() {
                 }}
               >
                 <div style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>
-                  แสดงหน้า <strong style={{ color: "var(--ink)" }}>{page}</strong> จาก ทั้งหมด <strong style={{ color: "var(--ink)" }}>{totalPages}</strong> หน้า (ทั้งหมด {kitchenActiveOrders.length} ออเดอร์)
+                  แสดงหน้า <strong style={{ color: "var(--ink)" }}>{page}</strong> จาก ทั้งหมด <strong style={{ color: "var(--ink)" }}>{totalPages}</strong> หน้า (ทั้งหมด {tabFilteredOrders.length} ออเดอร์)
                 </div>
 
                 <div style={{ display: "flex", gap: "0.5rem" }}>
@@ -954,7 +1076,13 @@ export default function POSKitchenPage() {
           >
             <Coffee size={40} style={{ margin: "0 auto 0.6rem", opacity: 0.35 }} />
             <p style={{ margin: 0, fontWeight: 700, fontSize: "0.95rem" }}>
-              ไม่มีออเดอร์ค้างในครัว
+              {activeTab === "new_order"
+                ? "ไม่มีออเดอร์ใหม่"
+                : activeTab === "preparing"
+                ? "ไม่มีออเดอร์ที่กำลังทำ"
+                : activeTab === "ready"
+                ? "ไม่มีออเดอร์ที่พร้อมรับ"
+                : "ไม่มีออเดอร์ที่เสร็จสิ้น"}
             </p>
           </div>
         )}

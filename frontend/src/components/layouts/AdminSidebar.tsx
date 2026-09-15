@@ -311,9 +311,6 @@ export default function AdminSidebar() {
             {/* Collapsed Compact View */}
             {isCollapsed ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", alignItems: "center" }}>
-                <p style={{ fontSize: "9px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: "0.1em", marginTop: "0.25rem" }}>
-                  MGMT
-                </p>
                 {managementSubItems.map((sub) => {
                   const isActive = pathname === sub.path;
                   const Icon = sub.icon;

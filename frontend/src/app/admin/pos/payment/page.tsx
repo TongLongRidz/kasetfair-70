@@ -9,6 +9,7 @@ import generatePayload from "promptpay-qr";
 import QRCode from "qrcode";
 import ConfirmPaymentModal from "./components/ConfirmPaymentModal";
 import OrderSuccessModal, { OrderSuccessData } from "./components/OrderSuccessModal";
+import { getStoredToken } from "@/lib/auth";
 import {
   ArrowLeft,
   ShoppingBag,
@@ -60,8 +61,9 @@ export default function POSPaymentPage() {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Slip upload mode: "immediate" (ต้องอัพสลิปเลย) vs "later" (อัพสลิปทีหลังได้)
+  // Slip & Cash upload mode: "immediate" (ต้องอัพรูป) vs "later" (ไม่อัพรูป)
   const [slipUploadMode, setSlipUploadMode] = useState<"immediate" | "later">("immediate");
+  const [cashUploadMode, setCashUploadMode] = useState<"immediate" | "later">("later");
 
   // Confirm Payment Modal State
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -110,26 +112,40 @@ export default function POSPaymentPage() {
       const savedName = localStorage.getItem("kaset_promptpay_name");
       if (savedName) setPromptpayName(savedName);
 
-      // Load Slip upload mode policy from backend API (with localStorage fallback)
-      const fetchSlipSetting = async () => {
+      // Slip & Cash upload mode policies
+      const fetchSettings = async () => {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
         try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
           const res = await fetch(`${apiUrl}/api/v1/settings/slip_upload_mode`);
           if (res.ok) {
             const data = await res.json();
             if (data.value === "later" || data.value === "immediate") {
               setSlipUploadMode(data.value);
               localStorage.setItem("kaset_slip_upload_mode", data.value);
-              return;
             }
           }
         } catch { }
+        try {
+          const res = await fetch(`${apiUrl}/api/v1/settings/cash_upload_mode`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.value === "later" || data.value === "immediate") {
+              setCashUploadMode(data.value);
+              localStorage.setItem("kaset_cash_upload_mode", data.value);
+            }
+          }
+        } catch { }
+
         const savedSlipMode = localStorage.getItem("kaset_slip_upload_mode");
         if (savedSlipMode === "later" || savedSlipMode === "immediate") {
           setSlipUploadMode(savedSlipMode);
         }
+        const savedCashMode = localStorage.getItem("kaset_cash_upload_mode");
+        if (savedCashMode === "later" || savedCashMode === "immediate") {
+          setCashUploadMode(savedCashMode);
+        }
       };
-      fetchSlipSetting();
+      fetchSettings();
     } catch (e) {
       console.error("Failed to load cart for payment:", e);
       router.replace("/admin/pos/front-desk");
@@ -202,7 +218,13 @@ export default function POSPaymentPage() {
 
   // Open Confirm Payment Modal
   const handleOpenConfirmModal = () => {
-    if (paymentMethod === "cash" && !isCashValid) return;
+    if (paymentMethod === "cash") {
+      if (!isCashValid) return;
+      if (cashUploadMode === "immediate" && !slipImage) {
+        alert("กรุณาอัพโหลดรูปถ่ายเงินสดก่อนยืนยันออเดอร์");
+        return;
+      }
+    }
     if (paymentMethod === "promptpay" && slipUploadMode === "immediate" && !slipImage) {
       alert("กรุณาอัพโหลดรูปภาพสลิปโอนเงินก่อนยืนยันออเดอร์");
       return;
@@ -214,7 +236,13 @@ export default function POSPaymentPage() {
 
   // 3. Confirm Payment and complete order
   const handleConfirmOrder = async () => {
-    if (paymentMethod === "cash" && !isCashValid) return;
+    if (paymentMethod === "cash") {
+      if (!isCashValid) return;
+      if (cashUploadMode === "immediate" && !slipImage) {
+        alert("กรุณาอัพโหลดรูปถ่ายเงินสดก่อนยืนยันออเดอร์");
+        return;
+      }
+    }
     if (paymentMethod === "promptpay" && slipUploadMode === "immediate" && !slipImage) {
       alert("กรุณาอัพโหลดรูปภาพสลิปโอนเงินก่อนยืนยันออเดอร์");
       return;
@@ -228,6 +256,7 @@ export default function POSPaymentPage() {
         method: "walk-in",
         total_amount: grandTotal,
         payment_method: paymentMethod,
+        received_amount: paymentMethod === "cash" ? cashNum : null,
         slip_url: slipImage || null,
         note: null,
         items: cart.map((c) => ({
@@ -245,10 +274,12 @@ export default function POSPaymentPage() {
         })),
       };
 
+      const token = getStoredToken();
       const res = await fetch(`${apiUrl}/api/v1/orders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(orderPayload),
       });
@@ -637,8 +668,8 @@ export default function POSPaymentPage() {
               </button>
             </div>
 
-            {/* Container for Payment Details (Fixed height for PromptPay & Cash to prevent jumping) */}
-            <div style={{ minHeight: "440px", display: "flex", flexDirection: "column" }}>
+            {/* Container for Payment Details (Fills naturally according to content) */}
+            <div style={{ display: "flex", flexDirection: "column" }}>
               {/* PAYMENT VIEW: PROMPTPAY */}
               {paymentMethod === "promptpay" && (
                 <div className="animate-fade-in">
@@ -651,16 +682,22 @@ export default function POSPaymentPage() {
                       border: "1px solid rgba(50, 55, 65, 0.1)",
                       textAlign: "center",
                       boxShadow: "0 4px 15px rgba(0,0,0,0.04)",
-                      marginBottom: "1.25rem",
+                      marginBottom: slipUploadMode === "immediate" ? "1.25rem" : "0",
+                      minHeight: "310px",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      boxSizing: "border-box",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem", marginBottom: "0.5rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem" }}>
                       <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--teal)" }}>
                         {promptpayName}
                       </span>
                     </div>
 
-                    <div style={{ width: "200px", height: "200px", margin: "0 auto", position: "relative", backgroundColor: "#fff", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "0.5rem", overflow: "hidden", userSelect: "none" }}>
+                    <div style={{ width: "200px", height: "200px", margin: "0.25rem auto", position: "relative", backgroundColor: "#fff", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "0.5rem", overflow: "hidden", userSelect: "none" }}>
                       {qrCodeDataUrl ? (
                         <img
                           src={qrCodeDataUrl}
@@ -673,131 +710,123 @@ export default function POSPaymentPage() {
                       )}
                     </div>
 
-                    <div style={{ display: "inline-block", marginTop: "0.35rem", padding: "0.25rem 0.75rem", borderRadius: "9999px", backgroundColor: "rgba(75, 155, 140, 0.12)", color: "var(--teal)", fontSize: "0.875rem", fontWeight: 800 }}>
+                    <div style={{ display: "inline-block", padding: "0.25rem 0.75rem", borderRadius: "9999px", backgroundColor: "rgba(75, 155, 140, 0.12)", color: "var(--teal)", fontSize: "0.875rem", fontWeight: 800 }}>
                       ยอดชำระ: ฿{grandTotal}
                     </div>
                   </div>
 
-                  {/* Slip Upload Area */}
-                  <div>
-                    <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)", marginBottom: "0.4rem" }}>
-                      <span>
-                        อัพโหลดสลิปโอนเงิน{" "}
-                        {slipUploadMode === "immediate" ? (
+                  {/* Slip Upload Area (Only displayed when required immediately) */}
+                  {slipUploadMode === "immediate" && (
+                    <div>
+                      <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)", marginBottom: "0.4rem" }}>
+                        <span>
+                          อัพโหลดสลิปโอนเงิน{" "}
                           <span style={{ color: "#dc2626", fontWeight: 400, fontSize: "0.75rem" }}>(ต้องอัพโหลดตอนนี้)</span>
-                        ) : (
-                          <span style={{ color: "var(--ink-soft)", fontWeight: 400, fontSize: "0.75rem" }}>(อัพโหลดภายหลังได้)</span>
-                        )}
-                      </span>
-                      {slipUploadMode === "immediate" ? (
+                        </span>
                         <span style={{ fontSize: "0.7rem", backgroundColor: "rgba(220, 38, 38, 0.12)", color: "#dc2626", padding: "0.1rem 0.5rem", borderRadius: "9999px", fontWeight: 600 }}>
                           ให้ผ่านโดยต้องแนบสลิป
                         </span>
-                      ) : (
-                        <span style={{ fontSize: "0.7rem", backgroundColor: "rgba(75, 155, 140, 0.15)", color: "var(--teal)", padding: "0.1rem 0.5rem", borderRadius: "9999px", fontWeight: 600 }}>
-                          ให้ผ่านโดยไม่ต้องแนบสลิป
-                        </span>
-                      )}
-                    </label>
+                      </label>
 
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      style={{ display: "none" }}
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          handleFileChange(e.target.files[0]);
-                        }
-                      }}
-                    />
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        style={{ display: "none" }}
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleFileChange(e.target.files[0]);
+                          }
+                        }}
+                      />
 
-                    {!slipImage ? (
-                      <div
-                        onClick={() => fileInputRef.current?.click()}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          setIsDragging(true);
-                        }}
-                        onDragLeave={() => setIsDragging(false)}
-                        onDrop={handleDrop}
-                        style={{
-                          border: isDragging ? "2px dashed var(--teal)" : "2px dashed rgba(50, 55, 65, 0.2)",
-                          backgroundColor: isDragging ? "rgba(75, 155, 140, 0.08)" : "var(--cream)",
-                          borderRadius: "0.85rem",
-                          padding: "1.5rem 1rem",
-                          textAlign: "center",
-                          cursor: "pointer",
-                          transition: "all 0.15s ease",
-                        }}
-                      >
-                        <div style={{ width: "42px", height: "42px", borderRadius: "50%", backgroundColor: "rgba(75,155,140,0.12)", color: "var(--teal)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 0.6rem" }}>
-                          <UploadCloud size={22} />
-                        </div>
-                        <p style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--ink)" }}>
-                          คลิกเพื่อเลือกไฟล์ หรือลากรูปภาพมาวางที่นี่
-                        </p>
-                        <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "2px" }}>
-                          รองรับรูปภาพ JPG, PNG, WebP
-                        </p>
-                      </div>
-                    ) : (
-                      /* Slip Preview Card */
-                      <div
-                        style={{
-                          backgroundColor: "var(--cream)",
-                          borderRadius: "0.85rem",
-                          padding: "0.75rem 1rem",
-                          border: "1px solid rgba(75, 155, 140, 0.3)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: "0.75rem",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
-                          <div style={{ width: "48px", height: "48px", borderRadius: "0.5rem", overflow: "hidden", flexShrink: 0, border: "1px solid rgba(0,0,0,0.1)" }}>
-                            <img src={slipImage} alt="Slip Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          </div>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
-                              <CheckCircle2 size={14} color="#22c55e" />
-                              <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {slipFileName || "สลิปโอนเงิน"}
-                              </span>
-                            </div>
-                            <span style={{ fontSize: "0.725rem", color: "#22c55e", fontWeight: 600 }}>
-                              อัพโหลดสลิปเรียบร้อยแล้ว
-                            </span>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSlipImage(null);
-                            setSlipFileName("");
+                      {!slipImage ? (
+                        <div
+                          onClick={() => fileInputRef.current?.click()}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            setIsDragging(true);
                           }}
+                          onDragLeave={() => setIsDragging(false)}
+                          onDrop={handleDrop}
                           style={{
-                            border: "none",
-                            backgroundColor: "rgba(220, 38, 38, 0.1)",
-                            color: "#dc2626",
-                            padding: "0.35rem 0.6rem",
-                            borderRadius: "0.4rem",
-                            fontSize: "0.75rem",
-                            fontWeight: 600,
+                            border: isDragging ? "2px dashed var(--teal)" : "2px dashed rgba(50, 55, 65, 0.2)",
+                            backgroundColor: isDragging ? "rgba(75, 155, 140, 0.08)" : "var(--cream)",
+                            borderRadius: "0.85rem",
+                            padding: "1.5rem 1rem",
+                            textAlign: "center",
                             cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.2rem",
+                            transition: "all 0.15s ease",
                           }}
                         >
-                          <Trash2 size={12} />
-                          <span>เปลี่ยนรูป</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                          <div style={{ width: "42px", height: "42px", borderRadius: "50%", backgroundColor: "rgba(75,155,140,0.12)", color: "var(--teal)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 0.6rem" }}>
+                            <UploadCloud size={22} />
+                          </div>
+                          <p style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--ink)" }}>
+                            คลิกเพื่อเลือกไฟล์ หรือลากรูปภาพมาวางที่นี่
+                          </p>
+                          <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "2px" }}>
+                            รองรับรูปภาพ JPG, PNG, WebP
+                          </p>
+                        </div>
+                      ) : (
+                        /* Slip Preview Card */
+                        <div
+                          style={{
+                            backgroundColor: "var(--cream)",
+                            borderRadius: "0.85rem",
+                            padding: "0.75rem 1rem",
+                            border: "1px solid rgba(75, 155, 140, 0.3)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: "0.75rem",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
+                            <div style={{ width: "48px", height: "48px", borderRadius: "0.5rem", overflow: "hidden", flexShrink: 0, border: "1px solid rgba(0,0,0,0.1)" }}>
+                              <img src={slipImage} alt="Slip Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            </div>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                                <CheckCircle2 size={14} color="#22c55e" />
+                                <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {slipFileName || "สลิปโอนเงิน"}
+                                </span>
+                              </div>
+                              <span style={{ fontSize: "0.725rem", color: "#22c55e", fontWeight: 600 }}>
+                                อัพโหลดสลิปเรียบร้อยแล้ว
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSlipImage(null);
+                              setSlipFileName("");
+                            }}
+                            style={{
+                              border: "none",
+                              backgroundColor: "rgba(220, 38, 38, 0.1)",
+                              color: "#dc2626",
+                              padding: "0.35rem 0.6rem",
+                              borderRadius: "0.4rem",
+                              fontSize: "0.75rem",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.2rem",
+                            }}
+                          >
+                            <Trash2 size={12} />
+                            <span>เปลี่ยนรูป</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -810,7 +839,12 @@ export default function POSPaymentPage() {
                       borderRadius: "1rem",
                       padding: "1.25rem",
                       border: "1px solid rgba(50, 55, 65, 0.1)",
-                      marginBottom: "1rem",
+                      marginBottom: "0",
+                      minHeight: "310px",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      boxSizing: "border-box",
                     }}
                   >
                     <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)", marginBottom: "0.4rem" }}>
@@ -929,6 +963,107 @@ export default function POSPaymentPage() {
                       </p>
                     </div>
                   </div>
+
+                  {/* Cash Image Upload Area (Displayed when cashUploadMode === 'immediate') */}
+                  {cashUploadMode === "immediate" && (
+                    <div style={{ marginTop: "1.25rem" }}>
+                      <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)", marginBottom: "0.4rem" }}>
+                        <span>
+                          อัพโหลดรูปถ่ายเงินสด / ใบเสร็จ{" "}
+                          <span style={{ color: "#dc2626", fontWeight: 400, fontSize: "0.75rem" }}>(ต้องอัพโหลดรูป)</span>
+                        </span>
+                        <span style={{ fontSize: "0.7rem", backgroundColor: "rgba(220, 38, 38, 0.12)", color: "#dc2626", padding: "0.1rem 0.5rem", borderRadius: "9999px", fontWeight: 600 }}>
+                          บังคับถ่ายรูปเงินสด
+                        </span>
+                      </label>
+
+                      {!slipImage ? (
+                        <div
+                          onClick={() => fileInputRef.current?.click()}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            setIsDragging(true);
+                          }}
+                          onDragLeave={() => setIsDragging(false)}
+                          onDrop={handleDrop}
+                          style={{
+                            border: isDragging ? "2px dashed var(--teal)" : "2px dashed rgba(50, 55, 65, 0.2)",
+                            backgroundColor: isDragging ? "rgba(75, 155, 140, 0.08)" : "var(--cream)",
+                            borderRadius: "0.85rem",
+                            padding: "1.5rem 1rem",
+                            textAlign: "center",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          <div style={{ width: "42px", height: "42px", borderRadius: "50%", backgroundColor: "rgba(75,155,140,0.12)", color: "var(--teal)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 0.6rem" }}>
+                            <UploadCloud size={22} />
+                          </div>
+                          <p style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--ink)" }}>
+                            คลิกเพื่อเลือกไฟล์ หรือลากรูปภาพมาวางที่นี่
+                          </p>
+                          <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "2px" }}>
+                            รองรับรูปภาพ JPG, PNG, WebP
+                          </p>
+                        </div>
+                      ) : (
+                        /* Cash Image Preview Card */
+                        <div
+                          style={{
+                            backgroundColor: "var(--cream)",
+                            borderRadius: "0.85rem",
+                            padding: "0.75rem 1rem",
+                            border: "1px solid rgba(75, 155, 140, 0.3)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: "0.75rem",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
+                            <div style={{ width: "48px", height: "48px", borderRadius: "0.5rem", overflow: "hidden", flexShrink: 0, border: "1px solid rgba(0,0,0,0.1)" }}>
+                              <img src={slipImage} alt="Cash Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            </div>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                                <CheckCircle2 size={14} color="#22c55e" />
+                                <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {slipFileName || "รูปถ่ายเงินสด"}
+                                </span>
+                              </div>
+                              <span style={{ fontSize: "0.725rem", color: "#22c55e", fontWeight: 600 }}>
+                                อัพโหลดรูปถ่ายเรียบร้อยแล้ว
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSlipImage(null);
+                              setSlipFileName("");
+                            }}
+                            style={{
+                              border: "none",
+                              backgroundColor: "rgba(220, 38, 38, 0.1)",
+                              color: "#dc2626",
+                              padding: "0.35rem 0.6rem",
+                              borderRadius: "0.4rem",
+                              fontSize: "0.75rem",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.2rem",
+                            }}
+                          >
+                            <Trash2 size={12} />
+                            <span>เปลี่ยนรูป</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -937,14 +1072,18 @@ export default function POSPaymentPage() {
             <div style={{ marginTop: "1.5rem" }}>
               {(() => {
                 const isPromptPayReady = paymentMethod === "promptpay" && (slipUploadMode === "later" || Boolean(slipImage));
-                const isCashReady = paymentMethod === "cash" && isCashValid;
+                const isCashReady = paymentMethod === "cash" && isCashValid && (cashUploadMode === "later" || Boolean(slipImage));
                 const isReady = isCashReady || isPromptPayReady;
 
                 // Determine button label based on status
                 let buttonText = "ยืนยันการชำระเงิน";
-                if (paymentMethod === "cash" && !isCashValid) {
-                  const shortage = grandTotal - cashNum;
-                  buttonText = cashNum > 0 ? `ยังไม่ครบจำนวน (ขาดอีก ฿${shortage})` : "ยังไม่ครบจำนวน";
+                if (paymentMethod === "cash") {
+                  if (!isCashValid) {
+                    const shortage = grandTotal - cashNum;
+                    buttonText = cashNum > 0 ? `ยังไม่ครบจำนวน (ขาดอีก ฿${shortage})` : "ยังไม่ครบจำนวน";
+                  } else if (cashUploadMode === "immediate" && !slipImage) {
+                    buttonText = "กรุณาอัพโหลดรูปถ่ายเงินสด";
+                  }
                 } else if (paymentMethod === "promptpay" && slipUploadMode === "immediate" && !slipImage) {
                   buttonText = "กรุณาอัพโหลดสลิป";
                 }

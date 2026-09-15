@@ -13,7 +13,7 @@ import {
   XCircle,
   AlertTriangle,
   FileImage,
-  CreditCard,
+  QrCode,
   Banknote,
   ExternalLink,
   ShieldCheck,
@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { getStoredToken } from "@/lib/auth";
+import OrderInspectionModal from "./components/OrderInspectionModal";
+import FraudReasonModal from "./components/FraudReasonModal";
 
 export type PaymentVerificationStatus = "verified" | "pending" | "fraud";
 export type PaymentMethod = "promptpay_qr" | "cash";
@@ -34,197 +36,69 @@ export interface SlipOrderItem {
   queueNo: string;
   customerName: string;
   customerPhone?: string;
-  channel: "ออนไลน์" | "หน้าร้าน";
+  channel: "ออนไลน์" | "หน้าร้าน" | "Nisit Shop";
   total: number;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentVerificationStatus;
   statusNote?: string;
   orderedAt: string;
+  createdAtRaw?: string;
+  slipVerifiedAt?: string;
+  verifiedByName?: string;
   slipImageUrl?: string;
   cashImageUrl?: string;
   itemsSummary: string;
 }
 
-const INITIAL_SLIP_ORDERS: SlipOrderItem[] = [
-  {
-    id: 1,
-    orderNo: "TT-1042",
-    queueNo: "B021",
-    customerName: "คุณฟ้า",
-    customerPhone: "081-234-5678",
-    channel: "ออนไลน์",
-    total: 185,
-    paymentMethod: "promptpay_qr",
-    paymentStatus: "pending",
-    orderedAt: "13:42 น.",
-    slipImageUrl: "/images/hero-soy.jpg",
-    itemsSummary: "น้ำเต้าหู้มัทฉะ (หวาน 50% + Boba) x2, น้ำเต้าหู้ชาไทย x1",
-  },
-  {
-    id: 2,
-    orderNo: "TT-1041",
-    queueNo: "W008",
-    customerName: "คุณเบียร์",
-    customerPhone: "089-987-6543",
-    channel: "หน้าร้าน",
-    total: 120,
-    paymentMethod: "cash",
-    paymentStatus: "verified",
-    orderedAt: "13:38 น.",
-    cashImageUrl: "/images/hero-soy.jpg",
-    itemsSummary: "น้ำเต้าหู้ดั้งเดิม (หวาน 25% + เฉาก๊วย) x2",
-  },
-  {
-    id: 3,
-    orderNo: "TT-1040",
-    queueNo: "B020",
-    customerName: "คุณแนน",
-    customerPhone: "086-555-4321",
-    channel: "ออนไลน์",
-    total: 240,
-    paymentMethod: "promptpay_qr",
-    paymentStatus: "verified",
-    orderedAt: "13:30 น.",
-    slipImageUrl: "/images/hero-soy.jpg",
-    itemsSummary: "เซ็ตคอมโบ 2 แก้ว + ท็อปปิ้ง x2",
-  },
-  {
-    id: 4,
-    orderNo: "TT-1039",
-    queueNo: "W007",
-    customerName: "คุณโอ๊ต",
-    customerPhone: "092-111-2233",
-    channel: "หน้าร้าน",
-    total: 90,
-    paymentMethod: "promptpay_qr",
-    paymentStatus: "fraud",
-    statusNote: "สลิปตัดต่อ เวลาไม่ตรงกับยอดเงินในระบบธนาคาร",
-    orderedAt: "13:22 น.",
-    slipImageUrl: "/images/hero-soy.jpg",
-    itemsSummary: "น้ำเต้าหู้โกโก้ x2",
-  },
-  {
-    id: 5,
-    orderNo: "TT-1038",
-    queueNo: "B019",
-    customerName: "คุณปอ",
-    customerPhone: "084-333-8899",
-    channel: "ออนไลน์",
-    total: 310,
-    paymentMethod: "promptpay_qr",
-    paymentStatus: "pending",
-    orderedAt: "13:15 น.",
-    slipImageUrl: "/images/hero-soy.jpg",
-    itemsSummary: "น้ำเต้าหู้ 5 รสชาติ x1, ท็อปปิ้งแยก x3",
-  },
-  {
-    id: 6,
-    orderNo: "TT-1037",
-    queueNo: "B018",
-    customerName: "คุณกานต์",
-    customerPhone: "087-444-5566",
-    channel: "ออนไลน์",
-    total: 150,
-    paymentMethod: "promptpay_qr",
-    paymentStatus: "verified",
-    orderedAt: "13:05 น.",
-    slipImageUrl: "/images/hero-soy.jpg",
-    itemsSummary: "น้ำเต้าหู้ดั้งเดิม x3",
-  },
-  {
-    id: 7,
-    orderNo: "TT-1036",
-    queueNo: "W006",
-    customerName: "คุณมุก",
-    customerPhone: "083-777-9911",
-    channel: "หน้าร้าน",
-    total: 70,
-    paymentMethod: "cash",
-    paymentStatus: "verified",
-    orderedAt: "12:50 น.",
-    cashImageUrl: "/images/hero-soy.jpg",
-    itemsSummary: "น้ำเต้าหู้มัทฉะ x1",
-  },
-  {
-    id: 8,
-    orderNo: "TT-1035",
-    queueNo: "B017",
-    customerName: "คุณนพ",
-    customerPhone: "082-888-0022",
-    channel: "ออนไลน์",
-    total: 260,
-    paymentMethod: "promptpay_qr",
-    paymentStatus: "fraud",
-    statusNote: "ใช้สลิปเก่าของเมื่อวานมาแนบใหม่",
-    orderedAt: "12:44 น.",
-    slipImageUrl: "/images/hero-soy.jpg",
-    itemsSummary: "น้ำเต้าหู้ชาไทย + ไข่มุก x4",
-  },
-  {
-    id: 9,
-    orderNo: "TT-1034",
-    queueNo: "W005",
-    customerName: "คุณบอย",
-    customerPhone: "095-666-3344",
-    channel: "หน้าร้าน",
-    total: 135,
-    paymentMethod: "cash",
-    paymentStatus: "verified",
-    orderedAt: "12:30 น.",
-    cashImageUrl: "/images/hero-soy.jpg",
-    itemsSummary: "น้ำเต้าหู้ถั่วแดง x2, สาคู x1",
-  },
-  {
-    id: 10,
-    orderNo: "TT-1033",
-    queueNo: "B016",
-    customerName: "คุณแพร",
-    customerPhone: "080-123-9988",
-    channel: "ออนไลน์",
-    total: 195,
-    paymentMethod: "promptpay_qr",
-    paymentStatus: "verified",
-    orderedAt: "12:15 น.",
-    slipImageUrl: "/images/hero-soy.jpg",
-    itemsSummary: "น้ำเต้าหู้ชมพูนมเย็น x3",
-  },
-];
-
 export default function SlipCheckManagementPage() {
   const { success, error: toastError, info, warning } = useToast();
-  // Slip upload requirement policy: "immediate" (ต้องอัพสลิปเลย) vs "later" (อัพสลิปทีหลังได้ / ให้ผ่านเลย)
-  const [slipUploadMode, setSlipUploadMode] = useState<"immediate" | "later">("immediate");
+  // Settings policies: "immediate" (ต้องอัพรูปเลย) vs "later" (ไม่อัพรูป/อัพทีหลังได้)
+  const [promptpayUploadMode, setPromptpayUploadMode] = useState<"immediate" | "later">("immediate");
+  const [cashUploadMode, setCashUploadMode] = useState<"immediate" | "later">("later");
 
-  // Load slip policy from Backend API (with localStorage fallback)
+  // Load settings policies from Backend API (with localStorage fallback)
   useEffect(() => {
-    const fetchSetting = async () => {
+    const fetchSettings = async () => {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
         const res = await fetch(`${apiUrl}/api/v1/settings/slip_upload_mode`);
         if (res.ok) {
           const data = await res.json();
           if (data.value === "later" || data.value === "immediate") {
-            setSlipUploadMode(data.value);
+            setPromptpayUploadMode(data.value);
             localStorage.setItem("kaset_slip_upload_mode", data.value);
-            return;
           }
         }
-      } catch (err) {
-        console.warn("Could not fetch slip setting from backend, using local:", err);
-      }
-      // Fallback
+      } catch {}
+
       try {
-        const savedMode = localStorage.getItem("kaset_slip_upload_mode");
-        if (savedMode === "later" || savedMode === "immediate") {
-          setSlipUploadMode(savedMode);
+        const res = await fetch(`${apiUrl}/api/v1/settings/cash_upload_mode`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.value === "later" || data.value === "immediate") {
+            setCashUploadMode(data.value);
+            localStorage.setItem("kaset_cash_upload_mode", data.value);
+          }
+        }
+      } catch {}
+
+      // Fallbacks
+      try {
+        const savedPromptpay = localStorage.getItem("kaset_slip_upload_mode");
+        if (savedPromptpay === "later" || savedPromptpay === "immediate") {
+          setPromptpayUploadMode(savedPromptpay);
+        }
+        const savedCash = localStorage.getItem("kaset_cash_upload_mode");
+        if (savedCash === "later" || savedCash === "immediate") {
+          setCashUploadMode(savedCash);
         }
       } catch {}
     };
-    fetchSetting();
+    fetchSettings();
   }, []);
 
-  const handleToggleSlipMode = async (mode: "immediate" | "later") => {
-    setSlipUploadMode(mode);
+  const handleTogglePromptpayMode = async (mode: "immediate" | "later") => {
+    setPromptpayUploadMode(mode);
     try {
       localStorage.setItem("kaset_slip_upload_mode", mode);
     } catch {}
@@ -240,21 +114,53 @@ export default function SlipCheckManagementPage() {
         },
         body: JSON.stringify({
           value: mode,
-          description: "เงื่อนไขการแนบสลิป: immediate (ต้องอัพสลิปเลย) หรือ later (อัพสลิปทีหลังได้)",
+          description: "เงื่อนไขการแนบสลิป PromptPay: immediate (ต้องอัพสลิป) หรือ later (ไม่ต้องอัพ)",
         }),
       });
     } catch (err) {
-      console.error("Failed to update setting on backend:", err);
+      console.error("Failed to update PromptPay setting:", err);
     }
 
     if (mode === "later") {
-      info("บันทึกการตั้งค่าลงระบบ: อัพสลิปทีหลังได้ (ให้ order ผ่านเลยโดยไม่ต้องแนบสลิปทันที)", "เงื่อนไขการแนบสลิป");
+      info("PromptPay: ไม่อัพรูป / อัพทีหลังได้", "ตั้งค่ารูป PromptPay");
     } else {
-      success("บันทึกการตั้งค่าลงระบบ: บังคับให้อัพโหลดสลิปทันทีก่อนยืนยันออเดอร์", "เงื่อนไขการแนบสลิป");
+      success("PromptPay: ต้องอัพโหลดสลิปทันที", "ตั้งค่ารูป PromptPay");
     }
   };
 
-  const [orders, setOrders] = useState<SlipOrderItem[]>(INITIAL_SLIP_ORDERS);
+  const handleToggleCashMode = async (mode: "immediate" | "later") => {
+    setCashUploadMode(mode);
+    try {
+      localStorage.setItem("kaset_cash_upload_mode", mode);
+    } catch {}
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const token = getStoredToken();
+      await fetch(`${apiUrl}/api/v1/settings/cash_upload_mode`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          value: mode,
+          description: "เงื่อนไขการถ่ายรูปเงินสด: immediate (ต้องถ่ายรูป/อัพรูป) หรือ later (ไม่ต้องถ่ายรูป)",
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to update Cash setting:", err);
+    }
+
+    if (mode === "later") {
+      info("เงินสด: ไม่ต้องถ่ายรูป", "ตั้งค่าถ่ายรูปเงินสด");
+    } else {
+      success("เงินสด: บังคับถ่ายรูป/อัพโหลดรูป", "ตั้งค่าถ่ายรูปเงินสด");
+    }
+  };
+
+  const [orders, setOrders] = useState<SlipOrderItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | PaymentVerificationStatus>("all");
   const [sortOrder, setSortOrder] = useState<"latest" | "oldest" | "amount_high" | "amount_low">("latest");
@@ -271,6 +177,99 @@ export default function SlipCheckManagementPage() {
   const [isFraudModalOpen, setIsFraudModalOpen] = useState(false);
   const [fraudTargetOrder, setFraudTargetOrder] = useState<SlipOrderItem | null>(null);
   const [fraudReason, setFraudReason] = useState("");
+
+  // Helper to format date / time nicely like administrator page
+  const renderFormattedDate = (dateStr?: string) => {
+    if (!dateStr) return "-";
+    const datePart = dateStr.includes("T") ? dateStr.split("T")[0] : dateStr.split(" ")[0];
+    const rawTime = dateStr.includes("T") ? dateStr.split("T")[1]?.substring(0, 8) : dateStr.split(" ")[1] || "";
+    const timePart = rawTime ? rawTime.substring(0, 8) : "";
+
+    return (
+      <div style={{ lineHeight: 1.25 }}>
+        <div className="font-mono" style={{ color: "var(--ink)", fontWeight: 500, fontSize: "0.8rem" }}>
+          {datePart}
+        </div>
+        {timePart && (
+          <div className="font-mono" style={{ fontSize: "0.725rem", color: "var(--ink-soft)", marginTop: "1px" }}>
+            {timePart}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Fetch orders from backend API
+  const fetchOrders = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const token = getStoredToken();
+      const res = await fetch(`${apiUrl}/api/v1/orders?page_size=500`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        const rawOrders = json.data || json || [];
+        const mapped: SlipOrderItem[] = rawOrders.map((o: any) => {
+          // Channel mapping
+          let channel: "ออนไลน์" | "หน้าร้าน" | "Nisit Shop" = "หน้าร้าน";
+          if (o.method === "online") channel = "ออนไลน์";
+          else if (o.method === "nisit-shop") channel = "Nisit Shop";
+
+          // Payment method mapping
+          const paymentMethod: PaymentMethod = o.payment_method === "promptpay" ? "promptpay_qr" : "cash";
+
+          // Verification status mapping
+          let paymentStatus: PaymentVerificationStatus = "pending";
+          if (o.slip_verification_status === "verified" || o.slip_verification_status === "fraud") {
+            paymentStatus = o.slip_verification_status;
+          }
+
+          // Build items summary
+          const itemsSummary = o.order_items && o.order_items.length > 0
+            ? o.order_items.map((item: any) => {
+                const pName = item.product?.name_th || "สินค้า";
+                const sweet = item.sweetness_level ? ` (${item.sweetness_level})` : "";
+                return `${pName}${sweet} x${item.quantity}`;
+              }).join(", ")
+            : "ไม่ระบุรายการ";
+
+          return {
+            id: o.id,
+            orderNo: `#${o.id}`,
+            queueNo: o.queue_no || `#${o.id}`,
+            customerName: o.customer_name || (o.method === "walk-in" ? "ลูกค้าหน้าร้าน" : "ลูกค้าออนไลน์"),
+            customerPhone: o.customer_phone || "",
+            channel,
+            total: o.total_amount || 0,
+            paymentMethod,
+            paymentStatus,
+            statusNote: o.check_note || o.note || "",
+            orderedAt: o.created_at,
+            createdAtRaw: o.created_at,
+            slipVerifiedAt: o.slip_verified_at || undefined,
+            verifiedByName: o.slip_admin?.name || o.slip_admin?.username || (o.slip_verified_by ? `Admin #${o.slip_verified_by}` : "-"),
+            slipImageUrl: o.slip_url || undefined,
+            itemsSummary,
+          };
+        });
+        setOrders(mapped);
+      }
+    } catch (err) {
+      console.error("Failed to fetch orders from backend:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Close kebab menu when clicking outside
   useEffect(() => {
@@ -308,8 +307,10 @@ export default function SlipCheckManagementPage() {
   const paginatedOrders = filteredOrders.slice((page - 1) * pageSize, page * pageSize);
 
   // Status Change Handlers
-  const handleSetStatus = (orderId: number, status: PaymentVerificationStatus, note?: string) => {
+  const handleSetStatus = async (orderId: number, status: PaymentVerificationStatus, note?: string) => {
     const target = orders.find((o) => o.id === orderId);
+
+    // Optimistic update
     setOrders((prev) =>
       prev.map((o) => {
         if (o.id === orderId) {
@@ -322,6 +323,30 @@ export default function SlipCheckManagementPage() {
         return o;
       })
     );
+
+    // API call to backend
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const token = getStoredToken();
+      const res = await fetch(`${apiUrl}/api/v1/orders/${orderId}/verify-slip`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          status,
+          check_note: note !== undefined ? note : "",
+          note: note !== undefined ? note : "",
+        }),
+      });
+
+      if (res.ok) {
+        fetchOrders();
+      }
+    } catch (err) {
+      console.error("Failed to update order slip verification status:", err);
+    }
 
     if (target) {
       if (status === "verified") {
@@ -345,6 +370,54 @@ export default function SlipCheckManagementPage() {
           : null
       );
     }
+  };
+
+  // Upload slip for existing order
+  const handleUploadSlip = async (orderId: number, file: File) => {
+    return new Promise<void>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const dataUrl = e.target?.result as string;
+        if (!dataUrl) {
+          resolve();
+          return;
+        }
+
+        try {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+          const token = getStoredToken();
+          const res = await fetch(`${apiUrl}/api/v1/orders/${orderId}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({
+              slip_url: dataUrl,
+            }),
+          });
+
+          if (res.ok) {
+            success("อัพโหลดรูปภาพสลิป/หลักฐานเรียบร้อยแล้ว", "บันทึกสำเร็จ");
+            setOrders((prev) =>
+              prev.map((o) => (o.id === orderId ? { ...o, slipImageUrl: dataUrl } : o))
+            );
+            if (selectedOrder && selectedOrder.id === orderId) {
+              setSelectedOrder((prev) => (prev ? { ...prev, slipImageUrl: dataUrl } : null));
+            }
+            fetchOrders();
+          } else {
+            toastError("ไม่สามารถอัพโหลดรูปสลิปได้", "เกิดข้อผิดพลาด");
+          }
+        } catch (err) {
+          console.error("Failed to upload slip:", err);
+          toastError("เกิดข้อผิดพลาดในการส่งข้อมูลสลิป", "เกิดข้อผิดพลาด");
+        } finally {
+          resolve();
+        }
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleOpenFraudReasonModal = (order: SlipOrderItem) => {
@@ -380,77 +453,275 @@ export default function SlipCheckManagementPage() {
             <h1 style={{ fontSize: "1.75rem", fontWeight: 800, lineHeight: 1.2, margin: 0 }}>
               การตรวจสอบการชำระเงิน
             </h1>
-            <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", marginTop: "0.25rem", margin: 0 }}>
-              จัดการและตรวจสอบความถูกต้องของสลิปโอนเงิน PromptPay และรายการเงินสด
-            </p>
           </div>
+        </div>
 
-          {/* Slip Order Pass Requirement Toggle */}
+        {/* 4 KPI Cards Grid */}
+        <div
+          className="admin-kpi-grid"
+          style={{
+            marginTop: "1.5rem",
+            marginBottom: "1.5rem",
+          }}
+        >
+          {/* Card 1: ยังไม่ได้ยืนยัน */}
           <div
+            className="admin-kpi-card animate-rise"
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.75rem",
+              borderRadius: "1.25rem",
               backgroundColor: "var(--card)",
-              padding: "0.45rem 0.75rem",
-              borderRadius: "1rem",
-              border: "1px solid rgba(50, 55, 65, 0.12)",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+              padding: "1.25rem 1.35rem",
+              border: "1px solid rgba(50, 55, 65, 0.09)",
+              boxShadow: "0 2px 12px -2px rgba(0,0,0,0.03)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              boxSizing: "border-box",
+              transition: "all 0.15s ease",
             }}
           >
-
-            <div style={{ display: "flex", gap: "0.25rem", backgroundColor: "var(--cream)", padding: "0.25rem", borderRadius: "0.75rem", border: "1px solid rgba(50,55,65,0.08)" }}>
-              <button
-                type="button"
-                onClick={() => handleToggleSlipMode("immediate")}
+            <div>
+              <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", fontWeight: 500, margin: 0 }}>
+                ยังไม่ได้ยืนยัน (รอตรวจสอบ)
+              </p>
+            </div>
+            <div style={{ marginTop: "0.5rem", marginBottom: "0.35rem" }}>
+              <p
                 style={{
-                  padding: "0.35rem 0.75rem",
-                  borderRadius: "0.55rem",
-                  border: "none",
-                  backgroundColor: slipUploadMode === "immediate" ? "var(--teal)" : "transparent",
-                  color: slipUploadMode === "immediate" ? "#fff" : "var(--ink-soft)",
-                  fontSize: "0.775rem",
-                  fontWeight: slipUploadMode === "immediate" ? 700 : 500,
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.3rem",
+                  fontSize: "1.85rem",
+                  fontWeight: 800,
+                  fontFamily: "'Kanit', sans-serif",
+                  color: "#f59e0b",
+                  letterSpacing: "-0.01em",
+                  lineHeight: 1.15,
+                  margin: 0,
                 }}
               >
-                <CheckCircle2 size={13} />
-                <span>ให้อัพเลย (บังคับ)</span>
-              </button>
+                {pendingCount}
+              </p>
+            </div>
+            <div>
+              <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 400, lineHeight: 1.3, margin: 0 }}>
+                รอตรวจสอบสลิป / เงินสด
+              </p>
+            </div>
+          </div>
 
-              <button
-                type="button"
-                onClick={() => handleToggleSlipMode("later")}
+          {/* Card 2: ยืนยันแล้ว */}
+          <div
+            className="admin-kpi-card animate-rise"
+            style={{
+              borderRadius: "1.25rem",
+              backgroundColor: "var(--card)",
+              padding: "1.25rem 1.35rem",
+              border: "1px solid rgba(50, 55, 65, 0.09)",
+              boxShadow: "0 2px 12px -2px rgba(0,0,0,0.03)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              boxSizing: "border-box",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <div>
+              <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", fontWeight: 500, margin: 0 }}>
+                ยืนยันแล้ว (ผ่าน)
+              </p>
+            </div>
+            <div style={{ marginTop: "0.5rem", marginBottom: "0.35rem" }}>
+              <p
                 style={{
-                  padding: "0.35rem 0.75rem",
-                  borderRadius: "0.55rem",
-                  border: "none",
-                  backgroundColor: slipUploadMode === "later" ? "var(--teal)" : "transparent",
-                  color: slipUploadMode === "later" ? "#fff" : "var(--ink-soft)",
-                  fontSize: "0.775rem",
-                  fontWeight: slipUploadMode === "later" ? 700 : 500,
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.3rem",
+                  fontSize: "1.85rem",
+                  fontWeight: 800,
+                  fontFamily: "'Kanit', sans-serif",
+                  color: "var(--teal)",
+                  letterSpacing: "-0.01em",
+                  lineHeight: 1.15,
+                  margin: 0,
                 }}
               >
-                <Clock size={13} />
-                <span>อัพที่หลังได้ (ให้ผ่าน)</span>
-              </button>
+                {verifiedCount}
+              </p>
+            </div>
+            <div>
+              <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 400, lineHeight: 1.3, margin: 0 }}>
+                ชำระเงินถูกต้อง พร้อมทำเครื่องดื่ม
+              </p>
+            </div>
+          </div>
+
+          {/* Card 3: เนียนเลยนะครับ (ปฏิเสธ) */}
+          <div
+            className="admin-kpi-card animate-rise"
+            style={{
+              borderRadius: "1.25rem",
+              backgroundColor: "var(--card)",
+              padding: "1.25rem 1.35rem",
+              border: "1px solid rgba(50, 55, 65, 0.09)",
+              boxShadow: "0 2px 12px -2px rgba(0,0,0,0.03)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              boxSizing: "border-box",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <div>
+              <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", fontWeight: 500, margin: 0 }}>
+                เนียนเลยนะครับ (ไม่ผ่าน)
+              </p>
+            </div>
+            <div style={{ marginTop: "0.5rem", marginBottom: "0.35rem" }}>
+              <p
+                style={{
+                  fontSize: "1.85rem",
+                  fontWeight: 800,
+                  fontFamily: "'Kanit', sans-serif",
+                  color: "#ef4444",
+                  letterSpacing: "-0.01em",
+                  lineHeight: 1.15,
+                  margin: 0,
+                }}
+              >
+                {fraudCount}
+              </p>
+            </div>
+            <div>
+              <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 400, lineHeight: 1.3, margin: 0 }}>
+                สลิปไม่ถูกต้อง / ปฏิเสธรายการ
+              </p>
+            </div>
+          </div>
+
+          {/* Card 4: ตั้งค่าเงื่อนไขรูปภาพการชำระเงิน */}
+          <div
+            className="admin-kpi-card animate-rise"
+            style={{
+              borderRadius: "1.25rem",
+              backgroundColor: "var(--card)",
+              padding: "1.1rem 1.25rem",
+              border: "1px solid rgba(50, 55, 65, 0.09)",
+              boxShadow: "0 2px 12px -2px rgba(0,0,0,0.03)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              boxSizing: "border-box",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <div style={{ marginBottom: "0.6rem" }}>
+              <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", fontWeight: 600, margin: 0 }}>
+                เงื่อนไขการอัพโหลดรูปภาพ
+              </p>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+              {/* PromptPay QR Toggle Row */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "0.5rem",
+                  padding: "0.4rem 0.6rem",
+                  backgroundColor: "rgba(50, 55, 65, 0.025)",
+                  borderRadius: "0.75rem",
+                  border: "1px solid rgba(50, 55, 65, 0.05)",
+                }}
+              >
+                <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--ink)", lineHeight: 1.2 }}>
+                  พร้อมเพย์ QR:
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => handleTogglePromptpayMode(promptpayUploadMode === "immediate" ? "later" : "immediate")}
+                  style={{
+                    position: "relative",
+                    width: "44px",
+                    height: "24px",
+                    borderRadius: "12px",
+                    border: "none",
+                    backgroundColor: promptpayUploadMode === "immediate" ? "var(--teal)" : "#cbd5e1",
+                    cursor: "pointer",
+                    transition: "background-color 0.2s ease",
+                    padding: 0,
+                    outline: "none",
+                  }}
+                  title={promptpayUploadMode === "immediate" ? "เปิดอยู่ (กดเพื่อปิด)" : "ปิดอยู่ (กดเพื่อเปิด)"}
+                >
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: "2px",
+                      left: promptpayUploadMode === "immediate" ? "22px" : "2px",
+                      width: "20px",
+                      height: "20px",
+                      borderRadius: "50%",
+                      backgroundColor: "#ffffff",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                      transition: "left 0.2s ease",
+                    }}
+                  />
+                </button>
+              </div>
+
+              {/* Cash Toggle Row */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "0.5rem",
+                  padding: "0.4rem 0.6rem",
+                  backgroundColor: "rgba(50, 55, 65, 0.025)",
+                  borderRadius: "0.75rem",
+                  border: "1px solid rgba(50, 55, 65, 0.05)",
+                }}
+              >
+                <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--ink)", whiteSpace: "nowrap" }}>
+                  เงินสด:
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => handleToggleCashMode(cashUploadMode === "immediate" ? "later" : "immediate")}
+                  style={{
+                    position: "relative",
+                    width: "44px",
+                    height: "24px",
+                    borderRadius: "12px",
+                    border: "none",
+                    backgroundColor: cashUploadMode === "immediate" ? "var(--teal)" : "#cbd5e1",
+                    cursor: "pointer",
+                    transition: "background-color 0.2s ease",
+                    padding: 0,
+                    outline: "none",
+                  }}
+                  title={cashUploadMode === "immediate" ? "เปิดอยู่ (กดเพื่อปิด)" : "ปิดอยู่ (กดเพื่อเปิด)"}
+                >
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: "2px",
+                      left: cashUploadMode === "immediate" ? "22px" : "2px",
+                      width: "20px",
+                      height: "20px",
+                      borderRadius: "50%",
+                      backgroundColor: "#ffffff",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                      transition: "left 0.2s ease",
+                    }}
+                  />
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Main Table Container (Dashboard Style) */}
+        {/* Main Table Container */}
         <section
           style={{
-            marginTop: "1.5rem",
             borderRadius: "1.25rem",
             backgroundColor: "var(--card)",
             padding: "1.5rem",
@@ -458,144 +729,16 @@ export default function SlipCheckManagementPage() {
             boxShadow: "0 4px 20px -2px rgba(0,0,0,0.03)",
           }}
         >
-          {/* Top of Table: Status Summary Cards (Dashboard KPI Card Style) */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: "1rem",
-              marginBottom: "1.25rem",
-              paddingBottom: "1.25rem",
-              borderBottom: "1px solid rgba(50, 55, 65, 0.08)",
-            }}
-          >
-            {/* Card 1: ยังไม่ได้ยืนยัน */}
-            <div
-              className="animate-rise"
-              onClick={() => {
-                setStatusFilter(statusFilter === "pending" ? "all" : "pending");
-                setPage(1);
-              }}
-              style={{
-                borderRadius: "1.25rem",
-                backgroundColor: statusFilter === "pending" ? "rgba(239, 68, 68, 0.08)" : "var(--card)",
-                padding: "1.25rem",
-                border: statusFilter === "pending" ? "2px solid #ef4444" : "1px solid rgba(50, 55, 65, 0.1)",
-                boxShadow: "0 4px 16px -2px rgba(0,0,0,0.03)",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
-            >
-              <p style={{ fontSize: "0.875rem", color: "var(--ink-soft)", fontWeight: 500, margin: 0 }}>
-                ยังไม่ได้ยืนยัน
-              </p>
-              <p
-                style={{
-                  marginTop: "0.35rem",
-                  marginBottom: 0,
-                  fontSize: "1.75rem",
-                  fontWeight: 700,
-                  fontFamily: "'Kanit', sans-serif",
-                  color: "var(--ink)",
-                  letterSpacing: "-0.01em",
-                  lineHeight: 1.15,
-                }}
-              >
-                {pendingCount}
-              </p>
-              <p style={{ marginTop: "0.25rem", marginBottom: 0, fontSize: "0.75rem", color: "var(--ink-soft)" }}>
-                รอตรวจสอบสลิป / เงินสด
-              </p>
-            </div>
-
-            {/* Card 2: ยืนยันแล้ว */}
-            <div
-              className="animate-rise"
-              onClick={() => {
-                setStatusFilter(statusFilter === "verified" ? "all" : "verified");
-                setPage(1);
-              }}
-              style={{
-                borderRadius: "1.25rem",
-                backgroundColor: statusFilter === "verified" ? "rgba(34, 197, 94, 0.08)" : "var(--card)",
-                padding: "1.25rem",
-                border: statusFilter === "verified" ? "2px solid #22c55e" : "1px solid rgba(50, 55, 65, 0.1)",
-                boxShadow: "0 4px 16px -2px rgba(0,0,0,0.03)",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
-            >
-              <p style={{ fontSize: "0.875rem", color: "var(--ink-soft)", fontWeight: 500, margin: 0 }}>
-                ยืนยันแล้ว
-              </p>
-              <p
-                style={{
-                  marginTop: "0.35rem",
-                  marginBottom: 0,
-                  fontSize: "1.75rem",
-                  fontWeight: 700,
-                  fontFamily: "'Kanit', sans-serif",
-                  color: "var(--ink)",
-                  letterSpacing: "-0.01em",
-                  lineHeight: 1.15,
-                }}
-              >
-                {verifiedCount}
-              </p>
-              <p style={{ marginTop: "0.25rem", marginBottom: 0, fontSize: "0.75rem", color: "var(--ink-soft)" }}>
-                ชำระเงินถูกต้อง พร้อมทำเครื่องดื่ม
-              </p>
-            </div>
-
-            {/* Card 3: เนียนเลยนะครับ */}
-            <div
-              className="animate-rise"
-              onClick={() => {
-                setStatusFilter(statusFilter === "fraud" ? "all" : "fraud");
-                setPage(1);
-              }}
-              style={{
-                borderRadius: "1.25rem",
-                backgroundColor: statusFilter === "fraud" ? "rgba(185, 28, 28, 0.08)" : "var(--card)",
-                padding: "1.25rem",
-                border: statusFilter === "fraud" ? "2px solid #991b1b" : "1px solid rgba(50, 55, 65, 0.1)",
-                boxShadow: "0 4px 16px -2px rgba(0,0,0,0.03)",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
-            >
-              <p style={{ fontSize: "0.875rem", color: "var(--ink-soft)", fontWeight: 500, margin: 0 }}>
-                เนียนเลยนะครับ
-              </p>
-              <p
-                style={{
-                  marginTop: "0.35rem",
-                  marginBottom: 0,
-                  fontSize: "1.75rem",
-                  fontWeight: 700,
-                  fontFamily: "'Kanit', sans-serif",
-                  color: "var(--ink)",
-                  letterSpacing: "-0.01em",
-                  lineHeight: 1.15,
-                }}
-              >
-                {fraudCount}
-              </p>
-              <p style={{ marginTop: "0.25rem", marginBottom: 0, fontSize: "0.75rem", color: "var(--ink-soft)" }}>
-                สลิปไม่ถูกต้อง / ปฏิเสธรายการ
-              </p>
-            </div>
-          </div>
 
           {/* Controls Bar: Filter Tabs & Search / Sort */}
           <div className="admin-controls-bar">
             {/* Filter Tabs (Desktop) */}
             <div className="admin-filter-tabs">
               {[
-                { id: "all", label: "ทั้งหมด" },
-                { id: "pending", label: "รอตรวจสอบ" },
-                { id: "verified", label: "ยืนยันแล้ว" },
-                { id: "fraud", label: "สลิปไม่ถูกต้อง" },
+                { id: "all", label: `ทั้งหมด (${orders.length})` },
+                { id: "pending", label: `รอตรวจสอบ (${pendingCount})` },
+                { id: "verified", label: `ยืนยันแล้ว (${verifiedCount})` },
+                { id: "fraud", label: `สลิปไม่ถูกต้อง (${fraudCount})` },
               ].map((tab) => {
                 const isSelected = statusFilter === tab.id;
                 return (
@@ -636,16 +779,15 @@ export default function SlipCheckManagementPage() {
                   setPage(1);
                 }}
               >
-                <option value="all">สถานะ: ทั้งหมด</option>
-                <option value="pending">สถานะ: รอตรวจสอบ</option>
-                <option value="verified">สถานะ: ยืนยันแล้ว</option>
-                <option value="fraud">สถานะ: สลิปไม่ถูกต้อง</option>
+                <option value="all">สถานะ: ทั้งหมด ({orders.length})</option>
+                <option value="pending">สถานะ: รอตรวจสอบ ({pendingCount})</option>
+                <option value="verified">สถานะ: ยืนยันแล้ว ({verifiedCount})</option>
+                <option value="fraud">สถานะ: สลิปไม่ถูกต้อง ({fraudCount})</option>
               </select>
             </div>
 
-            {/* Search & Sort */}
+            {/* Search */}
             <div className="admin-search-wrapper">
-              {/* Search */}
               <div className="admin-search-box">
                 <Search size={15} color="var(--ink-soft)" style={{ flexShrink: 0 }} />
                 <input
@@ -658,51 +800,21 @@ export default function SlipCheckManagementPage() {
                   }}
                 />
               </div>
-
-              {/* Sort */}
-              <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                <ArrowUpDown size={15} color="var(--ink-soft)" />
-                <select
-                  value={sortOrder}
-                  onChange={(e) => {
-                    setSortOrder(e.target.value as any);
-                    setPage(1);
-                  }}
-                  style={{
-                    padding: "0.45rem 0.75rem",
-                    borderRadius: "0.6rem",
-                    fontSize: "0.825rem",
-                    fontFamily: "'Kanit', sans-serif",
-                    backgroundColor: "var(--cream)",
-                    border: "1px solid rgba(50, 55, 65, 0.12)",
-                    color: "var(--ink)",
-                    cursor: "pointer",
-                    outline: "none",
-                  }}
-                >
-                  <option value="latest">ล่าสุด</option>
-                  <option value="oldest">เก่าสุด</option>
-                  <option value="amount_high">ยอดเงิน (มาก → น้อย)</option>
-                  <option value="amount_low">ยอดเงิน (น้อย → มาก)</option>
-                </select>
-              </div>
             </div>
           </div>
 
           {/* Table */}
-          <div style={{ overflowX: "visible" }}>
+          <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.875rem" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid rgba(50, 55, 65, 0.12)", color: "var(--ink-soft)", fontSize: "0.8rem" }}>
-                  <th style={{ padding: "0.75rem 0.6rem" }}>เลขที่ออเดอร์</th>
-                  <th style={{ padding: "0.75rem 0.6rem" }}>คิว</th>
-                  <th style={{ padding: "0.75rem 0.6rem" }}>ลูกค้า / เบอร์โทร</th>
-                  <th style={{ padding: "0.75rem 0.6rem" }}>ช่องทาง</th>
+                  <th style={{ padding: "0.75rem 0.6rem" }}>วันที่</th>
+                  <th style={{ padding: "0.75rem 0.6rem" }}>หมายเลขคิว</th>
                   <th style={{ padding: "0.75rem 0.6rem" }}>วิธีชำระ</th>
-                  <th style={{ padding: "0.75rem 0.6rem" }}>ยอดเงิน</th>
-                  <th style={{ padding: "0.75rem 0.6rem" }}>หลักฐาน</th>
+                  <th style={{ padding: "0.75rem 0.6rem" }}>ตรวจสอบ</th>
                   <th style={{ padding: "0.75rem 0.6rem" }}>สถานะตรวจสอบ</th>
-                  <th style={{ padding: "0.75rem 0.6rem", width: "45px" }}></th>
+                  <th style={{ padding: "0.75rem 0.6rem" }}>วันที่ตรวจสอบ</th>
+                  <th style={{ padding: "0.75rem 0.6rem" }}>คนที่ตรวจสอบ</th>
                 </tr>
               </thead>
               <tbody>
@@ -710,7 +822,6 @@ export default function SlipCheckManagementPage() {
                   const isPending = order.paymentStatus === "pending";
                   const isVerified = order.paymentStatus === "verified";
                   const isFraud = order.paymentStatus === "fraud";
-                  const isKebabOpen = activeKebabId === order.id;
 
                   return (
                     <tr
@@ -718,41 +829,25 @@ export default function SlipCheckManagementPage() {
                       style={{
                         borderBottom: "1px solid rgba(50, 55, 65, 0.06)",
                         transition: "background-color 0.15s ease",
-                        position: isKebabOpen ? "relative" : "static",
-                        zIndex: isKebabOpen ? 50 : 1,
                       }}
                     >
-                      <td className="font-mono" style={{ padding: "0.85rem 0.6rem", fontSize: "0.825rem", fontWeight: 600 }}>
-                        {order.orderNo}
-                        <span style={{ display: "block", fontSize: "0.7rem", color: "var(--ink-soft)", fontWeight: 400 }}>
-                          {order.orderedAt}
-                        </span>
+                      {/* วันที่ */}
+                      <td style={{ padding: "0.85rem 0.6rem" }}>
+                        {renderFormattedDate(order.createdAtRaw || order.orderedAt)}
                       </td>
+
+                      {/* หมายเลขคิว */}
                       <td style={{ padding: "0.85rem 0.6rem", fontWeight: 800, fontSize: "1rem", color: "var(--ink)" }}>
                         {order.queueNo}
                       </td>
-                      <td style={{ padding: "0.85rem 0.6rem" }}>
-                        <span style={{ fontWeight: 600, color: "var(--ink)", display: "block" }}>{order.customerName}</span>
-                        <span className="font-mono" style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>
-                          {order.customerPhone || "-"}
-                        </span>
-                      </td>
-                      <td style={{ padding: "0.85rem 0.6rem" }}>
-                        <span
-                          style={{
-                            fontWeight: 600,
-                            color: order.channel === "ออนไลน์" ? "var(--teal)" : "var(--ink)",
-                          }}
-                        >
-                          {order.channel}
-                        </span>
-                      </td>
+
+                      {/* วิธีชำระ */}
                       <td style={{ padding: "0.85rem 0.6rem" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.8rem" }}>
                           {order.paymentMethod === "promptpay_qr" ? (
                             <>
-                              <CreditCard size={15} color="var(--teal)" />
-                              <span>QR PromptPay</span>
+                              <QrCode size={15} color="var(--teal)" />
+                              <span>พร้อมเพย์ QR</span>
                             </>
                           ) : (
                             <>
@@ -762,10 +857,8 @@ export default function SlipCheckManagementPage() {
                           )}
                         </div>
                       </td>
-                      <td style={{ padding: "0.85rem 0.6rem", fontWeight: 800, fontSize: "1rem", color: "var(--ink)" }}>
-                        ฿{order.total}
-                      </td>
-                      {/* View Evidence / Slip Button */}
+
+                      {/* ตรวจสอบ */}
                       <td style={{ padding: "0.85rem 0.6rem" }}>
                         <button
                           type="button"
@@ -787,12 +880,11 @@ export default function SlipCheckManagementPage() {
                           onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--teal)")}
                           onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(50, 55, 65, 0.15)")}
                         >
-                          <FileImage size={14} color="var(--teal)" />
-                          <span>ดูสลิป/รูป</span>
+                          <span>รายละเอียด</span>
                         </button>
                       </td>
 
-                      {/* Status Tag */}
+                      {/* สถานะตรวจสอบ */}
                       <td style={{ padding: "0.85rem 0.6rem" }}>
                         <div>
                           <span
@@ -831,177 +923,14 @@ export default function SlipCheckManagementPage() {
                         </div>
                       </td>
 
-                      {/* Status Action: Kebab Menu */}
-                      <td style={{ padding: "0.85rem 0.6rem", textAlign: "right", position: isKebabOpen ? "relative" : "static", zIndex: isKebabOpen ? 50 : 1 }}>
-                        <div className="kebab-container" style={{ position: "relative", display: "inline-block" }}>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveKebabId(activeKebabId === order.id ? null : order.id);
-                            }}
-                            title="จัดการสถานะ"
-                            style={{
-                              width: "2.25rem",
-                              height: "2.25rem",
-                              borderRadius: "0.6rem",
-                              border: "1px solid rgba(50, 55, 65, 0.12)",
-                              backgroundColor: activeKebabId === order.id ? "var(--ink)" : "var(--cream)",
-                              color: activeKebabId === order.id ? "var(--cream)" : "var(--ink)",
-                              display: "grid",
-                              placeItems: "center",
-                              cursor: "pointer",
-                              transition: "all 0.15s ease",
-                              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                            }}
-                          >
-                            <MoreVertical size={16} />
-                          </button>
+                      {/* วันที่ตรวจสอบ */}
+                      <td style={{ padding: "0.85rem 0.6rem", fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+                        {renderFormattedDate(order.slipVerifiedAt)}
+                      </td>
 
-                          {/* Kebab Dropdown Menu */}
-                          {activeKebabId === order.id && (
-                            <div
-                              className="animate-rise"
-                              style={{
-                                position: "absolute",
-                                right: 0,
-                                top: "2.5rem",
-                                zIndex: 60,
-                                width: "180px",
-                                backgroundColor: "var(--card)",
-                                borderRadius: "0.85rem",
-                                border: "1px solid rgba(50, 55, 65, 0.12)",
-                                boxShadow: "0 10px 25px -3px rgba(0, 0, 0, 0.15), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
-                                padding: "0.4rem",
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: "0.25rem",
-                                textAlign: "left",
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <div style={{ padding: "0.35rem 0.5rem 0.2rem 0.5rem", borderBottom: "1px solid rgba(50, 55, 65, 0.08)", marginBottom: "0.2rem" }}>
-                                <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.05em", margin: 0 }}>
-                                  เปลี่ยนสถานะ
-                                </p>
-                              </div>
-
-                              {/* Option 1: ยืนยันแล้ว */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  handleSetStatus(order.id, "verified");
-                                  setActiveKebabId(null);
-                                }}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  width: "100%",
-                                  padding: "0.5rem 0.65rem",
-                                  borderRadius: "0.5rem",
-                                  border: "none",
-                                  backgroundColor: isVerified ? "rgba(34, 197, 94, 0.12)" : "transparent",
-                                  color: "#16a34a",
-                                  fontSize: "0.8rem",
-                                  fontWeight: 600,
-                                  fontFamily: "'Kanit', sans-serif",
-                                  cursor: "pointer",
-                                  textAlign: "left",
-                                  transition: "background-color 0.1s ease",
-                                }}
-                                onMouseEnter={(e) => {
-                                  if (!isVerified) (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(34, 197, 94, 0.08)";
-                                }}
-                                onMouseLeave={(e) => {
-                                  if (!isVerified) (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
-                                }}
-                              >
-                                <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-                                  <CheckCircle2 size={15} />
-                                  <span>ยืนยันแล้ว</span>
-                                </div>
-                                {isVerified && <Check size={14} />}
-                              </button>
-
-                              {/* Option 2: ยังไม่ได้ยืนยัน */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  handleSetStatus(order.id, "pending");
-                                  setActiveKebabId(null);
-                                }}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  width: "100%",
-                                  padding: "0.5rem 0.65rem",
-                                  borderRadius: "0.5rem",
-                                  border: "none",
-                                  backgroundColor: isPending ? "rgba(239, 68, 68, 0.12)" : "transparent",
-                                  color: "#dc2626",
-                                  fontSize: "0.8rem",
-                                  fontWeight: 600,
-                                  fontFamily: "'Kanit', sans-serif",
-                                  cursor: "pointer",
-                                  textAlign: "left",
-                                  transition: "background-color 0.1s ease",
-                                }}
-                                onMouseEnter={(e) => {
-                                  if (!isPending) (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(239, 68, 68, 0.08)";
-                                }}
-                                onMouseLeave={(e) => {
-                                  if (!isPending) (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
-                                }}
-                              >
-                                <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-                                  <Clock size={15} />
-                                  <span>ยังไม่ได้ยืนยัน</span>
-                                </div>
-                                {isPending && <Check size={14} />}
-                              </button>
-
-                              {/* Option 3: เนียนเลยนะครับ */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveKebabId(null);
-                                  handleOpenFraudReasonModal(order);
-                                }}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  width: "100%",
-                                  padding: "0.5rem 0.65rem",
-                                  borderRadius: "0.5rem",
-                                  border: "none",
-                                  backgroundColor: isFraud ? "rgba(185, 28, 28, 0.12)" : "transparent",
-                                  color: "#991b1b",
-                                  fontSize: "0.8rem",
-                                  fontWeight: 600,
-                                  fontFamily: "'Kanit', sans-serif",
-                                  cursor: "pointer",
-                                  textAlign: "left",
-                                  transition: "background-color 0.1s ease",
-                                }}
-                                onMouseEnter={(e) => {
-                                  if (!isFraud) (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(185, 28, 28, 0.08)";
-                                }}
-                                onMouseLeave={(e) => {
-                                  if (!isFraud) (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
-                                }}
-                              >
-                                <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-                                  <AlertTriangle size={15} />
-                                  <span>เนียนเลยนะครับ</span>
-                                </div>
-                                {isFraud && <Check size={14} />}
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                      {/* คนที่ตรวจสอบ */}
+                      <td style={{ padding: "0.85rem 0.6rem", fontSize: "0.8rem", fontWeight: 600, color: "var(--ink)" }}>
+                        {order.verifiedByName || "-"}
                       </td>
                     </tr>
                   );
@@ -1009,7 +938,7 @@ export default function SlipCheckManagementPage() {
 
                 {paginatedOrders.length === 0 && (
                   <tr>
-                    <td colSpan={9} style={{ textAlign: "center", padding: "2.5rem 0", color: "var(--ink-soft)" }}>
+                    <td colSpan={7} style={{ textAlign: "center", padding: "2.5rem 0", color: "var(--ink-soft)" }}>
                       ไม่พบข้อมูลรายการชำระเงินตามเงื่อนไขที่ระบุ
                     </td>
                   </tr>
@@ -1109,381 +1038,24 @@ export default function SlipCheckManagementPage() {
 
       {/* POPUP MODAL 1: View Slip / Evidence & Quick Status Change */}
       {selectedOrder && (
-        <div
-          className="animate-fade-in"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 100,
-            backgroundColor: "rgba(0, 0, 0, 0.65)",
-            backdropFilter: "blur(4px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1.5rem",
-          }}
-          onClick={() => setSelectedOrder(null)}
-        >
-          <div
-            className="animate-rise"
-            style={{
-              width: "100%",
-              maxWidth: "580px",
-              backgroundColor: "var(--card)",
-              borderRadius: "1.5rem",
-              padding: "1.75rem",
-              boxShadow: "0 20px 40px rgba(0,0,0,0.25)",
-              border: "1px solid rgba(50, 55, 65, 0.12)",
-              maxHeight: "90vh",
-              overflowY: "auto",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.25rem" }}>
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <span
-                    className="font-mono"
-                    style={{
-                      fontSize: "0.75rem",
-                      fontWeight: 700,
-                      backgroundColor: "var(--cream)",
-                      padding: "0.2rem 0.5rem",
-                      borderRadius: "0.4rem",
-                    }}
-                  >
-                    {selectedOrder.orderNo}
-                  </span>
-                  <span style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--teal)" }}>
-                    คิว {selectedOrder.queueNo}
-                  </span>
-                </div>
-                <h3 style={{ fontSize: "1.25rem", fontWeight: 800, color: "var(--ink)", marginTop: "0.35rem" }}>
-                  ตรวจสอบหลักฐานการชำระเงิน
-                </h3>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedOrder(null)}
-                style={{
-                  width: "2rem",
-                  height: "2rem",
-                  borderRadius: "50%",
-                  border: "none",
-                  backgroundColor: "var(--cream)",
-                  color: "var(--ink-soft)",
-                  display: "grid",
-                  placeItems: "center",
-                  cursor: "pointer",
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Order Info & Total */}
-            <div
-              style={{
-                backgroundColor: "var(--cream)",
-                borderRadius: "1rem",
-                padding: "1rem",
-                marginBottom: "1.25rem",
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "0.75rem",
-                fontSize: "0.85rem",
-              }}
-            >
-              <div>
-                <span style={{ color: "var(--ink-soft)", fontSize: "0.75rem" }}>ลูกค้า</span>
-                <p style={{ margin: 0, fontWeight: 700 }}>{selectedOrder.customerName}</p>
-                <p className="font-mono" style={{ margin: 0, fontSize: "0.75rem", color: "var(--ink-soft)" }}>
-                  {selectedOrder.customerPhone || "-"}
-                </p>
-              </div>
-
-              <div>
-                <span style={{ color: "var(--ink-soft)", fontSize: "0.75rem" }}>ยอดที่ต้องชำระ</span>
-                <p className="font-display" style={{ margin: 0, fontSize: "1.4rem", color: "var(--teal)", lineHeight: 1.1 }}>
-                  ฿{selectedOrder.total}
-                </p>
-              </div>
-
-              <div style={{ gridColumn: "1 / -1" }}>
-                <span style={{ color: "var(--ink-soft)", fontSize: "0.75rem" }}>รายการสั่งซื้อ</span>
-                <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--ink)" }}>{selectedOrder.itemsSummary}</p>
-              </div>
-            </div>
-
-            {/* Slip / Cash Evidence Preview Box */}
-            <div style={{ marginBottom: "1.25rem" }}>
-              <p style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)", marginBottom: "0.5rem" }}>
-                {selectedOrder.paymentMethod === "promptpay_qr"
-                  ? "รูปภาพสลิปโอนเงิน (Slip Attached)"
-                  : "รูปถ่ายเงินสด / ใบเสร็จหน้าร้าน"}
-              </p>
-
-              <div
-                style={{
-                  width: "100%",
-                  height: "280px",
-                  borderRadius: "1rem",
-                  backgroundColor: "#f1f0ea",
-                  border: "2px dashed rgba(50, 55, 65, 0.2)",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  position: "relative",
-                  overflow: "hidden",
-                }}
-              >
-                {/* Simulated Slip Visual */}
-                <div
-                  style={{
-                    width: "200px",
-                    backgroundColor: "#fff",
-                    borderRadius: "0.75rem",
-                    padding: "1rem",
-                    boxShadow: "0 8px 25px rgba(0,0,0,0.1)",
-                    textAlign: "center",
-                    border: "1px solid rgba(0,0,0,0.08)",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "36px",
-                      height: "36px",
-                      borderRadius: "50%",
-                      backgroundColor: "rgba(75, 155, 140, 0.15)",
-                      color: "var(--teal)",
-                      margin: "0 auto 0.5rem auto",
-                      display: "grid",
-                      placeItems: "center",
-                      fontWeight: 800,
-                    }}
-                  >
-                    ถ
-                  </div>
-                  <p style={{ fontSize: "0.75rem", fontWeight: 700, margin: 0 }}>สลิปโอนเงินสำเร็จ</p>
-                  <p className="font-mono" style={{ fontSize: "0.65rem", color: "#666", margin: "2px 0 6px 0" }}>
-                    {selectedOrder.orderedAt} · PromptPay
-                  </p>
-                  <p className="font-mono" style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--teal)", margin: "4px 0" }}>
-                    ฿{selectedOrder.total}.00
-                  </p>
-                  <p style={{ fontSize: "0.65rem", color: "#888", margin: 0 }}>
-                    ผู้รับ: ร้านถั่วทอง เกษตรแฟร์
-                  </p>
-                  <p className="font-mono" style={{ fontSize: "0.6rem", color: "#aaa", marginTop: "4px" }}>
-                    Ref: {selectedOrder.orderNo}-98234
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Current Status and Fraud Reason Warning (if any) */}
-            {selectedOrder.paymentStatus === "fraud" && selectedOrder.statusNote && (
-              <div
-                style={{
-                  backgroundColor: "rgba(185, 28, 28, 0.1)",
-                  border: "1px solid rgba(185, 28, 28, 0.3)",
-                  borderRadius: "0.75rem",
-                  padding: "0.75rem 1rem",
-                  marginBottom: "1.25rem",
-                  fontSize: "0.825rem",
-                  color: "#991b1b",
-                }}
-              >
-                <strong>ระบุข้อสงสัย / เหตุผลเนียน:</strong> {selectedOrder.statusNote}
-              </div>
-            )}
-
-            {/* Change Status Action Buttons */}
-            <div style={{ borderTop: "1px solid rgba(50, 55, 65, 0.1)", paddingTop: "1.25rem" }}>
-              <p style={{ fontSize: "0.85rem", fontWeight: 700, marginBottom: "0.6rem" }}>
-                เปลี่ยนสถานะการตรวจสอบ:
-              </p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem" }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleSetStatus(selectedOrder.id, "verified");
-                  }}
-                  style={{
-                    padding: "0.65rem",
-                    borderRadius: "0.75rem",
-                    backgroundColor: selectedOrder.paymentStatus === "verified" ? "#22c55e" : "rgba(34, 197, 94, 0.12)",
-                    color: selectedOrder.paymentStatus === "verified" ? "#fff" : "#16a34a",
-                    border: "1.5px solid #22c55e",
-                    fontWeight: 700,
-                    fontSize: "0.85rem",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "0.3rem",
-                  }}
-                >
-                  <CheckCircle2 size={16} />
-                  <span>ยืนยันแล้ว</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleSetStatus(selectedOrder.id, "pending");
-                  }}
-                  style={{
-                    padding: "0.65rem",
-                    borderRadius: "0.75rem",
-                    backgroundColor: selectedOrder.paymentStatus === "pending" ? "#ef4444" : "rgba(239, 68, 68, 0.12)",
-                    color: selectedOrder.paymentStatus === "pending" ? "#fff" : "#dc2626",
-                    border: "1.5px solid #ef4444",
-                    fontWeight: 700,
-                    fontSize: "0.85rem",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "0.3rem",
-                  }}
-                >
-                  <Clock size={16} />
-                  <span>ยังไม่ยืนยัน</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleOpenFraudReasonModal(selectedOrder);
-                  }}
-                  style={{
-                    padding: "0.65rem",
-                    borderRadius: "0.75rem",
-                    backgroundColor: selectedOrder.paymentStatus === "fraud" ? "#991b1b" : "rgba(185, 28, 28, 0.12)",
-                    color: selectedOrder.paymentStatus === "fraud" ? "#fff" : "#991b1b",
-                    border: "1.5px solid #991b1b",
-                    fontWeight: 700,
-                    fontSize: "0.85rem",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "0.3rem",
-                  }}
-                >
-                  <AlertTriangle size={16} />
-                  <span>เนียนเลยนะครับ</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <OrderInspectionModal
+          order={selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+          onSetStatus={handleSetStatus}
+          onOpenFraudReasonModal={handleOpenFraudReasonModal}
+          onUploadSlip={handleUploadSlip}
+        />
       )}
 
       {/* POPUP MODAL 2: Fraud Reason Required Modal */}
       {isFraudModalOpen && fraudTargetOrder && (
-        <div
-          className="animate-fade-in"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 110,
-            backgroundColor: "rgba(0, 0, 0, 0.75)",
-            backdropFilter: "blur(4px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1.5rem",
-          }}
-          onClick={() => setIsFraudModalOpen(false)}
-        >
-          <form
-            onSubmit={handleConfirmFraud}
-            className="animate-rise"
-            style={{
-              width: "100%",
-              maxWidth: "460px",
-              backgroundColor: "var(--card)",
-              borderRadius: "1.5rem",
-              padding: "1.75rem",
-              boxShadow: "0 20px 40px rgba(0,0,0,0.3)",
-              border: "2px solid #b91c1c",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#b91c1c", marginBottom: "0.5rem" }}>
-              <AlertTriangle size={24} />
-              <h3 style={{ fontSize: "1.2rem", fontWeight: 800, margin: 0 }}>
-                ระบุเหตุผล (เนียนเลยนะครับ)
-              </h3>
-            </div>
-            <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", marginBottom: "1rem" }}>
-              ออเดอร์ <strong className="font-mono">{fraudTargetOrder.orderNo}</strong> (คิว {fraudTargetOrder.queueNo}) โดย {fraudTargetOrder.customerName}
-            </p>
-
-            <label style={{ display: "block", fontSize: "0.825rem", fontWeight: 700, marginBottom: "0.4rem" }}>
-              กรุณาระบุเหตุผลที่ปฏิเสธสลิป / พบความผิดปกติ: <span style={{ color: "#b91c1c" }}>*</span>
-            </label>
-            <textarea
-              required
-              rows={3}
-              value={fraudReason}
-              onChange={(e) => setFraudReason(e.target.value)}
-              placeholder="เช่น สลิปปลอม, ยอดเงินไม่เข้าบัญชี, ใช้สลิปเก่าซ้ำ, สลิปตัดต่อ..."
-              style={{
-                width: "100%",
-                borderRadius: "0.75rem",
-                backgroundColor: "var(--cream)",
-                border: "1px solid rgba(50, 55, 65, 0.2)",
-                padding: "0.75rem",
-                fontSize: "0.875rem",
-                fontFamily: "'Kanit', sans-serif",
-                outline: "none",
-                color: "var(--ink)",
-                boxSizing: "border-box",
-                marginBottom: "1.25rem",
-              }}
-            />
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
-              <button
-                type="button"
-                onClick={() => setIsFraudModalOpen(false)}
-                style={{
-                  padding: "0.6rem 1rem",
-                  borderRadius: "0.6rem",
-                  backgroundColor: "var(--cream)",
-                  border: "1px solid rgba(50, 55, 65, 0.15)",
-                  color: "var(--ink)",
-                  fontWeight: 600,
-                  fontSize: "0.85rem",
-                  cursor: "pointer",
-                }}
-              >
-                ยกเลิก
-              </button>
-              <button
-                type="submit"
-                style={{
-                  padding: "0.6rem 1.25rem",
-                  borderRadius: "0.6rem",
-                  backgroundColor: "#991b1b",
-                  border: "none",
-                  color: "#fff",
-                  fontWeight: 700,
-                  fontSize: "0.85rem",
-                  cursor: "pointer",
-                }}
-              >
-                บันทึกสถานะเนียนเลยนะครับ
-              </button>
-            </div>
-          </form>
-        </div>
+        <FraudReasonModal
+          targetOrder={fraudTargetOrder}
+          reason={fraudReason}
+          onChangeReason={setFraudReason}
+          onClose={() => setIsFraudModalOpen(false)}
+          onSubmit={handleConfirmFraud}
+        />
       )}
     </div>
   );
