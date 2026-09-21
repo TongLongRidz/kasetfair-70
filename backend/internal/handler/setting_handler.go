@@ -59,6 +59,20 @@ func (h *AppHandler) GetSettingByKey(c *gin.Context) {
 				})
 				return
 			}
+			if key == "promptpay_target" {
+				c.JSON(http.StatusOK, gin.H{
+					"key":   key,
+					"value": "",
+				})
+				return
+			}
+			if key == "promptpay_name" {
+				c.JSON(http.StatusOK, gin.H{
+					"key":   key,
+					"value": "",
+				})
+				return
+			}
 			c.JSON(http.StatusNotFound, gin.H{"error": "Setting not found"})
 			return
 		}

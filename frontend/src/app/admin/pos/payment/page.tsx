@@ -51,8 +51,8 @@ export default function POSPaymentPage() {
   // Payment configuration & states
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "promptpay">("promptpay");
   const [cashReceived, setCashReceived] = useState<string>("");
-  const [promptpayAccount, setPromptpayAccount] = useState<string>("0812345678");
-  const [promptpayName, setPromptpayName] = useState<string>("ถั่วทอง น้ำเต้าหู้");
+  const [promptpayAccount, setPromptpayAccount] = useState<string>("");
+  const [promptpayName, setPromptpayName] = useState<string>("");
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
 
   // Slip upload state (for PromptPay)
@@ -122,6 +122,26 @@ export default function POSPaymentPage() {
             if (data.value === "later" || data.value === "immediate") {
               setSlipUploadMode(data.value);
               localStorage.setItem("kaset_slip_upload_mode", data.value);
+            }
+          }
+        } catch { }
+        try {
+          const res = await fetch(`${apiUrl}/api/v1/settings/promptpay_target`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.value) {
+              setPromptpayAccount(data.value);
+              localStorage.setItem("kaset_promptpay_account", data.value);
+            }
+          }
+        } catch { }
+        try {
+          const res = await fetch(`${apiUrl}/api/v1/settings/promptpay_name`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.value) {
+              setPromptpayName(data.value);
+              localStorage.setItem("kaset_promptpay_name", data.value);
             }
           }
         } catch { }

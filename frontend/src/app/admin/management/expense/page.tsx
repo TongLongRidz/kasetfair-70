@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import AdminSidebar from "@/components/layouts/AdminSidebar";
+import { getStoredToken } from "@/lib/auth";
+import { useToast } from "@/components/ui/toast";
 import generatePayload from "promptpay-qr";
 import QRCode from "qrcode";
 import {
@@ -94,6 +96,7 @@ const INITIAL_EXPENSES: Transaction[] = [
 ];
 
 export default function AdminExpensePage() {
+  const { success, error: toastError } = useToast();
   const [activeTab, setActiveTab] = useState<"records" | "qr_settings">("records");
 
   // Transactions State
@@ -114,11 +117,10 @@ export default function AdminExpensePage() {
   const [formNote, setFormNote] = useState("");
 
   // PromptPay Settings State
-  const [promptpayAccount, setPromptpayAccount] = useState("0812345678");
-  const [promptpayName, setPromptpayName] = useState("ถั่วทอง น้ำเต้าหู้");
+  const [promptpayAccount, setPromptpayAccount] = useState("");
+  const [promptpayName, setPromptpayName] = useState("");
   const [testAmount, setTestAmount] = useState<string>("50");
   const [previewQrUrl, setPreviewQrUrl] = useState<string>("");
-  const [saveSuccessNotice, setSaveSuccessNotice] = useState(false);
 
   // 1. Load Data from localStorage
   useEffect(() => {
@@ -143,6 +145,32 @@ export default function AdminExpensePage() {
     } catch {
       setTransactions(INITIAL_EXPENSES);
     }
+
+    const fetchSettings = async () => {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      try {
+        const res = await fetch(`${apiUrl}/api/v1/settings/promptpay_target`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.value) {
+            setPromptpayAccount(data.value);
+            localStorage.setItem("kaset_promptpay_account", data.value);
+          }
+        }
+      } catch {}
+
+      try {
+        const res = await fetch(`${apiUrl}/api/v1/settings/promptpay_name`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.value) {
+            setPromptpayName(data.value);
+            localStorage.setItem("kaset_promptpay_name", data.value);
+          }
+        }
+      } catch {}
+    };
+    fetchSettings();
   }, []);
 
   // 2. Save Transactions to localStorage
@@ -178,15 +206,49 @@ export default function AdminExpensePage() {
   }, [promptpayAccount, testAmount]);
 
   // Save PromptPay Settings
-  const handleSavePromptpaySettings = (e: React.FormEvent) => {
+  const handleSavePromptpaySettings = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanAccount = promptpayAccount.trim();
+    const cleanName = promptpayName.trim();
+
     try {
-      localStorage.setItem("kaset_promptpay_account", promptpayAccount.trim());
-      localStorage.setItem("kaset_promptpay_name", promptpayName.trim());
-      setSaveSuccessNotice(true);
-      setTimeout(() => setSaveSuccessNotice(false), 3000);
+      localStorage.setItem("kaset_promptpay_account", cleanAccount);
+      localStorage.setItem("kaset_promptpay_name", cleanName);
     } catch (err) {
-      console.error("Error saving promptpay settings:", err);
+      console.error("Error saving promptpay settings to localStorage:", err);
+    }
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const token = getStoredToken();
+      const headers = {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+
+      await Promise.all([
+        fetch(`${apiUrl}/api/v1/settings/promptpay_target`, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify({
+            value: cleanAccount,
+            description: "หมายเลขบัญชีพร้อมเพย์สำหรับรับชำระเงิน (เบอร์โทรศัพท์ หรือ เลขประจำตัวผู้เสียภาษี/บัตรประชาชน)",
+          }),
+        }),
+        fetch(`${apiUrl}/api/v1/settings/promptpay_name`, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify({
+            value: cleanName,
+            description: "ชื่อบัญชีพร้อมเพย์สำหรับรับชำระเงิน",
+          }),
+        }),
+      ]);
+
+      success("บันทึกการตั้งค่าพร้อมเพย์เรียบร้อยแล้ว", "ตั้งค่า PromptPay");
+    } catch (err) {
+      console.error("Error saving promptpay settings to backend:", err);
+      toastError("ไม่สามารถบันทึกการตั้งค่าได้", "เกิดข้อผิดพลาด");
     }
   };
 
@@ -743,26 +805,6 @@ export default function AdminExpensePage() {
                       }}
                     />
                   </div>
-
-                  {saveSuccessNotice && (
-                    <div
-                      style={{
-                        marginBottom: "1rem",
-                        padding: "0.65rem 0.85rem",
-                        borderRadius: "0.6rem",
-                        backgroundColor: "rgba(34, 197, 94, 0.12)",
-                        color: "#22c55e",
-                        fontSize: "0.85rem",
-                        fontWeight: 600,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.4rem",
-                      }}
-                    >
-                      <CheckCircle2 size={16} />
-                      <span>บันทึกการตั้งค่าพร้อมเพย์เรียบร้อยแล้ว</span>
-                    </div>
-                  )}
 
                   <button
                     type="submit"

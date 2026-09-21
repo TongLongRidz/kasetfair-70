@@ -29,3 +29,9 @@ frontend/.env.local
 *.pem
 .idea/
 .vscode/
+
+qr-verify/ocr_env/
+qr-verify/node_modules/
+qr-verify/*.traineddata
+qr-verify/__pycache__/
+

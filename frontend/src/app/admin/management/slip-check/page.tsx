@@ -5,6 +5,8 @@ import AdminSidebar from "@/components/layouts/AdminSidebar";
 import {
   Search,
   ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -25,7 +27,6 @@ import {
 import { useToast } from "@/components/ui/toast";
 import { getStoredToken } from "@/lib/auth";
 import OrderInspectionModal from "./components/OrderInspectionModal";
-import FraudReasonModal from "./components/FraudReasonModal";
 
 export type PaymentVerificationStatus = "verified" | "pending" | "fraud";
 export type PaymentMethod = "promptpay_qr" | "cash";
@@ -48,6 +49,12 @@ export interface SlipOrderItem {
   slipImageUrl?: string;
   cashImageUrl?: string;
   itemsSummary: string;
+  itemsDetail?: Array<{
+    productName: string;
+    sweetness?: string;
+    quantity: number;
+    toppings?: string[];
+  }>;
 }
 
 export default function SlipCheckManagementPage() {
@@ -69,7 +76,7 @@ export default function SlipCheckManagementPage() {
             localStorage.setItem("kaset_slip_upload_mode", data.value);
           }
         }
-      } catch {}
+      } catch { }
 
       try {
         const res = await fetch(`${apiUrl}/api/v1/settings/cash_upload_mode`);
@@ -80,7 +87,7 @@ export default function SlipCheckManagementPage() {
             localStorage.setItem("kaset_cash_upload_mode", data.value);
           }
         }
-      } catch {}
+      } catch { }
 
       // Fallbacks
       try {
@@ -92,7 +99,7 @@ export default function SlipCheckManagementPage() {
         if (savedCash === "later" || savedCash === "immediate") {
           setCashUploadMode(savedCash);
         }
-      } catch {}
+      } catch { }
     };
     fetchSettings();
   }, []);
@@ -101,7 +108,7 @@ export default function SlipCheckManagementPage() {
     setPromptpayUploadMode(mode);
     try {
       localStorage.setItem("kaset_slip_upload_mode", mode);
-    } catch {}
+    } catch { }
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
@@ -132,7 +139,7 @@ export default function SlipCheckManagementPage() {
     setCashUploadMode(mode);
     try {
       localStorage.setItem("kaset_cash_upload_mode", mode);
-    } catch {}
+    } catch { }
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
@@ -160,10 +167,14 @@ export default function SlipCheckManagementPage() {
   };
 
   const [orders, setOrders] = useState<SlipOrderItem[]>([]);
+  const [totalOrders, setTotalOrders] = useState<number>(0);
+  const [statsCounts, setStatsCounts] = useState({ pending: 0, verified: 0, fraud: 0 });
   const [loading, setLoading] = useState(true);
+
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | PaymentVerificationStatus>("all");
-  const [sortOrder, setSortOrder] = useState<"latest" | "oldest" | "amount_high" | "amount_low">("latest");
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<"all" | PaymentMethod>("all");
+  const [dateSort, setDateSort] = useState<"desc" | "asc">("desc");
   const [pageSize, setPageSize] = useState<number>(10);
   const [page, setPage] = useState<number>(1);
 
@@ -173,10 +184,26 @@ export default function SlipCheckManagementPage() {
   // Kebab dropdown menu state
   const [activeKebabId, setActiveKebabId] = useState<number | null>(null);
 
-  // Fraud reason input modal
-  const [isFraudModalOpen, setIsFraudModalOpen] = useState(false);
-  const [fraudTargetOrder, setFraudTargetOrder] = useState<SlipOrderItem | null>(null);
-  const [fraudReason, setFraudReason] = useState("");
+  // Header click handlers
+  const handleToggleDateSort = () => {
+    setDateSort((prev) => (prev === "desc" ? "asc" : "desc"));
+    setPage(1);
+  };
+
+  const handleCyclePaymentMethod = () => {
+    if (paymentMethodFilter === "all") setPaymentMethodFilter("promptpay_qr");
+    else if (paymentMethodFilter === "promptpay_qr") setPaymentMethodFilter("cash");
+    else setPaymentMethodFilter("all");
+    setPage(1);
+  };
+
+  const handleCycleStatusFilter = () => {
+    if (statusFilter === "all") setStatusFilter("pending");
+    else if (statusFilter === "pending") setStatusFilter("verified");
+    else if (statusFilter === "verified") setStatusFilter("fraud");
+    else setStatusFilter("all");
+    setPage(1);
+  };
 
   // Helper to format date / time nicely like administrator page
   const renderFormattedDate = (dateStr?: string) => {
@@ -199,12 +226,57 @@ export default function SlipCheckManagementPage() {
     );
   };
 
-  // Fetch orders from backend API
+  // Fetch overall status stats for KPI cards using count queries
+  const fetchStats = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const token = getStoredToken();
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
+      const [resP, resV, resF] = await Promise.all([
+        fetch(`${apiUrl}/api/v1/orders?slip_verification_status=pending&page_size=1`, { headers }),
+        fetch(`${apiUrl}/api/v1/orders?slip_verification_status=verified&page_size=1`, { headers }),
+        fetch(`${apiUrl}/api/v1/orders?slip_verification_status=fraud&page_size=1`, { headers }),
+      ]);
+
+      const [dataP, dataV, dataF] = await Promise.all([
+        resP.ok ? resP.json() : Promise.resolve({ total: 0 }),
+        resV.ok ? resV.json() : Promise.resolve({ total: 0 }),
+        resF.ok ? resF.json() : Promise.resolve({ total: 0 }),
+      ]);
+
+      setStatsCounts({
+        pending: dataP.total || 0,
+        verified: dataV.total || 0,
+        fraud: dataF.total || 0,
+      });
+    } catch (err) {
+      console.error("Failed to fetch stats:", err);
+    }
+  };
+
+  // Fetch paginated & filtered orders from Backend API
   const fetchOrders = async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
       const token = getStoredToken();
-      const res = await fetch(`${apiUrl}/api/v1/orders?page_size=500`, {
+
+      const queryParams = new URLSearchParams();
+      queryParams.append("page", page.toString());
+      queryParams.append("page_size", pageSize.toString());
+      queryParams.append("sort", dateSort === "asc" ? "date_asc" : "date_desc");
+
+      if (statusFilter !== "all") {
+        queryParams.append("slip_verification_status", statusFilter);
+      }
+      if (paymentMethodFilter !== "all") {
+        queryParams.append("payment_method", paymentMethodFilter);
+      }
+      if (search.trim()) {
+        queryParams.append("search", search.trim());
+      }
+
+      const res = await fetch(`${apiUrl}/api/v1/orders?${queryParams.toString()}`, {
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
@@ -212,30 +284,44 @@ export default function SlipCheckManagementPage() {
 
       if (res.ok) {
         const json = await res.json();
-        const rawOrders = json.data || json || [];
+        const rawOrders = json.data || [];
+        setTotalOrders(json.total || 0);
+
         const mapped: SlipOrderItem[] = rawOrders.map((o: any) => {
-          // Channel mapping
           let channel: "ออนไลน์" | "หน้าร้าน" | "Nisit Shop" = "หน้าร้าน";
           if (o.method === "online") channel = "ออนไลน์";
           else if (o.method === "nisit-shop") channel = "Nisit Shop";
 
-          // Payment method mapping
-          const paymentMethod: PaymentMethod = o.payment_method === "promptpay" ? "promptpay_qr" : "cash";
+          const paymentMethod: PaymentMethod = (o.payment_method === "promptpay" || o.payment_method === "promptpay_qr") ? "promptpay_qr" : "cash";
 
-          // Verification status mapping
           let paymentStatus: PaymentVerificationStatus = "pending";
           if (o.slip_verification_status === "verified" || o.slip_verification_status === "fraud") {
             paymentStatus = o.slip_verification_status;
           }
 
-          // Build items summary
           const itemsSummary = o.order_items && o.order_items.length > 0
             ? o.order_items.map((item: any) => {
-                const pName = item.product?.name_th || "สินค้า";
-                const sweet = item.sweetness_level ? ` (${item.sweetness_level})` : "";
-                return `${pName}${sweet} x${item.quantity}`;
-              }).join(", ")
+              const pName = item.product?.name_th || "สินค้า";
+              const sweet = item.sweetness_level ? ` (${item.sweetness_level})` : "";
+              return `${pName}${sweet} x${item.quantity}`;
+            }).join(", ")
             : "ไม่ระบุรายการ";
+
+          const itemsDetail = o.order_items && o.order_items.length > 0
+            ? o.order_items.map((item: any) => {
+              const pName = item.product?.name_th || item.product_name || "สินค้า";
+              const sweet = item.sweetness_level || undefined;
+              const toppings = (item.order_item_toppings || item.toppings || [])
+                .map((t: any) => t.topping?.name_th || t.name_th || t.topping_name || t.name)
+                .filter(Boolean);
+              return {
+                productName: pName,
+                sweetness: sweet,
+                quantity: item.quantity || 1,
+                toppings,
+              };
+            })
+            : undefined;
 
           return {
             id: o.id,
@@ -252,8 +338,13 @@ export default function SlipCheckManagementPage() {
             createdAtRaw: o.created_at,
             slipVerifiedAt: o.slip_verified_at || undefined,
             verifiedByName: o.slip_admin?.name || o.slip_admin?.username || (o.slip_verified_by ? `Admin #${o.slip_verified_by}` : "-"),
-            slipImageUrl: o.slip_url || undefined,
+            slipImageUrl: o.slip_url
+              ? o.slip_url.startsWith("http")
+                ? o.slip_url
+                : `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585"}${o.slip_url.startsWith("/") ? "" : "/"}${o.slip_url}`
+              : undefined,
             itemsSummary,
+            itemsDetail,
           };
         });
         setOrders(mapped);
@@ -267,9 +358,16 @@ export default function SlipCheckManagementPage() {
 
   useEffect(() => {
     fetchOrders();
-    const interval = setInterval(fetchOrders, 10000);
+    fetchStats();
+  }, [page, pageSize, dateSort, statusFilter, paymentMethodFilter, search]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchOrders();
+      fetchStats();
+    }, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [page, pageSize, dateSort, statusFilter, paymentMethodFilter, search]);
 
   // Close kebab menu when clicking outside
   useEffect(() => {
@@ -283,28 +381,8 @@ export default function SlipCheckManagementPage() {
     return () => document.removeEventListener("click", handleDocumentClick);
   }, []);
 
-  // Filter and sort logic
-  const filteredOrders = orders
-    .filter((o) => {
-      const matchSearch =
-        o.orderNo.toLowerCase().includes(search.toLowerCase()) ||
-        o.queueNo.toLowerCase().includes(search.toLowerCase()) ||
-        o.customerName.toLowerCase().includes(search.toLowerCase()) ||
-        (o.customerPhone && o.customerPhone.includes(search));
-
-      const matchStatus = statusFilter === "all" || o.paymentStatus === statusFilter;
-      return matchSearch && matchStatus;
-    })
-    .sort((a, b) => {
-      if (sortOrder === "latest") return b.id - a.id;
-      if (sortOrder === "oldest") return a.id - b.id;
-      if (sortOrder === "amount_high") return b.total - a.total;
-      if (sortOrder === "amount_low") return a.total - b.total;
-      return 0;
-    });
-
-  const totalPages = Math.ceil(filteredOrders.length / pageSize) || 1;
-  const paginatedOrders = filteredOrders.slice((page - 1) * pageSize, page * pageSize);
+  const totalPages = Math.ceil(totalOrders / pageSize) || 1;
+  const paginatedOrders = orders;
 
   // Status Change Handlers
   const handleSetStatus = async (orderId: number, status: PaymentVerificationStatus, note?: string) => {
@@ -363,84 +441,94 @@ export default function SlipCheckManagementPage() {
       setSelectedOrder((prev) =>
         prev
           ? {
-              ...prev,
-              paymentStatus: status,
-              statusNote: note !== undefined ? note : status === "fraud" ? prev.statusNote : undefined,
-            }
+            ...prev,
+            paymentStatus: status,
+            statusNote: note !== undefined ? note : status === "fraud" ? prev.statusNote : undefined,
+          }
           : null
       );
     }
   };
 
   // Upload slip for existing order
+  // Upload slip for existing order (using FormData to POST /api/v1/upload then PUT /api/v1/orders/:id)
   const handleUploadSlip = async (orderId: number, file: File) => {
-    return new Promise<void>((resolve) => {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const dataUrl = e.target?.result as string;
-        if (!dataUrl) {
-          resolve();
-          return;
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const token = getStoredToken();
+      const authHeader: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
+      // 1. Construct custom filename DDMMYYYY-QueueNumber.jpg
+      const targetOrder = orders.find((o) => o.id === orderId);
+      const queueNoStr = targetOrder?.queueNo || `ORDER${orderId}`;
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, "0");
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const yyyy = now.getFullYear();
+      const customFilename = `${dd}${mm}${yyyy}-${queueNoStr}.jpg`;
+
+      // 2. Upload file via FormData
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", "slips");
+      formData.append("custom_filename", customFilename);
+
+      const uploadRes = await fetch(`${apiUrl}/api/v1/upload`, {
+        method: "POST",
+        headers: {
+          ...authHeader,
+        },
+        body: formData,
+      });
+
+      if (!uploadRes.ok) {
+        const errJson = await uploadRes.json().catch(() => ({}));
+        toastError(errJson.error || "ไม่สามารถอัพโหลดไฟล์รูปภาพได้", "เกิดข้อผิดพลาด");
+        return;
+      }
+
+      const uploadData = await uploadRes.json();
+      const rawUrl: string = uploadData.url || "";
+      const fullImageUrl = rawUrl
+        ? rawUrl.startsWith("http")
+          ? rawUrl
+          : `${apiUrl}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`
+        : "";
+
+      // 2. Update order slip_url with saved image URL
+      const updateRes = await fetch(`${apiUrl}/api/v1/orders/${orderId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeader,
+        },
+        body: JSON.stringify({
+          slip_url: rawUrl,
+        }),
+      });
+
+      if (updateRes.ok) {
+        success("อัพโหลดรูปภาพสลิป/หลักฐานเรียบร้อยแล้ว", "บันทึกสำเร็จ");
+        setOrders((prev) =>
+          prev.map((o) => (o.id === orderId ? { ...o, slipImageUrl: fullImageUrl } : o))
+        );
+        if (selectedOrder && selectedOrder.id === orderId) {
+          setSelectedOrder((prev) => (prev ? { ...prev, slipImageUrl: fullImageUrl } : null));
         }
-
-        try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
-          const token = getStoredToken();
-          const res = await fetch(`${apiUrl}/api/v1/orders/${orderId}`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            body: JSON.stringify({
-              slip_url: dataUrl,
-            }),
-          });
-
-          if (res.ok) {
-            success("อัพโหลดรูปภาพสลิป/หลักฐานเรียบร้อยแล้ว", "บันทึกสำเร็จ");
-            setOrders((prev) =>
-              prev.map((o) => (o.id === orderId ? { ...o, slipImageUrl: dataUrl } : o))
-            );
-            if (selectedOrder && selectedOrder.id === orderId) {
-              setSelectedOrder((prev) => (prev ? { ...prev, slipImageUrl: dataUrl } : null));
-            }
-            fetchOrders();
-          } else {
-            toastError("ไม่สามารถอัพโหลดรูปสลิปได้", "เกิดข้อผิดพลาด");
-          }
-        } catch (err) {
-          console.error("Failed to upload slip:", err);
-          toastError("เกิดข้อผิดพลาดในการส่งข้อมูลสลิป", "เกิดข้อผิดพลาด");
-        } finally {
-          resolve();
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const handleOpenFraudReasonModal = (order: SlipOrderItem) => {
-    setFraudTargetOrder(order);
-    setFraudReason(order.statusNote || "");
-    setIsFraudModalOpen(true);
-  };
-
-  const handleConfirmFraud = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fraudTargetOrder) return;
-    if (!fraudReason.trim()) return;
-
-    handleSetStatus(fraudTargetOrder.id, "fraud", fraudReason.trim());
-    setIsFraudModalOpen(false);
-    setFraudTargetOrder(null);
-    setFraudReason("");
+        fetchOrders();
+      } else {
+        toastError("ไม่สามารถอัพเดตสลิปของออเดอร์ได้", "เกิดข้อผิดพลาด");
+      }
+    } catch (err) {
+      console.error("Failed to upload slip:", err);
+      toastError("เกิดข้อผิดพลาดในการส่งข้อมูลสลิป", "เกิดข้อผิดพลาด");
+    }
   };
 
   // Count stats
-  const pendingCount = orders.filter((o) => o.paymentStatus === "pending").length;
-  const verifiedCount = orders.filter((o) => o.paymentStatus === "verified").length;
-  const fraudCount = orders.filter((o) => o.paymentStatus === "fraud").length;
+  const pendingCount = statsCounts.pending;
+  const verifiedCount = statsCounts.verified;
+  const fraudCount = statsCounts.fraud;
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "var(--cream)", fontFamily: "'Kanit', sans-serif" }}>
@@ -779,10 +867,10 @@ export default function SlipCheckManagementPage() {
                   setPage(1);
                 }}
               >
-                <option value="all">สถานะ: ทั้งหมด ({orders.length})</option>
-                <option value="pending">สถานะ: รอตรวจสอบ ({pendingCount})</option>
-                <option value="verified">สถานะ: ยืนยันแล้ว ({verifiedCount})</option>
-                <option value="fraud">สถานะ: สลิปไม่ถูกต้อง ({fraudCount})</option>
+                <option value="all">ทั้งหมด ({orders.length})</option>
+                <option value="pending">รอตรวจสอบ ({pendingCount})</option>
+                <option value="verified">ยืนยันแล้ว ({verifiedCount})</option>
+                <option value="fraud">สลิปไม่ถูกต้อง ({fraudCount})</option>
               </select>
             </div>
 
@@ -803,18 +891,51 @@ export default function SlipCheckManagementPage() {
             </div>
           </div>
 
-          {/* Table */}
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.875rem" }}>
+          {/* Desktop / Tablet: Table View */}
+          <div className="admin-table-view" style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.875rem", tableLayout: "fixed" }}>
               <thead>
-                <tr style={{ borderBottom: "1px solid rgba(50, 55, 65, 0.12)", color: "var(--ink-soft)", fontSize: "0.8rem" }}>
-                  <th style={{ padding: "0.75rem 0.6rem" }}>วันที่</th>
-                  <th style={{ padding: "0.75rem 0.6rem" }}>หมายเลขคิว</th>
-                  <th style={{ padding: "0.75rem 0.6rem" }}>วิธีชำระ</th>
-                  <th style={{ padding: "0.75rem 0.6rem" }}>ตรวจสอบ</th>
-                  <th style={{ padding: "0.75rem 0.6rem" }}>สถานะตรวจสอบ</th>
-                  <th style={{ padding: "0.75rem 0.6rem" }}>วันที่ตรวจสอบ</th>
-                  <th style={{ padding: "0.75rem 0.6rem" }}>คนที่ตรวจสอบ</th>
+                <tr style={{ borderBottom: "1px solid rgba(50, 55, 65, 0.12)", color: "var(--ink)", fontSize: "0.825rem" }}>
+                  {/* วันที่ (Sortable: ASC / DESC with icon) */}
+                  <th
+                    onClick={handleToggleDateSort}
+                    style={{ width: "14%", padding: "0.75rem 0.6rem", cursor: "pointer", userSelect: "none" }}
+                    title="กดเพื่อสลับเรียงลำดับวันที่ (ล่าสุด ↔ เก่าสุด)"
+                  >
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                      <span>วันที่</span>
+                      {dateSort === "desc" ? (
+                        <ArrowDown size={13} style={{ color: "var(--teal)" }} />
+                      ) : (
+                        <ArrowUp size={13} style={{ color: "var(--teal)" }} />
+                      )}
+                    </div>
+                  </th>
+
+                  <th style={{ width: "12%", padding: "0.75rem 0.6rem" }}>หมายเลขคิว</th>
+
+                  {/* วิธีชำระ (Filterable: ทั้งหมด ↔ พร้อมเพย์ QR ↔ เงินสด) */}
+                  <th
+                    onClick={handleCyclePaymentMethod}
+                    style={{ width: "15%", padding: "0.75rem 0.6rem", cursor: "pointer", userSelect: "none" }}
+                    title="กดเพื่อสลับกรองวิธีชำระ (ทั้งหมด ↔ พร้อมเพย์ QR ↔ เงินสด)"
+                  >
+                    <span>วิธีชำระ</span>
+                  </th>
+
+                  <th style={{ width: "12%", padding: "0.75rem 0.6rem" }}>ตรวจสอบ</th>
+
+                  {/* สถานะตรวจสอบ (Filterable: ทั้งหมด ↔ รอตรวจสอบ ↔ ยืนยันแล้ว ↔ เนียนเลยนะครับ) */}
+                  <th
+                    onClick={handleCycleStatusFilter}
+                    style={{ width: "17%", padding: "0.75rem 0.6rem", cursor: "pointer", userSelect: "none" }}
+                    title="กดเพื่อสลับกรองสถานะตรวจสอบ (ทั้งหมด ↔ รอตรวจสอบ ↔ ยืนยันแล้ว ↔ เนียนเลยนะครับ)"
+                  >
+                    <span>สถานะตรวจสอบ</span>
+                  </th>
+
+                  <th style={{ width: "15%", padding: "0.75rem 0.6rem" }}>วันที่ตรวจสอบ</th>
+                  <th style={{ width: "15%", padding: "0.75rem 0.6rem" }}>ผู้ตรวจสอบ</th>
                 </tr>
               </thead>
               <tbody>
@@ -899,13 +1020,13 @@ export default function SlipCheckManagementPage() {
                               backgroundColor: isPending
                                 ? "rgba(224, 83, 83, 0.15)"
                                 : isVerified
-                                ? "rgba(34, 197, 94, 0.15)"
-                                : "rgba(185, 28, 28, 0.2)",
+                                  ? "rgba(34, 197, 94, 0.15)"
+                                  : "rgba(185, 28, 28, 0.2)",
                               color: isPending
                                 ? "#dc2626"
                                 : isVerified
-                                ? "#16a34a"
-                                : "#991b1b",
+                                  ? "#16a34a"
+                                  : "#991b1b",
                             }}
                           >
                             {isPending && <Clock size={12} />}
@@ -928,7 +1049,7 @@ export default function SlipCheckManagementPage() {
                         {renderFormattedDate(order.slipVerifiedAt)}
                       </td>
 
-                      {/* คนที่ตรวจสอบ */}
+                      {/* ผู้ตรวจสอบ */}
                       <td style={{ padding: "0.85rem 0.6rem", fontSize: "0.8rem", fontWeight: 600, color: "var(--ink)" }}>
                         {order.verifiedByName || "-"}
                       </td>
@@ -945,6 +1066,159 @@ export default function SlipCheckManagementPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile / Narrow Screen: Card View */}
+          <div className="admin-cards-view">
+            {paginatedOrders.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--ink-soft)" }}>
+                ไม่พบข้อมูลรายการชำระเงินตามเงื่อนไขที่ระบุ
+              </div>
+            ) : (
+              paginatedOrders.map((order) => {
+                const isPending = order.paymentStatus === "pending";
+                const isVerified = order.paymentStatus === "verified";
+                const isFraud = order.paymentStatus === "fraud";
+
+                return (
+                  <div
+                    key={order.id}
+                    style={{
+                      backgroundColor: "var(--cream)",
+                      border: "1px solid rgba(50, 55, 65, 0.1)",
+                      borderRadius: "0.75rem",
+                      padding: "0.95rem 1rem",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.65rem",
+                    }}
+                  >
+                    {/* Top Header Row: Queue No & Date (Left), Status Badge & Method (Right) */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div>
+                        <span style={{ fontWeight: 800, fontSize: "1.4rem", color: "var(--ink)", lineHeight: 1.1, display: "block" }}>
+                          คิว {order.queueNo}
+                        </span>
+                        <div style={{ fontSize: "0.775rem", color: "var(--ink-soft)", marginTop: "3px" }}>
+                          {renderFormattedDate(order.createdAtRaw || order.orderedAt)}
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.35rem" }}>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.3rem",
+                            borderRadius: "9999px",
+                            padding: "0.3rem 0.75rem",
+                            fontSize: "0.75rem",
+                            fontWeight: 700,
+                            backgroundColor: isPending
+                              ? "rgba(224, 83, 83, 0.15)"
+                              : isVerified
+                                ? "rgba(34, 197, 94, 0.15)"
+                                : "rgba(185, 28, 28, 0.2)",
+                            color: isPending
+                              ? "#dc2626"
+                              : isVerified
+                                ? "#16a34a"
+                                : "#991b1b",
+                          }}
+                        >
+                          {isPending && <Clock size={13} />}
+                          {isVerified && <CheckCircle2 size={13} />}
+                          {isFraud && <AlertTriangle size={13} />}
+                          <span>{isPending ? "ยังไม่ได้ยืนยัน" : isVerified ? "ยืนยันแล้ว" : "เนียนเลยนะครับ"}</span>
+                        </span>
+
+                        <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)", display: "flex", alignItems: "center", gap: "0.3rem", fontWeight: 600 }}>
+                          {order.paymentMethod === "promptpay_qr" ? (
+                            <>
+                              <QrCode size={14} color="var(--teal)" />
+                              <span>พร้อมเพย์ QR</span>
+                            </>
+                          ) : (
+                            <>
+                              <Banknote size={14} color="#b45309" />
+                              <span>เงินสด</span>
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Info Section: Customer (if not 'ลูกค้าหน้าร้าน'), Inspector & Verification Date */}
+                    <div style={{ fontSize: "0.825rem", color: "var(--ink)", display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+                      {order.customerName && order.customerName !== "ลูกค้าหน้าร้าน" && (
+                        <div><strong>ลูกค้า:</strong> {order.customerName} {order.customerPhone ? `(${order.customerPhone})` : ""}</div>
+                      )}
+
+                      {/* ผู้ตรวจสอบ & วันที่ตรวจสอบ (แสดงเฉพาะเมื่อยืนยันแล้ว และแสดงแยกคนละบรรทัด) */}
+                      {isVerified && (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "0.2rem",
+                            backgroundColor: "rgba(50, 55, 65, 0.04)",
+                            padding: "0.45rem 0.65rem",
+                            borderRadius: "0.5rem",
+                            fontSize: "0.775rem",
+                            color: "var(--ink-soft)",
+                            marginTop: "2px",
+                          }}
+                        >
+                          <div>
+                            <strong>ผู้ตรวจสอบ:</strong> <span style={{ color: "var(--ink)", fontWeight: 600 }}>{order.verifiedByName || "-"}</span>
+                          </div>
+                          <div>
+                            <strong>วันที่ตรวจสอบ:</strong> <span className="font-mono" style={{ color: "var(--ink)" }}>{order.slipVerifiedAt ? (order.slipVerifiedAt.includes("T") ? order.slipVerifiedAt.split("T")[0] + " " + order.slipVerifiedAt.split("T")[1]?.substring(0, 8) : order.slipVerifiedAt) : "-"}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {isFraud && order.statusNote && (
+                        <div style={{ fontSize: "0.775rem", color: "#b91c1c", marginTop: "2px" }}>
+                          <strong>เหตุผล:</strong> {order.statusNote}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Bottom Action Row */}
+                    <div
+                      style={{
+                        paddingTop: "0.4rem",
+                        borderTop: "1px dashed rgba(50, 55, 65, 0.1)",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOrder(order)}
+                        style={{
+                          width: "100%",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "0.35rem",
+                          borderRadius: "0.6rem",
+                          backgroundColor: "var(--teal)",
+                          color: "#fff",
+                          border: "none",
+                          padding: "0.55rem 0.85rem",
+                          fontSize: "0.85rem",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          boxShadow: "0 2px 8px rgba(75, 155, 140, 0.2)",
+                        }}
+                      >
+                        <span>ตรวจสอบหลักฐาน</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
 
           {/* Pagination Controls */}
@@ -964,7 +1238,7 @@ export default function SlipCheckManagementPage() {
           >
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
               <span>
-                แสดงหน้า {page} จาก {totalPages} (ทั้งหมด {filteredOrders.length} รายการ)
+                แสดงหน้า {page} จาก {totalPages} (ทั้งหมด {totalOrders} รายการ)
               </span>
 
               {/* Max Items Per Page Selector (Moved to Bottom Pagination) */}
@@ -1042,19 +1316,7 @@ export default function SlipCheckManagementPage() {
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
           onSetStatus={handleSetStatus}
-          onOpenFraudReasonModal={handleOpenFraudReasonModal}
           onUploadSlip={handleUploadSlip}
-        />
-      )}
-
-      {/* POPUP MODAL 2: Fraud Reason Required Modal */}
-      {isFraudModalOpen && fraudTargetOrder && (
-        <FraudReasonModal
-          targetOrder={fraudTargetOrder}
-          reason={fraudReason}
-          onChangeReason={setFraudReason}
-          onClose={() => setIsFraudModalOpen(false)}
-          onSubmit={handleConfirmFraud}
         />
       )}
     </div>

@@ -1,0 +1,318 @@
+import io
+import re
+import json
+import base64
+import time
+import os
+import torch
+import numpy as np
+from flask import Flask, request, jsonify
+from PIL import Image
+import easyocr
+
+# Set PyTorch thread allocation to maximize CPU throughput
+try:
+    cpu_count = os.cpu_count() or 4
+    torch.set_num_threads(max(4, cpu_count))
+except Exception:
+    pass
+
+app = Flask(__name__)
+
+print("[EasyOCR] Initializing EasyOCR Reader (th, en)...")
+# Initialize reader
+reader = easyocr.Reader(['th', 'en'], gpu=False)
+print("[EasyOCR] Model loaded successfully!")
+
+# Load bank mapping
+try:
+    with open("bank_code.json", "r", encoding="utf-8") as f:
+        BANK_CODES = json.load(f)
+except Exception as e:
+    BANK_CODES = {}
+
+def parse_slip_fields(text_list, full_text):
+    """
+    Extract key slip fields:
+    - ธนาคาร (sender_bank)
+    - ผู้โอน (sender_name)
+    - ผู้รับ (receiver_name)
+    - ยอดเงิน (amount)
+    - วันเวลา (date_time)
+    - เลขอ้างอิง (transaction_ref)
+    """
+    res = {
+        "amount": None,
+        "sender_name": None,
+        "receiver_name": None,
+        "sender_bank": {
+            "name_th": None,
+            "name_en": None,
+        },
+        "transaction_ref": None,
+        "date_time": None,
+        "raw_lines": text_list
+    }
+
+    # 1. Detect Bank according to bank_code.json
+    # Matches name_th, name_en, abbr, and variations like "ธ. <name>" or short bank name without "ธนาคาร"
+    matched_bank = None
+    for code, binfo in BANK_CODES.items():
+        name_th = binfo.get("name_th", "")
+        name_en = binfo.get("name_en", "")
+        abbr = binfo.get("abbr", "")
+
+        # Generate search patterns
+        patterns = []
+        if name_th:
+            patterns.append(re.escape(name_th))
+            # If name_th starts with "ธนาคาร", create "ธ. <name>" and pure name patterns
+            if name_th.startswith("ธนาคาร"):
+                short_name = name_th.replace("ธนาคาร", "").strip()
+                if short_name:
+                    patterns.append(r'ธ\.?\s*' + re.escape(short_name))
+                    patterns.append(re.escape(short_name))
+        if name_en:
+            patterns.append(re.escape(name_en))
+        if abbr:
+            patterns.append(r'\b' + re.escape(abbr) + r'\b')
+
+        bank_regex = r'(?:' + '|'.join(patterns) + r')'
+        if re.search(bank_regex, full_text, flags=re.IGNORECASE):
+            matched_bank = {
+                "name_th": name_th,
+                "name_en": name_en,
+                "abbr": abbr,
+                "code": code
+            }
+            break
+
+    if matched_bank:
+        res["sender_bank"] = matched_bank
+
+    # 2. Detect Transaction Ref / Slip No.
+    # Handles "เลขที่สลิป 626411608760", "รหัสอ้างอิง", "Ref", "014..."
+    ref_match = re.search(r'(?:รหัสอ้างอิง|เลขที่รายการ|เลขที่สลิป|Transaction\s*ID|Ref\.?|Ref\s*No\.?)[\s:]*([A-Za-z0-9]+)', full_text, re.IGNORECASE)
+    if not ref_match:
+        ref_match = re.search(r'\b(0[0-9]{2}[A-Za-z0-9]{12,22})\b', full_text)
+    if not ref_match:
+        # Match standalone slip number string (10-25 digits/alphanumeric)
+        digits_matches = re.findall(r'\b([A-Za-z0-9]{10,25})\b', full_text)
+        for cand in digits_matches:
+            if not cand.startswith("08") and not cand.startswith("09") and not cand.startswith("06"):
+                res["transaction_ref"] = cand
+                break
+    else:
+        res["transaction_ref"] = ref_match.group(1).strip()
+
+    # 3. Detect Amount (Handle OCR letter O / o misread as digit 0, e.g. "o.0o" -> "0.00")
+    # First, fix common Thai/English OCR digit misreads in numbers (e.g. "1.oo" -> "1.00", "o.0o" -> "0.00")
+    sanitized_full_text = re.sub(r'(?<=\d)[oO](?=\d)', '0', full_text)
+    sanitized_full_text = re.sub(r'(?<=\d)\.[oO]{1,2}\b', lambda m: m.group(0).replace('o', '0').replace('O', '0'), sanitized_full_text)
+
+    amt_match = re.search(r'(?:จำนวนเงิน|จำนวน|ยอดโอน|โอนสำเร็จ|amount)[\s:]*([0-9]{1,3}(?:,[0-9]{3})*\.[0-9]{2})', sanitized_full_text, re.IGNORECASE)
+    if not amt_match:
+        floats = re.findall(r'\b([0-9]{1,3}(?:,[0-9]{3})*\.[0-9]{2})\b', sanitized_full_text)
+        if floats:
+            res["amount"] = float(floats[0].replace(",", ""))
+    else:
+        res["amount"] = float(amt_match.group(1).replace(",", ""))
+
+    # 4. Detect Date Time
+    # Case A: Combined Date & Time on same or consecutive lines (e.g. "21 ก.ย. 2569 \n 11:49 น.")
+    date_part = None
+    time_part = None
+
+    d_match = re.search(r'(\d{1,2}\s+(?:ม\.ค\.|ก\.พ\.|มี\.ค\.|เม\.ย\.|พ\.ค\.|มิ\.ย\.|ก\.ค\.|ส\.ค\.|ก\.ย\.|ต\.ค\.|พ\.ย\.|ธ\.ค\.|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม|[A-Za-z]{3,9})\s+\d{2,4}|\d{1,2}[/\.-]\d{1,2}[/\.-]\d{2,4})', full_text)
+    if d_match:
+        date_part = d_match.group(1).strip()
+
+    t_match = re.search(r'(\d{1,2}:\d{2}(?::\d{2})?(?:\s*น\.)?)', full_text)
+    if t_match:
+        time_part = t_match.group(1).strip()
+        if not time_part.endswith("น.") and not time_part.endswith("น"):
+            time_part = f"{time_part} น."
+        elif time_part.endswith("น"):
+            time_part = f"{time_part}."
+
+    if date_part and time_part:
+        res["date_time"] = f"{date_part} {time_part}"
+    elif date_part:
+        res["date_time"] = date_part
+    elif time_part:
+        res["date_time"] = time_part
+
+    # Prefix regex pattern (optional whitespace after prefix)
+    PREFIX_REGEX = r'(?:นาย|นางสาว|นาง|น\.ส\.|นส\.|ด\.ช\.|ด\.ญ\.|Mr\.?|Mrs\.?|Miss|Ms\.?)'
+
+    # Non-name noise words to ignore
+    NOISE_WORDS = r'(?:สแกน|ตรวจสอบ|พร้อมเพย์|PromptPay|บัญชี|ออมทรัพย์|กระแสรายวัน|ธนาคาร|โอนเงิน|ค่าธรรมเนียม|บาท|THB|สำเร็จ|วันที|วันที่|เวลา|รหัส|เลขที|เลขที่|scan|verify|account|transfer|fee)'
+
+    # Helper to strip Thai/English prefixes and noise
+    def clean_name(name_str):
+        if not name_str:
+            return None
+        text = name_str.strip()
+        # Remove keyword prefixes if attached (e.g. "จาก นาย ...", "ไปยัง นาย ...")
+        text = re.sub(r'^(?:จาก|ผู้โอน|from|sender|ไปยัง|ถึง|ผู้รับ|to|receiver|โอนเข้าบัญชี)[\s:]*', '', text, flags=re.IGNORECASE)
+        # Remove title prefix (นาย, นาง, นางสาว, etc.)
+        text = re.sub(r'^(?:' + PREFIX_REGEX + r')\s*', '', text, flags=re.IGNORECASE)
+        # Remove non-name artifacts like bank account masking (x-xxxx, xxx-xxxxxx-x), numbers
+        text = re.sub(r'\b[xX*]+[-\d]+\b', '', text).strip()
+        text = re.sub(r'\b\d{3,}[-\d]*\b', '', text).strip()
+        # Clean rogue noise symbols (quotes, degree, dashes, etc.)
+        text = re.sub(r'[\'"`~^°|•\-_/\\:]+', '', text)
+        # Convert nikhahit (ํ U+0E4D) which OCR often misreads as thanthakhat (์ U+0E4C)
+        text = text.replace('\u0E4D', '\u0E4C')
+        # Fix duplicate or misplaced thanthakhat / karan (e.g. ์์ -> ์)
+        text = re.sub(r'\u0E4C+', '\u0E4C', text)
+        # Remove extra whitespace
+        text = re.sub(r'\s+', ' ', text).strip()
+
+        # If what's left is too short or is a noise word, reject
+        if len(text) < 2 or re.match(r'^' + NOISE_WORDS, text, flags=re.IGNORECASE):
+            return None
+        return text or None
+
+    def is_valid_name_candidate(line_str):
+        if not line_str:
+            return False
+        cleaned = line_str.strip()
+        # Skip if purely numbers or masking
+        if re.match(r'^[xX*\d\s\-\.:,]+$', cleaned):
+            return False
+        # Skip if pure noise line (e.g. "สแกนเพือ", "ตรวจสอบสลิป", "1.00 บาท")
+        if re.search(r'^(?:สแกน|ตรวจสอบ|โอนเงิน|ค่าธรรมเนียม|วันที่|เวลา|เลขที่|บาท|THB|fee|scan)', cleaned, flags=re.IGNORECASE):
+            return False
+        return True
+
+    # 5. Detect Sender & Receiver
+    # Priority:
+    # "จาก / From" -> sender
+    # "ไปยัง / ถึง / To / ผู้รับ" -> receiver
+    for i, line in enumerate(text_list):
+        cleaned_line = line.strip()
+
+        # Sender detection
+        if re.search(r'^(จาก|จาก:|ผู้โอน|from|sender)', cleaned_line, re.IGNORECASE):
+            # Check if name is on same line
+            inline = re.sub(r'^(จาก|จาก:|ผู้โอน|from|sender)[\s:]*', '', cleaned_line, flags=re.IGNORECASE).strip()
+            if inline and is_valid_name_candidate(inline):
+                res["sender_name"] = clean_name(inline)
+            else:
+                # Look ahead up to 3 lines for a valid name candidate
+                for offset in range(1, 4):
+                    if i + offset < len(text_list):
+                        cand = text_list[i + offset].strip()
+                        if is_valid_name_candidate(cand):
+                            res["sender_name"] = clean_name(cand)
+                            break
+
+        # Receiver detection (Keyword "ไปยัง", "ถึง", "ผู้รับ")
+        elif re.search(r'^(ไปยัง|ถึง|ผู้รับ|to|receiver|โอนเข้าบัญชี)', cleaned_line, re.IGNORECASE):
+            # Check if name is on same line
+            inline = re.sub(r'^(ไปยัง|ถึง|ผู้รับ|to|receiver|โอนเข้าบัญชี)[\s:]*', '', cleaned_line, flags=re.IGNORECASE).strip()
+            if inline and is_valid_name_candidate(inline):
+                res["receiver_name"] = clean_name(inline)
+            else:
+                # Look ahead up to 3 lines for a valid name candidate
+                for offset in range(1, 4):
+                    if i + offset < len(text_list):
+                        cand = text_list[i + offset].strip()
+                        if is_valid_name_candidate(cand):
+                            res["receiver_name"] = clean_name(cand)
+                            break
+
+    # Fallback if sender_name or receiver_name not found via line index
+    if not res["receiver_name"] and "ไปยัง" in full_text:
+        after_payang = full_text.split("ไปยัง", 1)[1]
+        for sub_line in after_payang.split("\n"):
+            sub_cleaned = sub_line.strip()
+            if sub_cleaned and is_valid_name_candidate(sub_cleaned):
+                res["receiver_name"] = clean_name(sub_cleaned)
+                if res["receiver_name"]:
+                    break
+
+    if not res["sender_name"] and "จาก" in full_text:
+        after_jak = full_text.split("จาก", 1)[1]
+        for sub_line in after_jak.split("\n"):
+            sub_cleaned = sub_line.strip()
+            if sub_cleaned and is_valid_name_candidate(sub_cleaned):
+                res["sender_name"] = clean_name(sub_cleaned)
+                if res["sender_name"]:
+                    break
+
+    # Final sanitization
+    if res["sender_name"]:
+        res["sender_name"] = clean_name(res["sender_name"])
+    if res["receiver_name"]:
+        res["receiver_name"] = clean_name(res["receiver_name"])
+
+    return res
+
+@app.route("/ocr", methods=["POST"])
+def do_ocr():
+    t0 = time.time()
+    try:
+        data = request.json or {}
+        image_data = data.get("image")
+        if not image_data:
+            return jsonify({"success": False, "error": "No image provided"}), 400
+
+        # Decode base64
+        if "base64," in image_data:
+            image_data = image_data.split("base64,")[1]
+        
+        img_bytes = base64.b64decode(image_data)
+        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+
+        # ⚡ OPTIMIZATION 1: Downscale high-resolution slips to max 900px
+        # Slip text is already large & crisp; resizing from 2000px -> 900px speeds up OCR by 4x-6x
+        max_dim = 900
+        w, h = img.size
+        if max(w, h) > max_dim:
+            if w > h:
+                new_w = max_dim
+                new_h = int(h * (max_dim / w))
+            else:
+                new_h = max_dim
+                new_w = int(w * (max_dim / h))
+            img = img.resize((new_w, new_h), Image.Resampling.BILINEAR)
+
+        # Convert to numpy array directly (avoids JPEG encode/decode bottleneck)
+        np_img = np.array(img)
+
+        # ⚡ OPTIMIZATION 2: Tune EasyOCR parameters for speed
+        # - batch_size=8: parallelizes recognition batches
+        # - canvas_size=900: prevents CRAFT text detector from upsampling
+        # - mag_ratio=1.0: avoids artificial magnification
+        # - paragraph=False, detail=0
+        ocr_results = reader.readtext(
+            np_img,
+            detail=0,
+            batch_size=8,
+            canvas_size=900,
+            mag_ratio=1.0,
+            low_text=0.3,
+            text_threshold=0.5
+        )
+        ocr_results = [line.replace('\u0E4D', '\u0E4C') for line in ocr_results]
+        full_text = " \n ".join(ocr_results)
+        
+        parsed = parse_slip_fields(ocr_results, full_text)
+        elapsed = round((time.time() - t0) * 1000, 2)
+
+        return jsonify({
+            "success": True,
+            "engine": "EasyOCR (Python)",
+            "elapsed_ms": elapsed,
+            "full_text": full_text,
+            "data": parsed
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+if __name__ == "__main__":
+    print("[EasyOCR Microservice] Running on port 8587...")
+    app.run(host="0.0.0.0", port=8587, debug=False)
+

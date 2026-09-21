@@ -1,0 +1,87 @@
+{
+  "002": {
+    "name_th": "ธนาคารกรุงเทพ",
+    "name_en": "Bangkok Bank",
+    "abbr": "BBL"
+  },
+  "004": {
+    "name_th": "ธนาคารกสิกรไทย",
+    "name_en": "Kasikornbank",
+    "abbr": "KBANK"
+  },
+  "006": {
+    "name_th": "ธนาคารกรุงไทย",
+    "name_en": "Krungthai Bank",
+    "abbr": "KTB"
+  },
+  "011": {
+    "name_th": "ธนาคารทหารไทยธนชาต",
+    "name_en": "TMBThanachart Bank",
+    "abbr": "TTB"
+  },
+  "014": {
+    "name_th": "ธนาคารไทยพาณิชย์",
+    "name_en": "Siam Commercial Bank",
+    "abbr": "SCB"
+  },
+  "017": {
+    "name_th": "ธนาคารซิตี้แบงก์",
+    "name_en": "Citibank",
+    "abbr": "CITIBANK"
+  },
+  "022": {
+    "name_th": "ธนาคารซีไอเอ็มบี ไทย",
+    "name_en": "CIMB Thai Bank",
+    "abbr": "CIMBT"
+  },
+  "024": {
+    "name_th": "ธนาคารยูโอบี",
+    "name_en": "UOB Bank",
+    "abbr": "UOB"
+  },
+  "025": {
+    "name_th": "ธนาคารกรุงศรีอยุธยา",
+    "name_en": "Bank of Ayudhya",
+    "abbr": "BAY"
+  },
+  "030": {
+    "name_th": "ธนาคารออมสิน",
+    "name_en": "Government Savings Bank",
+    "abbr": "GSB"
+  },
+  "033": {
+    "name_th": "ธนาคารอาคารสงเคราะห์",
+    "name_en": "GH Bank",
+    "abbr": "GHB"
+  },
+  "034": {
+    "name_th": "ธนาคารเพื่อการเกษตรและสหกรณ์การเกษตร",
+    "name_en": "Bank for Agriculture and Agricultural Cooperatives",
+    "abbr": "BAAC"
+  },
+  "065": {
+    "name_th": "ธนาคารไทยเครดิต",
+    "name_en": "Thai Credit Bank",
+    "abbr": "TCB"
+  },
+  "067": {
+    "name_th": "ธนาคารทิสโก้",
+    "name_en": "TISCO Bank",
+    "abbr": "TISCO"
+  },
+  "069": {
+    "name_th": "ธนาคารเกียรตินาคินภัทร",
+    "name_en": "Kiatnakin Phatra Bank",
+    "abbr": "KKP"
+  },
+  "073": {
+    "name_th": "ธนาคารแลนด์ แอนด์ เฮ้าส์",
+    "name_en": "LH Bank",
+    "abbr": "LHBANK"
+  },
+  "098": {
+    "name_th": "ทรูมันนี่ วอลเล็ท",
+    "name_en": "TrueMoney Wallet",
+    "abbr": "TRUEMONEY"
+  }
+}

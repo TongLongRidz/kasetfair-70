@@ -716,6 +716,17 @@ func (h *AppHandler) UploadImage(c *gin.Context) {
 	}
 
 	filename := fmt.Sprintf("%d-%s%s", time.Now().UnixNano(), uuid.New().String()[:8], ext)
+	customFilename := c.DefaultPostForm("custom_filename", c.Query("custom_filename"))
+	if customFilename != "" {
+		customFilename = filepath.Clean(customFilename)
+		if !strings.Contains(customFilename, "..") && !strings.Contains(customFilename, "/") && !strings.Contains(customFilename, "\\") {
+			if !strings.HasSuffix(strings.ToLower(customFilename), ".jpg") && !strings.HasSuffix(strings.ToLower(customFilename), ".jpeg") && !strings.HasSuffix(strings.ToLower(customFilename), ".png") && !strings.HasSuffix(strings.ToLower(customFilename), ".webp") {
+				customFilename += ".jpg"
+			}
+			filename = customFilename
+		}
+	}
+
 	dst := filepath.Join(uploadDir, filename)
 
 	if err := c.SaveUploadedFile(file, dst); err != nil {

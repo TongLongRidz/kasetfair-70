@@ -161,8 +161,20 @@ func seedSettings(db *gorm.DB) {
 		},
 		{
 			Key:         "cash_upload_mode",
-			Value:       "later",
+			Value:       "immediate",
 			Description: "เงื่อนไขการถ่ายรูปเงินสด: immediate (ต้องถ่ายรูป/อัพรูป) หรือ later (ไม่ต้องถ่ายรูป)",
+			UpdatedAt:   time.Now(),
+		},
+		{
+			Key:         "promptpay_target",
+			Value:       "",
+			Description: "หมายเลขบัญชีพร้อมเพย์สำหรับรับชำระเงิน (เบอร์โทรศัพท์ หรือ เลขประจำตัวผู้เสียภาษี/บัตรประชาชน)",
+			UpdatedAt:   time.Now(),
+		},
+		{
+			Key:         "promptpay_name",
+			Value:       "",
+			Description: "ชื่อบัญชีพร้อมเพย์สำหรับรับชำระเงิน",
 			UpdatedAt:   time.Now(),
 		},
 	}

@@ -8,7 +8,6 @@ interface OrderInspectionModalProps {
   order: SlipOrderItem;
   onClose: () => void;
   onSetStatus: (orderId: number, status: PaymentVerificationStatus, note?: string) => void;
-  onOpenFraudReasonModal: (order: SlipOrderItem) => void;
   onUploadSlip: (orderId: number, file: File) => Promise<void>;
 }
 
@@ -16,36 +15,52 @@ export default function OrderInspectionModal({
   order,
   onClose,
   onSetStatus,
-  onOpenFraudReasonModal,
   onUploadSlip,
 }: OrderInspectionModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<PaymentVerificationStatus>(order.paymentStatus || "pending");
   const [fraudNote, setFraudNote] = useState<string>(order.statusNote || "");
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const initialStatus = order.paymentStatus || "pending";
+  const initialNote = order.statusNote || "";
+  const isStatusOrNoteChanged = selectedStatus !== initialStatus || (selectedStatus === "fraud" && fraudNote.trim() !== initialNote.trim());
+  const isChanged = pendingFile !== null || isStatusOrNoteChanged;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0]) return;
     const file = e.target.files[0];
     if (!file.type.startsWith("image/")) {
       alert("กรุณาเลือกไฟล์รูปภาพเท่านั้น");
       return;
     }
-    setIsUploading(true);
-    try {
-      await onUploadSlip(order.id, file);
-    } finally {
-      setIsUploading(false);
-    }
+    setPendingFile(file);
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (selectedStatus === "fraud" && !fraudNote.trim()) {
       alert("กรุณาระบุข้อสงสัย/เหตุผลที่เลือก 'เนียนเลยนะครับ'");
       return;
     }
-    onSetStatus(order.id, selectedStatus, selectedStatus === "fraud" ? fraudNote.trim() : undefined);
-    onClose();
+
+    setIsSaving(true);
+    try {
+      if (pendingFile) {
+        await onUploadSlip(order.id, pendingFile);
+      }
+      if (isStatusOrNoteChanged) {
+        onSetStatus(order.id, selectedStatus, selectedStatus === "fraud" ? fraudNote.trim() : undefined);
+      }
+      onClose();
+    } catch (err) {
+      console.error("Failed to save changes:", err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -111,48 +126,66 @@ export default function OrderInspectionModal({
           style={{
             backgroundColor: "var(--cream)",
             borderRadius: "1rem",
-            padding: "1rem",
+            padding: "1.1rem 1.25rem",
             marginBottom: "1.25rem",
             display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
+            gridTemplateColumns: "1.1fr 1.3fr 1.1fr",
             gap: "0.75rem",
-            fontSize: "0.85rem",
+            alignItems: "center",
           }}
         >
           <div>
-            <span style={{ color: "var(--ink-soft)", fontSize: "0.75rem" }}>หมายเลขคิว</span>
-            <p style={{ margin: 0, fontSize: "1rem", color: "var(--ink)", fontWeight: 800, lineHeight: 1.3, marginTop: "0.2rem" }}>
+            <span style={{ color: "var(--ink-soft)", fontSize: "0.75rem", fontWeight: 600 }}>หมายเลขคิว</span>
+            <p style={{ margin: 0, fontSize: "1.6rem", color: "var(--ink)", fontWeight: 800, lineHeight: 1.1, marginTop: "0.2rem" }}>
               {order.queueNo}
             </p>
           </div>
 
           <div>
-            <span style={{ color: "var(--ink-soft)", fontSize: "0.75rem" }}>วิธีชำระเงิน</span>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginTop: "0.25rem", fontWeight: 700, color: "var(--ink)" }}>
+            <span style={{ color: "var(--ink-soft)", fontSize: "0.75rem", fontWeight: 600 }}>วิธีชำระเงิน</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginTop: "0.3rem", fontWeight: 700, color: "var(--ink)", fontSize: "0.9rem", whiteSpace: "nowrap" }}>
               {order.paymentMethod === "promptpay_qr" ? (
                 <>
-                  <QrCode size={16} color="var(--teal)" />
+                  <QrCode size={17} color="var(--teal)" style={{ flexShrink: 0 }} />
                   <span>พร้อมเพย์ QR</span>
                 </>
               ) : (
                 <>
-                  <Banknote size={16} color="#b45309" />
+                  <Banknote size={17} color="#b45309" style={{ flexShrink: 0 }} />
                   <span>เงินสด</span>
                 </>
               )}
             </div>
           </div>
 
-          <div>
-            <span style={{ color: "var(--ink-soft)", fontSize: "0.75rem" }}>ยอดที่ต้องชำระ</span>
-            <p style={{ margin: 0, fontSize: "1rem", color: "var(--ink)", fontWeight: 800, lineHeight: 1.3, marginTop: "0.2rem" }}>
+          <div style={{ textAlign: "right" }}>
+            <span style={{ color: "var(--ink-soft)", fontSize: "0.75rem", fontWeight: 600 }}>ยอดที่ต้องชำระ</span>
+            <p style={{ margin: 0, fontSize: "1.5rem", color: "var(--ink)", fontWeight: 800, lineHeight: 1.1, marginTop: "0.2rem" }}>
               ฿{order.total}
             </p>
           </div>
 
-          <div style={{ gridColumn: "1 / -1" }}>
-            <span style={{ color: "var(--ink-soft)", fontSize: "0.75rem" }}>รายการสั่งซื้อ</span>
-            <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--ink)" }}>{order.itemsSummary}</p>
+          <div style={{ gridColumn: "1 / -1", paddingTop: "0.5rem", borderTop: "1px dashed rgba(50, 55, 65, 0.12)", marginTop: "0.25rem" }}>
+            <span style={{ color: "var(--ink-soft)", fontSize: "0.775rem", fontWeight: 700, display: "block", marginBottom: "0.4rem" }}>รายการสั่งซื้อ</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+              {order.itemsDetail && order.itemsDetail.length > 0 ? (
+                order.itemsDetail.map((item, idx) => (
+                  <div key={idx} style={{ fontSize: "0.875rem", color: "var(--ink)" }}>
+                    <div style={{ fontWeight: 600, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                      <span>{item.productName}{item.sweetness ? ` (${item.sweetness})` : ""}</span>
+                      <span style={{ fontWeight: 700, color: "var(--ink-soft)", fontSize: "0.85rem", marginLeft: "0.5rem" }}>x{item.quantity}</span>
+                    </div>
+                    {item.toppings && item.toppings.length > 0 && (
+                      <div style={{ paddingLeft: "0.75rem", color: "var(--ink-soft)", fontSize: "0.8rem", marginTop: "2px" }}>
+                        + {item.toppings.join(", ")}
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--ink)", fontWeight: 500 }}>{order.itemsSummary}</p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -183,23 +216,45 @@ export default function OrderInspectionModal({
               padding: "0.5rem",
             }}
           >
-            {isUploading ? (
-              <div style={{ textAlign: "center", color: "var(--teal)", padding: "1.5rem" }}>
-                <Loader2 size={32} className="animate-spin" style={{ margin: "0 auto 0.5rem auto" }} />
-                <p style={{ fontSize: "0.9rem", fontWeight: 600, margin: 0 }}>กำลังอัพโหลดรูปสลิป...</p>
+            {previewUrl || order.slipImageUrl ? (
+              /* Display slip image (from local preview or existing uploaded URL) */
+              <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <img
+                  src={previewUrl || order.slipImageUrl}
+                  alt="สลิปโอนเงิน"
+                  style={{
+                    maxWidth: "100%",
+                    maxHeight: "360px",
+                    objectFit: "contain",
+                    borderRadius: "0.5rem",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    position: "absolute",
+                    bottom: "0.75rem",
+                    right: "0.75rem",
+                    backgroundColor: "rgba(0, 0, 0, 0.7)",
+                    backdropFilter: "blur(4px)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "0.5rem",
+                    padding: "0.4rem 0.75rem",
+                    fontSize: "0.75rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+                  }}
+                >
+                  <UploadCloud size={14} />
+                  <span>{pendingFile ? "เปลี่ยนรูปใหม่" : "เปลี่ยนรูปสลิป"}</span>
+                </button>
               </div>
-            ) : order.slipImageUrl ? (
-              /* Display real slip image if uploaded */
-              <img
-                src={order.slipImageUrl}
-                alt="สลิปโอนเงิน"
-                style={{
-                  maxWidth: "100%",
-                  maxHeight: "360px",
-                  objectFit: "contain",
-                  borderRadius: "0.5rem",
-                }}
-              />
             ) : (
               /* No slip attached fallback with direct upload click */
               <div
@@ -209,7 +264,7 @@ export default function OrderInspectionModal({
                 <AlertTriangle size={32} color="#f59e0b" style={{ margin: "0 auto 0.5rem auto" }} />
                 <p style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, color: "var(--ink)" }}>ไม่มีรูปหลักฐาน/สลิปแนบ</p>
                 <p style={{ fontSize: "0.8rem", margin: "0.35rem 0 0 0", color: "var(--teal)", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.25rem" }}>
-                  <span>คลิกตรงนี้เพื่ออัพโหลดรูปภาพ</span>
+                  <span>คลิกตรงนี้เพื่อเลือกรูปภาพ</span>
                 </p>
               </div>
             )}
@@ -274,6 +329,7 @@ export default function OrderInspectionModal({
           <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
             <button
               type="button"
+              disabled={isSaving}
               onClick={onClose}
               style={{
                 padding: "0.65rem 1.25rem",
@@ -290,20 +346,32 @@ export default function OrderInspectionModal({
             </button>
             <button
               type="button"
+              disabled={!isChanged || isSaving}
               onClick={handleSave}
               style={{
                 padding: "0.65rem 1.5rem",
                 borderRadius: "0.75rem",
                 border: "none",
-                backgroundColor: "var(--teal)",
-                color: "#fff",
+                backgroundColor: isChanged && !isSaving ? "var(--teal)" : "#cbd5e1",
+                color: isChanged && !isSaving ? "#fff" : "#64748b",
                 fontWeight: 700,
                 fontSize: "0.875rem",
-                cursor: "pointer",
-                boxShadow: "0 4px 12px rgba(75, 155, 140, 0.35)",
+                cursor: isChanged && !isSaving ? "pointer" : "not-allowed",
+                boxShadow: isChanged && !isSaving ? "0 4px 12px rgba(75, 155, 140, 0.35)" : "none",
+                transition: "all 0.15s ease",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.4rem",
               }}
             >
-              บันทึก
+              {isSaving ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>กำลังบันทึก...</span>
+                </>
+              ) : (
+                <span>บันทึก</span>
+              )}
             </button>
           </div>
         </div>

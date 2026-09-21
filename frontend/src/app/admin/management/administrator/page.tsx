@@ -455,10 +455,10 @@ export default function AdminListPage() {
                   setCurrentPage(1);
                 }}
               >
-                <option value="all">แสดงทั้งหมด</option>
-                <option value="active">แสดงเฉพาะบัญชีที่ถูกเปิดใช้งาน</option>
-                <option value="inactive">แสดงเฉพาะบัญชีที่รอเปิดใช้งาน</option>
-                <option value="superadmin">แสดงเฉพาะบัญชีที่เป็น Super Admin</option>
+                <option value="all">ทั้งหมด</option>
+                <option value="active">บัญชีที่ถูกเปิดใช้งาน</option>
+                <option value="inactive">บัญชีที่รอเปิดใช้งาน</option>
+                <option value="superadmin">Super Admin</option>
               </select>
             </div>
 

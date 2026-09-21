@@ -79,8 +79,17 @@ func (h *AppHandler) GetOrders(c *gin.Context) {
 	}
 
 	// Filter: payment_method
-	if pm := c.Query("payment_method"); pm != "" {
-		query = query.Where("payment_method = ?", pm)
+	if pm := c.Query("payment_method"); pm != "" && pm != "all" {
+		if pm == "promptpay" || pm == "promptpay_qr" {
+			query = query.Where("payment_method IN ?", []string{"promptpay", "promptpay_qr"})
+		} else {
+			query = query.Where("payment_method = ?", pm)
+		}
+	}
+
+	// Filter: slip_verification_status
+	if svs := c.Query("slip_verification_status"); svs != "" && svs != "all" {
+		query = query.Where("slip_verification_status = ?", svs)
 	}
 
 	// Filter: date (YYYY-MM-DD)
@@ -92,21 +101,58 @@ func (h *AppHandler) GetOrders(c *gin.Context) {
 		}
 	}
 
-	// Filter: search by queue_no or uuid
+	// Filter: search by queue_no, uuid, or id
 	if search := c.Query("search"); search != "" {
 		searchTerm := "%" + strings.TrimSpace(search) + "%"
-		query = query.Where("queue_no ILIKE ? OR uuid ILIKE ?", searchTerm, searchTerm)
+		query = query.Where("queue_no ILIKE ? OR uuid ILIKE ? OR CAST(id AS TEXT) ILIKE ?", searchTerm, searchTerm, searchTerm)
 	}
 
 	// Sort order: default newest first
 	sortBy := c.DefaultQuery("sort", "created_at_desc")
 	switch sortBy {
-	case "created_at_asc":
+	case "created_at_asc", "date_asc":
 		query = query.Order("created_at ASC")
+	case "created_at_desc", "date_desc":
+		query = query.Order("created_at DESC")
+	case "payment_method_asc":
+		query = query.Order("payment_method ASC")
+	case "payment_method_desc":
+		query = query.Order("payment_method DESC")
+	case "slip_verification_status_asc":
+		query = query.Order("slip_verification_status ASC")
+	case "slip_verification_status_desc":
+		query = query.Order("slip_verification_status DESC")
 	case "id_desc":
 		query = query.Order("id DESC")
+	case "id_asc":
+		query = query.Order("id ASC")
 	default:
 		query = query.Order("created_at DESC")
+	}
+
+	// Count total records matching filters before pagination
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count orders", "details": err.Error()})
+		return
+	}
+
+	pageStr := c.Query("page")
+	pageSizeStr := c.Query("page_size")
+
+	page := 1
+	pageSize := 0
+
+	if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+		page = p
+	}
+	if ps, err := strconv.Atoi(pageSizeStr); err == nil && ps > 0 {
+		pageSize = ps
+	}
+
+	if pageSize > 0 {
+		offset := (page - 1) * pageSize
+		query = query.Offset(offset).Limit(pageSize)
 	}
 
 	var orders []model.Order
@@ -116,9 +162,11 @@ func (h *AppHandler) GetOrders(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    orders,
-		"total":   len(orders),
+		"success":   true,
+		"data":      orders,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
 	})
 }
 

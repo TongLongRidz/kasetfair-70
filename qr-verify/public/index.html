@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบตรวจสอบสลิป QR Code (PromptPay Verify)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Prompt:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #faf9f5;
+      --card: #ffffff;
+      --cream: #f4efe6;
+      --ink: #2b2f38;
+      --ink-soft: #636b78;
+      --teal: #4b9b8c;
+      --teal-dark: #377569;
+      --green: #2b7a4b;
+      --red: #d32f2f;
+      --amber: #d97706;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      scrollbar-gutter: stable;
+    }
+
+    body {
+      font-family: 'Kanit', 'Prompt', sans-serif;
+      background-color: var(--bg);
+      color: var(--ink);
+      margin: 0;
+      padding: 1.5rem;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1700px;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1.1rem;
+      align-items: start;
+    }
+
+    @media (max-width: 1200px) {
+      .main-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 768px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    header h1 {
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: var(--ink);
+      margin: 0 0 0.5rem 0;
+    }
+
+    header p {
+      color: var(--ink-soft);
+      font-size: 0.9rem;
+      margin: 0;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 1.25rem;
+      padding: 1.25rem;
+      border: 1px solid rgba(50, 55, 65, 0.1);
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.03);
+      width: 100%;
+      min-width: 0;
+      height: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #qrContent,
+    #jsonContent {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .card h2 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-top: 0;
+      margin-bottom: 1.1rem;
+      border-bottom: 2px solid var(--cream);
+      padding-bottom: 0.5rem;
+      color: var(--teal-dark);
+      flex-shrink: 0;
+    }
+
+    .form-group {
+      margin-bottom: 0.85rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.825rem;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+      color: var(--ink-soft);
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border-radius: 0.75rem;
+      border: 1.5px solid rgba(50, 55, 65, 0.2);
+      font-family: inherit;
+      font-size: 0.875rem;
+      outline: none;
+      transition: border 0.15s ease;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: var(--teal);
+    }
+
+    .upload-box {
+      border: 2px dashed rgba(50, 55, 65, 0.2);
+      background: var(--cream);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      min-height: 130px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .upload-box img {
+      max-width: 100%;
+      max-height: 200px;
+      object-fit: contain;
+      border-radius: 0.5rem;
+    }
+
+    button.btn-primary {
+      width: 100%;
+      padding: 0.85rem;
+      border-radius: 0.75rem;
+      border: none;
+      background-color: var(--teal);
+      color: white;
+      font-weight: 700;
+      font-size: 0.95rem;
+      font-family: inherit;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(75, 155, 140, 0.35);
+      transition: all 0.15s ease;
+    }
+
+    button.btn-primary:hover {
+      background-color: var(--teal-dark);
+    }
+
+    button.btn-secondary {
+      width: 100%;
+      padding: 0.75rem;
+      border-radius: 0.75rem;
+      border: 1.5px solid var(--teal);
+      background-color: transparent;
+      color: var(--teal-dark);
+      font-weight: 700;
+      font-size: 0.9rem;
+      font-family: inherit;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      transition: all 0.15s ease;
+    }
+
+    button.btn-secondary:hover {
+      background-color: rgba(75, 155, 140, 0.08);
+    }
+
+    .benchmark-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      margin-top: 0.75rem;
+    }
+
+    .benchmark-table th,
+    .benchmark-table td {
+      padding: 0.45rem 0.55rem;
+      border-bottom: 1px solid rgba(50, 55, 65, 0.1);
+      text-align: left;
+    }
+
+    .benchmark-table th {
+      background: rgba(0, 0, 0, 0.02);
+      color: var(--ink-soft);
+      font-weight: 600;
+    }
+
+    .result-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.4rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+
+    .badge-success {
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--green);
+    }
+
+    .badge-error {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--red);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    .pill-success {
+      background: rgba(43, 122, 75, 0.12);
+      color: var(--green);
+    }
+
+    .pill-danger {
+      background: rgba(211, 47, 47, 0.12);
+      color: var(--red);
+    }
+
+    .pill-neutral {
+      background: rgba(99, 107, 120, 0.1);
+      color: var(--ink-soft);
+    }
+
+    .pill-processing {
+      background: rgba(217, 119, 6, 0.15);
+      color: var(--amber);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(217, 119, 6, 0.3);
+      border-top-color: var(--amber);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .tag-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.12rem 0.45rem;
+      background: rgba(75, 155, 140, 0.12);
+      color: var(--teal-dark);
+      border: 1px solid rgba(75, 155, 140, 0.25);
+      border-radius: 0.35rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .checksum-compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      margin: 0.4rem 0 0.55rem 0;
+    }
+
+    .checksum-compare-box {
+      background: rgba(255, 255, 255, 0.75);
+      border: 1px solid rgba(50, 55, 65, 0.1);
+      border-radius: 0.6rem;
+      padding: 0.45rem 0.6rem;
+      text-align: center;
+    }
+
+    .checksum-compare-label {
+      font-size: 0.7rem;
+      color: var(--ink-soft);
+      margin-bottom: 0.15rem;
+      white-space: nowrap;
+    }
+
+    .checksum-compare-val {
+      font-family: monospace;
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      min-height: 1.3rem;
+    }
+
+    .section-box {
+      background: rgba(244, 239, 230, 0.45);
+      border: 1px solid rgba(50, 55, 65, 0.08);
+      border-radius: 0.85rem;
+      padding: 0.85rem 0.95rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .section-box:last-child {
+      margin-bottom: 0;
+    }
+
+    .section-title {
+      font-weight: 700;
+      font-size: 0.875rem;
+      color: var(--teal-dark);
+      margin-bottom: 0.65rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .result-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 0.35rem 0;
+      font-size: 0.825rem;
+      gap: 0.5rem;
+      min-height: 1.6rem;
+    }
+
+    .result-row>span:first-child {
+      flex-shrink: 0;
+      white-space: nowrap;
+      color: var(--ink-soft);
+    }
+
+    .result-row span.val {
+      font-weight: 600;
+      font-family: inherit;
+      text-align: right;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      min-height: 1.2rem;
+    }
+
+    .val-code {
+      font-family: inherit;
+      word-break: break-all;
+      min-height: 1.4rem;
+    }
+
+    .verify-item {
+      padding: 0.35rem 0;
+      margin-bottom: 0.4rem;
+    }
+
+    .verify-item:last-child {
+      margin-bottom: 0;
+    }
+
+    #jsonCard {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #jsonContent {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    pre {
+      background: var(--cream);
+      padding: 0.75rem;
+      border-radius: 0.5rem;
+      font-size: 0.725rem;
+      overflow-x: auto;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      flex: 1;
+      min-height: 0;
+      margin: 0;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+    <div class="main-grid">
+      <!-- Column 1: Main Verification Form -->
+      <div class="card" id="formCard">
+        <h2>1. ตรวจสอบสลิป QR Code</h2>
+
+        <div class="form-group">
+          <label>ยอดเงินที่ต้องชำระ (บาท):</label>
+          <input type="number" id="expectedAmountInput" placeholder="เช่น 100, 150..." value="">
+        </div>
+
+        <div class="form-group">
+          <label>หมายเลขพร้อมเพย์เป้าหมาย (PromptPay Target):</label>
+          <input type="text" id="expectedTargetInput" placeholder="เช่น 0812345678 หรือ 010555..." value="">
+        </div>
+
+        <div class="form-group">
+          <label>ชื่อบัญชีผู้รับเป้าหมาย (PromptPay Target Name):</label>
+          <input type="text" id="expectedReceiverInput" placeholder="เช่น นาย สมศักดิ์, TongLong Store..." value="">
+        </div>
+
+        <div class="form-group">
+          <label>เลือกรูปภาพสลิปโอนเงิน:</label>
+          <div class="upload-box" id="uploadBoxScan">
+            <span id="uploadTextScan">คลิกตรงนี้เพื่ออัปโหลดรูปภาพสลิป</span>
+            <img id="previewScan" style="display: none;">
+          </div>
+          <input type="file" id="fileScan" accept="image/*" style="display: none;">
+        </div>
+
+        <button class="btn-primary" id="btnScanQR">ตรวจสอบสลิปเทียบกับข้อมูลที่ระบุ</button>
+      </div>
+
+      <!-- Column 2: QR Code Combined Card -->
+      <div class="card" id="qrCard">
+        <h2>2. ข้อมูลที่แกะได้จาก QR Code</h2>
+        <div id="qrContent">
+          <!-- หมวดที่ 1: ข้อมูล Payload -->
+          <div class="section-box">
+            <div class="section-title">
+              <span>ข้อมูล QR Code</span>
+              <span class="status-pill pill-neutral">Standby</span>
+            </div>
+            <div class="result-row"><span>ประเภท:</span><span class="val" style="color: var(--ink-soft);">-</span></div>
+            <div class="result-row"><span>ธนาคาร:</span><span class="val" style="color: var(--ink-soft);">-</span></div>
+            <div class="result-row"><span>เลขอ้างอิง:</span><span class="val" style="color: var(--ink-soft);">-</span>
+            </div>
+            <div class="result-row"><span>ประเทศ:</span><span class="val" style="color: var(--ink-soft);">-</span></div>
+          </div>
+
+          <!-- หมวดที่ 2: Checksum CRC16 -->
+          <div class="section-box">
+            <div class="section-title">
+              <div style="display: flex; align-items: center; gap: 0.45rem;">
+                <span>Checksum (CRC16)</span>
+              </div>
+              <span class="status-pill pill-neutral">Standby</span>
+            </div>
+            <div class="checksum-compare-grid">
+              <div class="checksum-compare-box">
+                <div class="checksum-compare-label">ในสลิป (Expected)</div>
+                <div class="checksum-compare-val" style="color: var(--ink-soft);">-</div>
+              </div>
+              <div class="checksum-compare-box">
+                <div class="checksum-compare-label">คำนวณได้ (Calculated)</div>
+                <div class="checksum-compare-val" style="color: var(--ink-soft);">-</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 3: OCR Slip Data Section (Standby Card) -->
+      <div class="card" id="ocrCard">
+        <h2>3. ข้อมูลที่แกะได้จากสลิป (OCR)</h2>
+        <!-- หมวดที่ 1: ข้อมูลสลิป OCR -->
+        <div class="section-box">
+          <div class="section-title">
+            <span>ข้อมูลสลิป (OCR)</span>
+            <span class="status-pill pill-neutral">Standby</span>
+          </div>
+          <div class="result-row"><span>ธนาคาร:</span><span class="val" style="color: var(--ink-soft);"></span></div>
+          <div class="result-row"><span>ผู้โอน:</span><span class="val" style="color: var(--ink-soft);"></span></div>
+          <div class="result-row"><span>ผู้รับ:</span><span class="val" style="color: var(--ink-soft);"></span></div>
+          <div class="result-row"><span>ยอดเงิน:</span><span class="val" style="color: var(--ink-soft);"></span></div>
+          <div class="result-row"><span>วันเวลา:</span><span class="val" style="color: var(--ink-soft);"></span></div>
+          <div class="result-row"><span>เลขอ้างอิง:</span><span class="val" style="color: var(--ink-soft);"></span>
+          </div>
+        </div>
+
+        <!-- หมวดที่ 2: ผลการตรวจสอบ Verification -->
+        <div class="section-box">
+          <div class="section-title">ผลการตรวจสอบ (Verification)</div>
+
+          <div class="result-row">
+            <div>
+              <div>ธนาคารผู้โอน:</div>
+              <div style="font-size: 0.7rem; color: var(--ink-soft); font-weight: normal;">(QR Code ↔ OCR)</div>
+            </div>
+            <span class="status-pill pill-neutral"></span>
+          </div>
+          <div class="result-row">
+            <div>
+              <div>หมายเลขอ้างอิง:</div>
+              <div style="font-size: 0.7rem; color: var(--ink-soft); font-weight: normal;">(QR Code ↔ OCR)</div>
+            </div>
+            <span class="status-pill pill-neutral"></span>
+          </div>
+          <div class="result-row">
+            <div>
+              <div>ยอดเงินโอน:</div>
+              <div style="font-size: 0.7rem; color: var(--ink-soft); font-weight: normal;">(OCR ↔ ยอดที่ระบุ)</div>
+            </div>
+            <span class="status-pill pill-neutral"></span>
+          </div>
+          <div class="result-row">
+            <div>
+              <div>ชื่อผู้รับเงิน:</div>
+              <div style="font-size: 0.7rem; color: var(--ink-soft); font-weight: normal;">(OCR ↔ ชื่อที่ระบุ)</div>
+            </div>
+            <span class="status-pill pill-neutral"></span>
+          </div>
+          <div class="result-row">
+            <div>
+              <div>การตัดต่อภาพ:</div>
+              <div style="font-size: 0.7rem; color: var(--ink-soft); font-weight: normal;">(วิเคราะห์ภาพสลิป)</div>
+            </div>
+            <span class="status-pill pill-neutral"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 4: JSON Response -->
+      <div class="card" id="jsonCard">
+        <h2>4. Raw String & JSON Payload</h2>
+        <div id="jsonContent">
+          <p style="color: var(--ink-soft); font-size: 0.85rem;">รอผลการสแกน...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let base64ScanImg = "";
+
+    function getBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = img.naturalWidth || img.width;
+            canvas.height = img.naturalHeight || img.height;
+            const ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL("image/jpeg", 0.92));
+          };
+          img.onerror = () => resolve(e.target.result);
+          img.src = e.target.result;
+        };
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    const fileScan = document.getElementById("fileScan");
+    const uploadBoxScan = document.getElementById("uploadBoxScan");
+    const previewScan = document.getElementById("previewScan");
+    const uploadTextScan = document.getElementById("uploadTextScan");
+
+    uploadBoxScan.onclick = () => fileScan.click();
+    fileScan.onchange = async (e) => {
+      if (e.target.files[0]) {
+        base64ScanImg = await getBase64(e.target.files[0]);
+        previewScan.src = base64ScanImg;
+        previewScan.style.display = "block";
+        uploadTextScan.style.display = "none";
+      }
+    };
+
+    document.getElementById("btnScanQR").onclick = async () => {
+      const btn = document.getElementById("btnScanQR");
+      const qrContent = document.getElementById("qrContent");
+      const ocrCard = document.getElementById("ocrCard");
+      const jsonContent = document.getElementById("jsonContent");
+
+      if (!base64ScanImg) {
+        alert("กรุณาเลือกรูปภาพสลิปก่อนกดตรวจสอบ");
+        return;
+      }
+
+      const expectedAmount = document.getElementById("expectedAmountInput").value;
+      const expectedTarget = document.getElementById("expectedTargetInput").value;
+      const expectedReceiver = document.getElementById("expectedReceiverInput") ? document.getElementById("expectedReceiverInput").value : "";
+
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner" style="border-top-color: white; border-color: rgba(255,255,255,0.3); vertical-align: middle; margin-right: 0.4rem;"></span> กำลังประมวลผล OCR...`;
+
+      // Show processing status in OCR card immediately
+      ocrCard.innerHTML = `
+        <h2>3. ข้อมูลที่แกะได้จากสลิป (OCR)</h2>
+        <div class="section-box" style="text-align: center; padding: 2.2rem 1rem;">
+          <div style="display: inline-flex; align-items: center; gap: 0.5rem; background: rgba(217, 119, 6, 0.1); color: var(--amber); padding: 0.4rem 0.9rem; border-radius: 9999px; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.75rem;">
+            <span class="spinner"></span> กำลังประมวลผล OCR (EasyOCR)...
+          </div>
+          <div style="color: var(--ink-soft); font-size: 0.8rem;">ระบบกำลังถอดข้อความภาษาไทยและอ่านข้อมูลจากรูปสลิป</div>
+        </div>
+      `;
+
+      try {
+        const res = await fetch("/api/v1/qr-verify/scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            image: base64ScanImg,
+            ocr_expected: {
+              amount: expectedAmount,
+              target_account: expectedTarget,
+              receiver_name: expectedReceiver,
+            },
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          const errHtml = `<div class="result-badge badge-error">${data.message || data.error || 'ไม่พบ QR Code'}</div>`;
+          qrContent.innerHTML = errHtml;
+          jsonContent.innerHTML = errHtml;
+          return;
+        }
+
+        const qrInfo = data.qr_data || {};
+        const ocrInfo = data.ocr_data || {};
+        const vResults = data.verification_results || {};
+        const crc = vResults.crc16_checksum || {};
+        const crcMeta = crc.metadata || {};
+        const crcComp = crc.computation || {};
+
+        // Column 2: QR Code Info & Checksum Combined Content
+        const bankStr = qrInfo.sender_bank ? `${qrInfo.sender_bank.code} - ${qrInfo.sender_bank.name_th} (${qrInfo.sender_bank.abbr})` : '';
+        const qrTypeStr = typeof qrInfo.qr_type === 'object' ? qrInfo.qr_type.description : (qrInfo.qr_type || '');
+        const rawQrDisplay = qrInfo.raw_qr || data.raw_qr || '';
+        const tagNum = crcMeta.tag_used || '91';
+
+        qrContent.innerHTML = `
+          <!-- หมวดที่ 1: ข้อมูล Payload -->
+          <div class="section-box">
+            <div class="section-title">
+              <span>ข้อมูล QR Code</span>
+              <span class="status-pill pill-success">✓ สแกนสำเร็จ</span>
+            </div>
+            <div class="result-row"><span>ประเภท:</span><span class="val">${qrTypeStr}</span></div>
+            <div class="result-row"><span>ธนาคาร:</span><span class="val" style="color: var(--teal); font-weight: 700;">${bankStr}</span></div>
+            <div class="result-row"><span>เลขอ้างอิง:</span><span class="val val-code" style="color: var(--teal); font-weight: 700;">${qrInfo.transaction_ref || ''}</span></div>
+            <div class="result-row"><span>วันเวลา:</span><span class="val val-code" style="color: var(--teal); font-weight: 600;">${qrInfo.date_time || 'ไม่มีระบุใน QR Code'}</span></div>
+            <div class="result-row"><span>ประเทศ:</span><span class="val">${qrInfo.country || 'TH'}</span></div>
+            <div style="margin-top: 0.5rem;">
+              <div style="font-size: 0.75rem; color: var(--ink-soft); margin-bottom: 0.25rem;">Raw QR Code:</div>
+              <div class="val-code" style="font-size: 0.7rem; background: rgba(0, 0, 0, 0.04); border: 1px solid rgba(0, 0, 0, 0.06); padding: 0.45rem 0.6rem; border-radius: 0.45rem; color: var(--ink-soft); word-break: break-all; line-height: 1.4;">${rawQrDisplay}</div>
+            </div>
+          </div>
+
+          <!-- หมวดที่ 2: Checksum CRC16 -->
+          <div class="section-box">
+            <div class="section-title">
+              <div style="display: flex; align-items: center; gap: 0.45rem;">
+                <span>Checksum (CRC16)</span>
+                <span class="tag-badge">Tag : ${tagNum}</span>
+              </div>
+              <span class="status-pill ${crc.is_valid ? 'pill-success' : 'pill-danger'}">${crc.is_valid ? '✓ ถูกต้อง' : '✕ ไม่ถูกต้อง'}</span>
+            </div>
+            <div class="checksum-compare-grid">
+              <div class="checksum-compare-box" style="border-color: ${crc.is_valid ? 'rgba(43, 122, 75, 0.25)' : 'rgba(211, 47, 47, 0.25)'};">
+                <div class="checksum-compare-label">ในสลิป (Expected)</div>
+                <div class="checksum-compare-val" style="color: ${crc.is_valid ? 'var(--green)' : 'var(--red)'};">${crcComp.expected_crc || ''}</div>
+              </div>
+              <div class="checksum-compare-box" style="border-color: ${crc.is_valid ? 'rgba(43, 122, 75, 0.25)' : 'rgba(211, 47, 47, 0.25)'};">
+                <div class="checksum-compare-label">คำนวณได้ (Calculated)</div>
+                <div class="checksum-compare-val" style="color: ${crc.is_valid ? 'var(--green)' : 'var(--red)'};">${crcComp.calculated_crc || ''}</div>
+              </div>
+            </div>
+            <div style="margin-top: 0.5rem;">
+              <div style="font-size: 0.75rem; color: var(--ink-soft); margin-bottom: 0.25rem;">Payload ที่ใช้คำนวณ:</div>
+              <div class="val-code" style="font-size: 0.7rem; background: rgba(0, 0, 0, 0.04); border: 1px solid rgba(0, 0, 0, 0.06); padding: 0.45rem 0.6rem; border-radius: 0.45rem; color: var(--ink-soft); word-break: break-all; line-height: 1.4;">${crcComp.data_for_checksum || ''}</div>
+            </div>
+          </div>
+        `;
+
+        // Helper to format match status (handles true, false, null)
+        const formatMatchStatus = (val) => {
+          if (val === true) return '<span class="status-pill pill-success">✓ ตรงกัน</span>';
+          if (val === false) return '<span class="status-pill pill-danger">✕ ไม่ตรง</span>';
+          return '<span class="status-pill pill-neutral"></span>';
+        };
+
+        const formatSlipEditedStatus = (val) => {
+          if (val === true) return '<span class="status-pill pill-danger">✕ พบตัดต่อ</span>';
+          if (val === false) return '<span class="status-pill pill-success">✓ ไม่พบตัดต่อ</span>';
+          return '<span class="status-pill pill-neutral"></span>';
+        };
+
+        // Column 3: OCR Card Content
+        const ocrCard = document.getElementById("ocrCard");
+        const ocrBankStr = ocrInfo.sender_bank?.name_th || '';
+        const elapsedSec = data.elapsed_seconds !== undefined ? `${data.elapsed_seconds}s` : '';
+
+        ocrCard.innerHTML = `
+          <h2>3. ข้อมูลที่แกะได้จากสลิป (OCR)</h2>
+          <!-- หมวดที่ 1: ข้อมูลสลิป OCR -->
+          <div class="section-box">
+            <div class="section-title">
+              <span>ข้อมูลสลิป (OCR)</span>
+              <div style="display: flex; gap: 0.35rem; align-items: center;">
+                ${elapsedSec ? `<span class="tag-badge" style="background: rgba(75, 155, 140, 0.15); color: var(--teal-dark); font-weight: 700;">⏱️ ${elapsedSec}</span>` : ''}
+                <span class="status-pill pill-success">✓ สำเร็จ</span>
+              </div>
+            </div>
+            <div class="result-row"><span>ธนาคาร:</span><span class="val" style="color: var(--teal); font-weight: 600;">${ocrBankStr || '-'}</span></div>
+            <div class="result-row"><span>ผู้โอน:</span><span class="val" style="color: var(--ink); font-weight: 600;">${ocrInfo.sender_name || '-'}</span></div>
+            <div class="result-row"><span>ผู้รับ:</span><span class="val" style="color: var(--ink); font-weight: 600;">${ocrInfo.receiver_name || '-'}</span></div>
+            <div class="result-row"><span>ยอดเงิน:</span><span class="val" style="color: var(--teal-dark); font-weight: 700;">${ocrInfo.amount !== null && ocrInfo.amount !== undefined ? '฿' + ocrInfo.amount : '-'}</span></div>
+            <div class="result-row"><span>วันเวลา:</span><span class="val val-code" style="color: var(--ink-soft);">${ocrInfo.date_time || '-'}</span></div>
+            <div class="result-row"><span>เลขอ้างอิง:</span><span class="val val-code" style="color: var(--ink-soft); font-weight: 600;">${ocrInfo.transaction_ref || '-'}</span></div>
+          </div>
+
+          <!-- หมวดที่ 2: ผลการตรวจสอบ Verification -->
+          <div class="section-box">
+            <div class="section-title">ผลการตรวจสอบ (Verification)</div>
+
+            <div class="result-row">
+              <div>
+                <div>ธนาคารผู้โอน:</div>
+                <div style="font-size: 0.7rem; color: var(--ink-soft); font-weight: normal;">(QR Code ↔ OCR)</div>
+              </div>
+              ${formatMatchStatus(vResults.is_bank_match)}
+            </div>
+
+            <div class="result-row">
+              <div>
+                <div>หมายเลขอ้างอิง:</div>
+                <div style="font-size: 0.7rem; color: var(--ink-soft); font-weight: normal;">(QR Code ↔ OCR)</div>
+              </div>
+              ${formatMatchStatus(vResults.is_trans_ref_match)}
+            </div>
+
+            <div class="result-row">
+              <div>
+                <div>ยอดเงินโอน:</div>
+                <div style="font-size: 0.7rem; color: var(--ink-soft); font-weight: normal;">(OCR ↔ ยอดที่ระบุ)</div>
+              </div>
+              ${formatMatchStatus(vResults.is_amount_match)}
+            </div>
+
+            <div class="result-row">
+              <div>
+                <div>ชื่อผู้รับเงิน:</div>
+                <div style="font-size: 0.7rem; color: var(--ink-soft); font-weight: normal;">(OCR ↔ ชื่อที่ระบุ)</div>
+              </div>
+              ${formatMatchStatus(vResults.is_receiver_match)}
+            </div>
+
+            <div class="result-row">
+              <div>
+                <div>การตัดต่อภาพ:</div>
+                <div style="font-size: 0.7rem; color: var(--ink-soft); font-weight: normal;">(วิเคราะห์ภาพสลิป)</div>
+              </div>
+              ${formatSlipEditedStatus(vResults.is_slip_edited)}
+            </div>
+          </div>
+        `;
+
+        // Column 4: JSON Content
+        jsonContent.innerHTML = `
+          <pre>${JSON.stringify(data, null, 2)}</pre>
+        `;
+      } catch (err) {
+        const errHtml = `<div class="result-badge badge-error">เกิดข้อผิดพลาดการเชื่อมต่อ: ${err.message}</div>`;
+        qrContent.innerHTML = errHtml;
+        jsonContent.innerHTML = errHtml;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "ตรวจสอบสลิปเทียบกับข้อมูลที่ระบุ";
+        syncCardMinHeights();
+      }
+    };
+
+    function syncCardMinHeights() {
+      const formCard = document.getElementById("formCard");
+      const jsonCard = document.getElementById("jsonCard");
+
+      if (formCard && jsonCard) {
+        if (window.innerWidth > 1200) {
+          jsonCard.style.height = `${formCard.offsetHeight}px`;
+        } else {
+          jsonCard.style.height = "auto";
+        }
+      }
+    }
+
+    window.addEventListener("resize", syncCardMinHeights);
+    window.addEventListener("DOMContentLoaded", syncCardMinHeights);
+
+    const formCardEl = document.getElementById("formCard");
+    if (formCardEl && window.ResizeObserver) {
+      new ResizeObserver(() => syncCardMinHeights()).observe(formCardEl);
+    }
+  </script>
+</body>
+
+</html>

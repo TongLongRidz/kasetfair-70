@@ -667,3 +667,24 @@ wjKU@RfNXxXE
       ↓
   completed      (เสร็จสิ้น - ลูกค้ามารับของแล้ว / หน้าร้านกดยืนยันจบงาน)
 ```
+
+---
+
+## 🔮 แผนพัฒนาฟีเจอร์ในอนาคต (Future Features Roadmap)
+
+### 1. ระบบ OCR อ่านสลิปและแกะข้อมูลสลิปอัตโนมัติ (Slip OCR Data Extraction)
+- ใช้เอนจิน OCR (เช่น Tesseract / Google Vision API) อ่านตัวหนังสือบนรูปภาพสลิปเพื่อแกะข้อมูล:
+  - หมายเลขอ้างอิงสลิป / Transaction Reference ID
+  - ยอดเงินโอนจริง (Amount Transferred)
+  - ชื่อผู้โอน และ บัญชีผู้รับโอนปลายทาง (Sender & Receiver Bank Account)
+  - ชื่อธนาคารต้นทาง-ปลายทาง (Bank Code / Bank Name)
+  - วันที่และเวลาที่โอนเงินจริง (Transaction Date & Time)
+
+### 2. ระบบตรวจจับการตัดต่อสลิป / ภาพดัดแปลง (Slip Tampering & Fraud Detection)
+- ตรวจสอบ ELA (Error Level Analysis) และ EXIF Metadata เพื่อหาการแก้ไขพิกเซลหรือตัดต่อภาพ
+- ตรวจสอบความผิดปกติของตัวฟอนต์ (Font Consistency) และระดับสีพื้นหลังรอบข้อความยอดเงิน
+- ตรวจสอบประวัติสลิปซ้ำ (Duplicate Slip Hash / Duplicate Transaction Ref Check) ป้องกันการนำสลิปเก่ามาโอนซ้ำ
+
+### 3. ระบบแจ้งเตือนยอดเงินไม่ตรงกับการสั่งซื้อ (Amount Mismatch Alert & Auto Warning)
+- เปรียบเทียบยอดเงินที่อ่านได้จากสลิป (หรือจาก QR Code / OCR) กับยอดสุทธิที่ต้องชำระของออเดอร์ (`orders.total_amount`)
+- แสดงสถานะและป้ายเตือนสีแดง **"ยอดเงินไม่ตรงกับที่ต้องจ่าย"** บน Modal และหน้าตาราง slip-check หากพบความต่างของจำนวนเงิน (เช่น ยอดสั่ง 100 บาท แต่สลิปโอน 10 บาท)
