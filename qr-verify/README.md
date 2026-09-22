@@ -17,7 +17,7 @@
 | ผลการตรวจสอบ | วิธีการเช็ค (Verification Logic) | หมายเหตุ |
 | :--- | :--- | :--- |
 | **`is_bank_match`** | เช็คชื่อธนาคารต้นทางจาก **OCR** เทียบกับธนาคารต้นทางจาก **QR Code** (`qr_data.sender_bank`) | ตรงกันเป็น `true` (อ้างอิงจาก `bank_code.json`) |
-| **`is_trans_ref_match`** | เช็คหมายเลขอ้างอิงรายการจาก **OCR** เทียบกับ **QR Code** (`qr_data.transaction_ref`) | Case-Insensitive และแปลงตัวอักษรคล้ายกัน (`I` / `l` และ `0` / `O`) ให้เทียบเท่ากัน |
+| **`is_trans_ref_match`** | เช็คหมายเลขอ้างอิงรายการจาก **OCR** เทียบกับ **QR Code** (`qr_data.transaction_ref`) | ตรวจสอบผ่าน `validate_slip_reference` (Normalize ตัวอักษรคล้ายกัน `I`/`l` และ `0`/`O` + รองรับ Edge Case เช่น กรุงศรี `025` ตัด 2 ตัวท้าย/Prefix Matching) |
 | **`is_ref_match_expected`** | ระบุว่าธนาคารนี้เลขสลิปและ QR Code ควรตรงกันหรือไม่ | ดึงกฎจาก `bank_code.json` (`true`/`false`) |
 | **`is_amount_match`** | เช็คจำนวนเงินจากค่าที่กำหนดใน **Frontend (`ocr_expected.amount`)** เทียบกับ **OCR** (`ocr_data.amount`) | ยอดเงินตรงกันเป็น `true` (แก้ปัญหา OCR สับสน `O` กับ `0`) |
 | **`is_receiver_match`** | เช็คชื่อผู้รับเงินจาก **Frontend (`ocr_expected.receiver_name`)** เทียบกับ **OCR** (`ocr_data.receiver_name`) | **Strict Exact Match:** ต้องสะกดตรงกันเป๊ะทุกพยัญชนะ สระ และการันต์ |

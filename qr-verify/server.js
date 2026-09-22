@@ -111,9 +111,53 @@ function parseNestedTLV(str) {
 }
 
 /**
- * Comprehensive EMVCo & Thai MiniQR Slip Parser
- * Parses both Merchant QR (Tag 29/30) and Slip Verification MiniQR (Tag 000201010212...)
+ * Validate & compare reference numbers between QR Code and OCR slip data,
+ * handling bank-specific edge cases (e.g., Krungsri 025 prefix matching/suffix stripping,
+ * character normalization for I vs l vs 1, 0 vs O).
  */
+function validate_slip_reference(bankCode, qrRef, ocrRef) {
+  if (!ocrRef || !qrRef) {
+    return ocrRef ? false : null;
+  }
+
+  // Normalize ambiguous visual characters: lowercase, l->i, 0->o, removes spaces/dashes
+  const normalize = (str) =>
+    String(str || "")
+      .toLowerCase()
+      .replace(/[\s\-_]/g, "")
+      .replace(/l/g, "i")
+      .replace(/0/g, "o");
+
+  const normQr = normalize(qrRef);
+  const normOcr = normalize(ocrRef);
+
+  // Direct / Substring exact match after normalization
+  if (normQr === normOcr || normQr.includes(normOcr) || normOcr.includes(normQr)) {
+    return true;
+  }
+
+  // Bank-specific edge case handling
+  const bank = String(bankCode || "").padStart(3, "0");
+
+  // Bank 025: กรุงศรีอยุธยา (BAY / Krungsri)
+  // Edge Case: QR Code reference contains 2 extra suffix digits compared to the slip printed reference number,
+  // or printed slip ref is a prefix/substring of QR ref.
+  if (bank === "025") {
+    // 1. Strip last 2 characters from QR reference
+    if (normQr.length > 2) {
+      const normQrStripped = normQr.substring(0, normQr.length - 2);
+      if (normQrStripped === normOcr || normQrStripped.includes(normOcr) || normOcr.includes(normQrStripped)) {
+        return true;
+      }
+    }
+    // 2. Prefix matching (OCR reference starts at beginning of QR reference)
+    if (normQr.startsWith(normOcr) || normOcr.startsWith(normQr)) {
+      return true;
+    }
+  }
+
+  return false;
+}
 function parseFullQRData(qrRaw) {
   const rootTags = parseEMVCo(qrRaw);
 
@@ -742,16 +786,8 @@ app.post("/api/v1/qr-verify/scan", async (req, res) => {
       ? (ocrData.sender_bank.name_th === fullParsed.sender_bank.name_th || fullParsed.sender_bank.name_th.includes(ocrData.sender_bank.name_th) || ocrData.sender_bank.name_th.includes(fullParsed.sender_bank.name_th))
       : (ocrData.sender_bank?.name_th ? false : null);
 
-    // 2. is_trans_ref_match (Normalize visually ambiguous characters: I/l/1 and 0/O)
-    const normalizeRef = (str) => String(str || "").toLowerCase().replace(/l/g, "i").replace(/0/g, "o");
-
-    const isTransRefMatch = (ocrData.transaction_ref && fullParsed.transaction_ref)
-      ? (
-          normalizeRef(ocrData.transaction_ref) === normalizeRef(fullParsed.transaction_ref) ||
-          normalizeRef(fullParsed.transaction_ref).includes(normalizeRef(ocrData.transaction_ref)) ||
-          normalizeRef(ocrData.transaction_ref).includes(normalizeRef(fullParsed.transaction_ref))
-        )
-      : (ocrData.transaction_ref ? false : null);
+    // 2. is_trans_ref_match (Validate & compare reference numbers with bank-specific rules)
+    const isTransRefMatch = validate_slip_reference(bankCode, fullParsed.transaction_ref, ocrData.transaction_ref);
 
     // 3. is_amount_match
     const isAmountMatch = (ocrData.amount !== null && expAmt !== null)
