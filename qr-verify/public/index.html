@@ -253,12 +253,15 @@
     .status-pill {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 0.25rem;
-      padding: 0.15rem 0.5rem;
+      padding: 0.25rem 0.65rem;
       border-radius: 9999px;
       font-size: 0.75rem;
       font-weight: 600;
       line-height: 1.2;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .pill-success {
@@ -272,8 +275,14 @@
     }
 
     .pill-neutral {
-      background: rgba(99, 107, 120, 0.1);
+      background: rgba(99, 107, 120, 0.12);
       color: var(--ink-soft);
+    }
+
+    .pill-info {
+      background: rgba(217, 119, 6, 0.12);
+      color: var(--amber);
+      border: 1px solid rgba(217, 119, 6, 0.25);
     }
 
     .pill-processing {
@@ -451,12 +460,7 @@
         </div>
 
         <div class="form-group">
-          <label>หมายเลขพร้อมเพย์เป้าหมาย (PromptPay Target):</label>
-          <input type="text" id="expectedTargetInput" placeholder="เช่น 0812345678 หรือ 010555..." value="">
-        </div>
-
-        <div class="form-group">
-          <label>ชื่อบัญชีผู้รับเป้าหมาย (PromptPay Target Name):</label>
+          <label>ชื่อบัญชีผู้รับเป้าหมาย (ชื่อผู้รับเงิน):</label>
           <input type="text" id="expectedReceiverInput" placeholder="เช่น นาย สมศักดิ์, TongLong Store..." value="">
         </div>
 
@@ -634,7 +638,6 @@
       }
 
       const expectedAmount = document.getElementById("expectedAmountInput").value;
-      const expectedTarget = document.getElementById("expectedTargetInput").value;
       const expectedReceiver = document.getElementById("expectedReceiverInput") ? document.getElementById("expectedReceiverInput").value : "";
 
       btn.disabled = true;
@@ -659,7 +662,6 @@
             image: base64ScanImg,
             ocr_expected: {
               amount: expectedAmount,
-              target_account: expectedTarget,
               receiver_name: expectedReceiver,
             },
           }),
@@ -738,9 +740,9 @@
         };
 
         const formatSlipEditedStatus = (val) => {
-          if (val === true) return '<span class="status-pill pill-danger">✕ พบตัดต่อ</span>';
-          if (val === false) return '<span class="status-pill pill-success">✓ ไม่พบตัดต่อ</span>';
-          return '<span class="status-pill pill-neutral"></span>';
+          if (val === true) return '<span class="status-pill pill-danger">✕ รูปผ่านการตัดต่อ</span>';
+          if (val === false) return '<span class="status-pill pill-success">✓ รูปไม่ได้ผ่านการตัดต่อ</span>';
+          return '<span class="status-pill pill-neutral">-</span>';
         };
 
         // Column 3: OCR Card Content
@@ -780,11 +782,13 @@
             </div>
 
             <div class="result-row">
-              <div>
+              <div style="flex: 1; min-width: 0;">
                 <div>หมายเลขอ้างอิง:</div>
                 <div style="font-size: 0.7rem; color: var(--ink-soft); font-weight: normal;">(QR Code ↔ OCR)</div>
               </div>
-              ${formatMatchStatus(vResults.is_trans_ref_match)}
+              ${vResults.is_ref_match_expected === false 
+                ? `<span class="status-pill pill-info" title="${vResults.ref_notes || 'ธนาคารนี้หน้าสลิปและ QR Code ใช้คนละเลขกัน'}">⚪ ไม่จำเป็นต้องตรง</span>` 
+                : formatMatchStatus(vResults.is_trans_ref_match)}
             </div>
 
             <div class="result-row">

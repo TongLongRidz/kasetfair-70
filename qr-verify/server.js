@@ -21,7 +21,6 @@ app.get("/", (req, res) => {
   const indexPath = path.join(__dirname, "public", "index.html");
   let html = fs.readFileSync(indexPath, "utf8");
   html = html.replace('id="expectedAmountInput" placeholder="เช่น 100, 150..." value=""', `id="expectedAmountInput" placeholder="เช่น 100, 150..." value="${process.env.DEFAULT_EXPECTED_AMOUNT || "1"}"`);
-  html = html.replace('id="expectedTargetInput" placeholder="เช่น 0812345678 หรือ 010555..." value=""', `id="expectedTargetInput" placeholder="เช่น 0812345678 หรือ 010555..." value="${process.env.DEFAULT_PROMPTPAY_TARGET || "0823393244"}"`);
   html = html.replace('id="expectedReceiverInput" placeholder="เช่น นาย สมศักดิ์, TongLong Store..." value=""', `id="expectedReceiverInput" placeholder="เช่น นาย สมศักดิ์, TongLong Store..." value="${process.env.DEFAULT_PROMPTPAY_NAME || "นาย สมศักดิ์"}"`);
   res.send(html);
 });
@@ -273,32 +272,45 @@ function parseFullQRData(qrRaw) {
           transTimestamp = `${locYY}-${locMM}-${locDD}T${locHH}:${locMin}:${locSS}+07:00`;
         }
       }
-      // Rule 3: Standard MiniQR 23 chars format: [2 prefix][YYMMDD][HHMMSS][traceId]
-      else if (transRef.length === 23) {
-        const dateStr = transRef.substring(2, 8);
-        const timeStr = transRef.substring(8, 14);
-        if (/^\d{6}$/.test(dateStr) && /^\d{6}$/.test(timeStr)) {
-          const yy = parseInt(dateStr.substring(0, 2), 10);
-          const mm = parseInt(dateStr.substring(2, 4), 10);
-          const dd = parseInt(dateStr.substring(4, 6), 10);
-          const hh = parseInt(timeStr.substring(0, 2), 10);
-          const min = parseInt(timeStr.substring(2, 4), 10);
-          const ss = parseInt(timeStr.substring(4, 6), 10);
+      // Rule 3: Standard MiniQR / SCB format: [2 prefix][YYMMDD/YYYYMMDD][...]
+      // Handles 23-char MiniQR and 25-char SCB format (e.g., 202211022XMj8r6IIId6H8WNs)
+      else {
+        // Check for YYYYMMDD (e.g. 20221102) or YYMMDD at start of transRef
+        if (/^\d{8}/.test(transRef)) {
+          const yyyy = transRef.substring(0, 4);
+          const mm = transRef.substring(4, 6);
+          const dd = transRef.substring(6, 8);
+          // Check if valid month (01-12) and day (01-31)
+          if (parseInt(mm, 10) >= 1 && parseInt(mm, 10) <= 12 && parseInt(dd, 10) >= 1 && parseInt(dd, 10) <= 31) {
+            transDate = `${yyyy}-${mm}-${dd}`;
+          }
+        }
+        if (transRef.length === 23) {
+          const dateStr = transRef.substring(2, 8);
+          const timeStr = transRef.substring(8, 14);
+          if (/^\d{6}$/.test(dateStr) && /^\d{6}$/.test(timeStr)) {
+            const yy = parseInt(dateStr.substring(0, 2), 10);
+            const mm = parseInt(dateStr.substring(2, 4), 10);
+            const dd = parseInt(dateStr.substring(4, 6), 10);
+            const hh = parseInt(timeStr.substring(0, 2), 10);
+            const min = parseInt(timeStr.substring(2, 4), 10);
+            const ss = parseInt(timeStr.substring(4, 6), 10);
 
-          // Convert raw UTC time to Thailand local time (+7 hours)
-          const utcDate = new Date(Date.UTC(2000 + yy, mm - 1, dd, hh, min, ss));
-          const localTime = new Date(utcDate.getTime() + 7 * 60 * 60 * 1000);
+            // Convert raw UTC time to Thailand local time (+7 hours)
+            const utcDate = new Date(Date.UTC(2000 + yy, mm - 1, dd, hh, min, ss));
+            const localTime = new Date(utcDate.getTime() + 7 * 60 * 60 * 1000);
 
-          const locYY = localTime.getUTCFullYear();
-          const locMM = String(localTime.getUTCMonth() + 1).padStart(2, "0");
-          const locDD = String(localTime.getUTCDate()).padStart(2, "0");
-          const locHH = String(localTime.getUTCHours()).padStart(2, "0");
-          const locMin = String(localTime.getUTCMinutes()).padStart(2, "0");
-          const locSS = String(localTime.getUTCSeconds()).padStart(2, "0");
+            const locYY = localTime.getUTCFullYear();
+            const locMM = String(localTime.getUTCMonth() + 1).padStart(2, "0");
+            const locDD = String(localTime.getUTCDate()).padStart(2, "0");
+            const locHH = String(localTime.getUTCHours()).padStart(2, "0");
+            const locMin = String(localTime.getUTCMinutes()).padStart(2, "0");
+            const locSS = String(localTime.getUTCSeconds()).padStart(2, "0");
 
-          transDate = `${locYY}-${locMM}-${locDD}`;
-          transTime = `${locHH}:${locMin}:${locSS}`;
-          transTimestamp = `${locYY}-${locMM}-${locDD}T${locHH}:${locMin}:${locSS}+07:00`;
+            transDate = `${locYY}-${locMM}-${locDD}`;
+            transTime = `${locHH}:${locMin}:${locSS}`;
+            transTimestamp = `${locYY}-${locMM}-${locDD}T${locHH}:${locMin}:${locSS}+07:00`;
+          }
         }
       }
     }
@@ -314,6 +326,8 @@ function parseFullQRData(qrRaw) {
         abbr: bankInfo.abbr,
         name_th: bankInfo.name_th,
         name_en: bankInfo.name_en,
+        is_ref_match_expected: bankInfo.is_ref_match_expected !== false,
+        ref_notes: bankInfo.ref_notes || null,
       };
     } else {
       senderBankObj = {
@@ -321,6 +335,8 @@ function parseFullQRData(qrRaw) {
         abbr: null,
         name_th: null,
         name_en: null,
+        is_ref_match_expected: true,
+        ref_notes: null,
       };
     }
     sendingBank = paddedCode;
@@ -714,18 +730,26 @@ app.post("/api/v1/qr-verify/scan", async (req, res) => {
       date_time: ocrResult.data?.date_time ?? null,
     };
 
+    // Bank reference match rule lookup
+    const bankCode = fullParsed.sender_bank?.code || (ocrData.sender_bank?.name_th ? Object.keys(bankCodes).find(k => bankCodes[k].name_th === ocrData.sender_bank.name_th) : null);
+    const bankConfig = bankCode && bankCodes[bankCode] ? bankCodes[bankCode] : null;
+    const isRefMatchExpected = bankConfig ? (bankConfig.is_ref_match_expected !== false) : true;
+    const refNotes = bankConfig?.ref_notes || null;
+
     // Verification Logic Rules:
     // 1. is_bank_match
     const isBankMatch = (ocrData.sender_bank?.name_th && fullParsed.sender_bank?.name_th)
       ? (ocrData.sender_bank.name_th === fullParsed.sender_bank.name_th || fullParsed.sender_bank.name_th.includes(ocrData.sender_bank.name_th) || ocrData.sender_bank.name_th.includes(fullParsed.sender_bank.name_th))
       : (ocrData.sender_bank?.name_th ? false : null);
 
-    // 2. is_trans_ref_match (Case-insensitive comparison)
+    // 2. is_trans_ref_match (Normalize visually ambiguous characters: I/l/1 and 0/O)
+    const normalizeRef = (str) => String(str || "").toLowerCase().replace(/l/g, "i").replace(/0/g, "o");
+
     const isTransRefMatch = (ocrData.transaction_ref && fullParsed.transaction_ref)
       ? (
-          ocrData.transaction_ref.toLowerCase() === fullParsed.transaction_ref.toLowerCase() ||
-          fullParsed.transaction_ref.toLowerCase().includes(ocrData.transaction_ref.toLowerCase()) ||
-          ocrData.transaction_ref.toLowerCase().includes(fullParsed.transaction_ref.toLowerCase())
+          normalizeRef(ocrData.transaction_ref) === normalizeRef(fullParsed.transaction_ref) ||
+          normalizeRef(fullParsed.transaction_ref).includes(normalizeRef(ocrData.transaction_ref)) ||
+          normalizeRef(ocrData.transaction_ref).includes(normalizeRef(fullParsed.transaction_ref))
         )
       : (ocrData.transaction_ref ? false : null);
 
@@ -760,6 +784,8 @@ app.post("/api/v1/qr-verify/scan", async (req, res) => {
       crc16_checksum: fullParsed.crc16_info,
       is_bank_match: isBankMatch,
       is_trans_ref_match: isTransRefMatch,
+      is_ref_match_expected: isRefMatchExpected,
+      ref_notes: refNotes,
       is_amount_match: isAmountMatch,
       is_receiver_match: isReceiverMatch,
       is_slip_edited: isSlipEdited,
@@ -773,6 +799,10 @@ app.post("/api/v1/qr-verify/scan", async (req, res) => {
       found_qr: true,
       elapsed_seconds: elapsedSeconds,
       elapsed_ms: elapsedTotalMs,
+      expected_result: {
+        amount: expAmt,
+        receiver_name: expReceiver,
+      },
       qr_data: qrData,
       ocr_data: ocrData,
       verification_results: verificationResults,
@@ -931,7 +961,6 @@ app.post("/api/v1/slipok/check-slip", async (req, res) => {
 app.get("/api/v1/qr-verify/config", (req, res) => {
   res.json({
     default_expected_amount: process.env.DEFAULT_EXPECTED_AMOUNT || "1",
-    default_promptpay_target: process.env.DEFAULT_PROMPTPAY_TARGET || "0823393244",
     default_promptpay_name: process.env.DEFAULT_PROMPTPAY_NAME || "นาย สมศักดิ์",
   });
 });

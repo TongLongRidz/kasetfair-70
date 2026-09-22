@@ -90,20 +90,31 @@ def parse_slip_fields(text_list, full_text):
     if matched_bank:
         res["sender_bank"] = matched_bank
 
-    # 2. Detect Transaction Ref / Slip No.
-    # Handles "เลขที่สลิป 626411608760", "รหัสอ้างอิง", "Ref", "014..."
-    ref_match = re.search(r'(?:รหัสอ้างอิง|เลขที่รายการ|เลขที่สลิป|Transaction\s*ID|Ref\.?|Ref\s*No\.?)[\s:]*([A-Za-z0-9]+)', full_text, re.IGNORECASE)
-    if not ref_match:
-        ref_match = re.search(r'\b(0[0-9]{2}[A-Za-z0-9]{12,22})\b', full_text)
-    if not ref_match:
+    # 2. Detect Transaction Ref / Slip No. (Preserve original casing: e.g. 202211022XMj8r6IIId6H8WNs)
+    # Search line by line from text_list to preserve exact character cases outputted by OCR
+    ref_cand = None
+    for line in text_list:
+        m = re.search(r'(?:รหัสอ้างอิง|เลขที่รายการ|เลขที่สลิป|Transaction\s*ID|Ref\.?|Ref\s*No\.?)[\s:]*([A-Za-z0-9]+)', line, re.IGNORECASE)
+        if m:
+            ref_cand = m.group(1).strip()
+            break
+        m2 = re.search(r'\b(0[0-9]{2}[A-Za-z0-9]{12,22})\b', line)
+        if m2:
+            ref_cand = m2.group(1).strip()
+            break
+
+    if not ref_cand:
         # Match standalone slip number string (10-25 digits/alphanumeric)
-        digits_matches = re.findall(r'\b([A-Za-z0-9]{10,25})\b', full_text)
-        for cand in digits_matches:
-            if not cand.startswith("08") and not cand.startswith("09") and not cand.startswith("06"):
-                res["transaction_ref"] = cand
+        for line in text_list:
+            digits_matches = re.findall(r'\b([A-Za-z0-9]{10,25})\b', line)
+            for cand in digits_matches:
+                if not cand.startswith("08") and not cand.startswith("09") and not cand.startswith("06"):
+                    ref_cand = cand
+                    break
+            if ref_cand:
                 break
-    else:
-        res["transaction_ref"] = ref_match.group(1).strip()
+
+    res["transaction_ref"] = ref_cand
 
     # 3. Detect Amount (Handle OCR letter O / o misread as digit 0, e.g. "o.0o" -> "0.00")
     # First, fix common Thai/English OCR digit misreads in numbers (e.g. "1.oo" -> "1.00", "o.0o" -> "0.00")
@@ -146,7 +157,7 @@ def parse_slip_fields(text_list, full_text):
     PREFIX_REGEX = r'(?:นาย|นางสาว|นาง|น\.ส\.|นส\.|ด\.ช\.|ด\.ญ\.|Mr\.?|Mrs\.?|Miss|Ms\.?)'
 
     # Non-name noise words to ignore
-    NOISE_WORDS = r'(?:สแกน|ตรวจสอบ|พร้อมเพย์|PromptPay|บัญชี|ออมทรัพย์|กระแสรายวัน|ธนาคาร|โอนเงิน|ค่าธรรมเนียม|บาท|THB|สำเร็จ|วันที|วันที่|เวลา|รหัส|เลขที|เลขที่|scan|verify|account|transfer|fee)'
+    NOISE_WORDS = r'(?:สแกน|ตรวจสอบ|พร้อมเพย์|PromptPay|บัญชี|ออมทรัพย์|กระแสรายวัน|ธนาคาร|โอนเงิน|ค่าธรรมเนียม|บาท|THB|สำเร็จ|วันที|วันที่|เวลา|รหัส|เลขที|เลขที่|ผู้รับเงินสามารถ|เพื่อ|สแกนคิวอาร์|สแกนคิวอาร์โค้ด|scan|verify|account|transfer|fee)'
 
     # Helper to strip Thai/English prefixes and noise
     def clean_name(name_str):
@@ -169,8 +180,8 @@ def parse_slip_fields(text_list, full_text):
         # Remove extra whitespace
         text = re.sub(r'\s+', ' ', text).strip()
 
-        # If what's left is too short or is a noise word, reject
-        if len(text) < 2 or re.match(r'^' + NOISE_WORDS, text, flags=re.IGNORECASE):
+        # If what's left is too short or contains footer noise text, reject
+        if len(text) < 2 or re.search(NOISE_WORDS, text, flags=re.IGNORECASE):
             return None
         return text or None
 
@@ -181,8 +192,8 @@ def parse_slip_fields(text_list, full_text):
         # Skip if purely numbers or masking
         if re.match(r'^[xX*\d\s\-\.:,]+$', cleaned):
             return False
-        # Skip if pure noise line (e.g. "สแกนเพือ", "ตรวจสอบสลิป", "1.00 บาท")
-        if re.search(r'^(?:สแกน|ตรวจสอบ|โอนเงิน|ค่าธรรมเนียม|วันที่|เวลา|เลขที่|บาท|THB|fee|scan)', cleaned, flags=re.IGNORECASE):
+        # Skip if pure noise line (e.g. "สแกนเพือ", "ตรวจสอบสลิป", "ผู้รับเงินสามารถสแกนคิวอาร์โค้ดนี้เพื่อ", "1.00 บาท")
+        if re.search(r'(?:สแกน|ตรวจสอบ|โอนเงิน|ค่าธรรมเนียม|วันที่|เวลา|เลขที่|ผู้รับเงินสามารถ|คิวอาร์โค้ด|บาท|THB|fee|scan)', cleaned, flags=re.IGNORECASE):
             return False
         return True
 
@@ -212,34 +223,45 @@ def parse_slip_fields(text_list, full_text):
         elif re.search(r'^(ไปยัง|ถึง|ผู้รับ|to|receiver|โอนเข้าบัญชี)', cleaned_line, re.IGNORECASE):
             # Check if name is on same line
             inline = re.sub(r'^(ไปยัง|ถึง|ผู้รับ|to|receiver|โอนเข้าบัญชี)[\s:]*', '', cleaned_line, flags=re.IGNORECASE).strip()
-            if inline and is_valid_name_candidate(inline):
-                res["receiver_name"] = clean_name(inline)
+            c_inline = clean_name(inline) if inline else None
+            if c_inline and is_valid_name_candidate(c_inline):
+                res["receiver_name"] = c_inline
             else:
-                # Look ahead up to 3 lines for a valid name candidate
-                for offset in range(1, 4):
+                # Strictly look at the immediate next 1-2 lines only for receiver name
+                for offset in range(1, 3):
                     if i + offset < len(text_list):
                         cand = text_list[i + offset].strip()
-                        if is_valid_name_candidate(cand):
-                            res["receiver_name"] = clean_name(cand)
+                        # Stop if encountering next section headers (e.g. จำนวนเงิน, บันทึกช่วยจำ, จาก)
+                        if re.search(r'^(?:จำนวนเงิน|จำนวน|ยอดโอน|บันทึกช่วยจำ|จาก|โอนสำเร็จ)', cand, re.IGNORECASE):
+                            break
+                        c_cand = clean_name(cand)
+                        if c_cand and is_valid_name_candidate(c_cand):
+                            res["receiver_name"] = c_cand
                             break
 
     # Fallback if sender_name or receiver_name not found via line index
     if not res["receiver_name"] and "ไปยัง" in full_text:
         after_payang = full_text.split("ไปยัง", 1)[1]
-        for sub_line in after_payang.split("\n"):
+        for sub_line in after_payang.split("\n")[:3]:  # Check only first 3 lines right after "ไปยัง"
             sub_cleaned = sub_line.strip()
+            if re.search(r'^(?:จำนวนเงิน|จำนวน|ยอดโอน|บันทึกช่วยจำ|จาก|โอนสำเร็จ)', sub_cleaned, re.IGNORECASE):
+                break
             if sub_cleaned and is_valid_name_candidate(sub_cleaned):
-                res["receiver_name"] = clean_name(sub_cleaned)
-                if res["receiver_name"]:
+                c_sub = clean_name(sub_cleaned)
+                if c_sub:
+                    res["receiver_name"] = c_sub
                     break
 
     if not res["sender_name"] and "จาก" in full_text:
         after_jak = full_text.split("จาก", 1)[1]
-        for sub_line in after_jak.split("\n"):
+        for sub_line in after_jak.split("\n")[:3]:
             sub_cleaned = sub_line.strip()
+            if re.search(r'^(?:ไปยัง|จำนวนเงิน|จำนวน|ยอดโอน|บันทึกช่วยจำ|โอนสำเร็จ)', sub_cleaned, re.IGNORECASE):
+                break
             if sub_cleaned and is_valid_name_candidate(sub_cleaned):
-                res["sender_name"] = clean_name(sub_cleaned)
-                if res["sender_name"]:
+                c_sub = clean_name(sub_cleaned)
+                if c_sub:
+                    res["sender_name"] = c_sub
                     break
 
     # Final sanitization

@@ -2,86 +2,127 @@
   "002": {
     "name_th": "ธนาคารกรุงเทพ",
     "name_en": "Bangkok Bank",
-    "abbr": "BBL"
+    "abbr": "BBL",
+    "is_ref_match_expected": true,
+    "ref_notes": "แสดงหมายเลขรายการบนสลิปตรงกับค่าใน QR Code"
   },
   "004": {
     "name_th": "ธนาคารกสิกรไทย",
     "name_en": "Kasikornbank",
-    "abbr": "KBANK"
+    "abbr": "KBANK",
+    "is_ref_match_expected": true,
+    "ref_notes": "แสดงรหัสอ้างอิงบนสลิปตรงกับใน QR Code ทั้งชุด (มักขึ้นต้นด้วยตัวเลขและปีเดือนวัน)"
   },
   "006": {
     "name_th": "ธนาคารกรุงไทย",
     "name_en": "Krungthai Bank",
-    "abbr": "KTB"
+    "abbr": "KTB",
+    "is_ref_match_expected": true,
+    "ref_notes": "แสดงรหัสรายการ หรือ เลขอ้างอิง ตรงกับค่าใน QR Code (Krungthai NEXT / เป๋าตัง)"
   },
   "011": {
     "name_th": "ธนาคารทหารไทยธนชาต",
     "name_en": "TMBThanachart Bank",
-    "abbr": "TTB"
+    "abbr": "TTB",
+    "is_ref_match_expected": true,
+    "ref_notes": "แสดงรหัสอ้างอิงบนสลิปตรงกับค่าใน QR Code (ttb touch)"
   },
   "014": {
     "name_th": "ธนาคารไทยพาณิชย์",
     "name_en": "Siam Commercial Bank",
-    "abbr": "SCB"
+    "abbr": "SCB",
+    "is_ref_match_expected": true,
+    "ref_notes": "แสดงรหัสธุรกรรมบนสลิปตรงกับค่าใน QR Code (SCB EASY)"
   },
   "017": {
     "name_th": "ธนาคารซิตี้แบงก์",
     "name_en": "Citibank",
-    "abbr": "CITIBANK"
+    "abbr": "CITIBANK",
+    "is_ref_match_expected": true,
+    "ref_notes": "แสดงรหัสอ้างอิงตรงกับค่าใน QR Code"
   },
   "022": {
     "name_th": "ธนาคารซีไอเอ็มบี ไทย",
     "name_en": "CIMB Thai Bank",
-    "abbr": "CIMBT"
+    "abbr": "CIMBT",
+    "is_ref_match_expected": false,
+    "ref_notes": "หน้าสลิปใช้เลขอ้างอิงภายในระบบ Core Banking ส่วนใน QR Code เป็นรหัสธุรกรรมเครือข่ายกลาง (ไม่ต้องตรงกัน)"
   },
   "024": {
     "name_th": "ธนาคารยูโอบี",
     "name_en": "UOB Bank",
-    "abbr": "UOB"
+    "abbr": "UOB",
+    "is_ref_match_expected": true,
+    "ref_notes": "แสดงรหัสอ้างอิงตรงกับค่าใน QR Code"
   },
   "025": {
     "name_th": "ธนาคารกรุงศรีอยุธยา",
     "name_en": "Bank of Ayudhya",
-    "abbr": "BAY"
+    "abbr": "BAY",
+    "is_ref_match_expected": true,
+    "ref_notes": "แสดงรหัสอ้างอิงบนสลิปตรงกับค่าใน QR Code (KMA krungsri app)"
   },
   "030": {
     "name_th": "ธนาคารออมสิน",
     "name_en": "Government Savings Bank",
-    "abbr": "GSB"
+    "abbr": "GSB",
+    "is_ref_match_expected": true,
+    "ref_notes": "แสดงรหัสอ้างอิง / Transaction ID ตรงกับค่าใน QR Code (MyMo)"
   },
   "033": {
     "name_th": "ธนาคารอาคารสงเคราะห์",
     "name_en": "GH Bank",
-    "abbr": "GHB"
+    "abbr": "GHB",
+    "is_ref_match_expected": true,
+    "ref_notes": "แสดงรหัสอ้างอิงตรงกับค่าใน QR Code"
   },
   "034": {
     "name_th": "ธนาคารเพื่อการเกษตรและสหกรณ์การเกษตร",
     "name_en": "Bank for Agriculture and Agricultural Cooperatives",
-    "abbr": "BAAC"
+    "abbr": "BAAC",
+    "is_ref_match_expected": true,
+    "ref_notes": "แสดงรหัสอ้างอิงบนสลิปตรงกับค่าใน QR Code (BAAC Mobile)"
   },
   "065": {
     "name_th": "ธนาคารไทยเครดิต",
     "name_en": "Thai Credit Bank",
-    "abbr": "TCB"
+    "abbr": "TCB",
+    "is_ref_match_expected": true,
+    "ref_notes": "แสดงรหัสอ้างอิงตรงกับค่าใน QR Code"
   },
   "067": {
     "name_th": "ธนาคารทิสโก้",
     "name_en": "TISCO Bank",
-    "abbr": "TISCO"
+    "abbr": "TISCO",
+    "is_ref_match_expected": true,
+    "ref_notes": "แสดงรหัสอ้างอิงตรงกับค่าใน QR Code"
   },
   "069": {
     "name_th": "ธนาคารเกียรตินาคินภัทร",
     "name_en": "Kiatnakin Phatra Bank",
-    "abbr": "KKP"
+    "abbr": "KKP",
+    "is_ref_match_expected": false,
+    "ref_notes": "หน้าสลิปแสดงหมายเลขใบเสร็จ (ตัวเลขล้วน) ส่วนใน QR Code เป็นรหัสเฉพาะของระบบกลาง เช่น DM... (ไม่ต้องตรงกัน)"
   },
   "073": {
     "name_th": "ธนาคารแลนด์ แอนด์ เฮ้าส์",
     "name_en": "LH Bank",
-    "abbr": "LHBANK"
+    "abbr": "LHBANK",
+    "is_ref_match_expected": false,
+    "ref_notes": "หน้าสลิปใช้หมายเลขรายการภายในแอปพลิเคชัน ส่วนใน QR Code เป็นรหัสสวิตชิ่งกลาง (ไม่ต้องตรงกัน)"
   },
   "098": {
     "name_th": "ทรูมันนี่ วอลเล็ท",
     "name_en": "TrueMoney Wallet",
-    "abbr": "TRUEMONEY"
+    "abbr": "TRUEMONEY",
+    "is_ref_match_expected": false,
+    "ref_notes": "หน้าสลิปแสดง Transaction ID ของระบบทรูมันนี่ ส่วนใน QR Code เป็นรหัสการโอนเงินเชื่อมต่อระบบกลาง (ไม่ต้องตรงกัน)"
+  },
+  "SHOPEEPAY": {
+    "name_th": "ช้อปปี้เพย์",
+    "name_en": "ShopeePay",
+    "abbr": "SHOPEEPAY",
+    "is_ref_match_expected": false,
+    "ref_notes": "หน้าสลิปแสดงเลขอ้างอิงคำสั่งซื้อ/ธุรกรรมของ ShopeePay ส่วนใน QR Code เป็นรหัส PromptPay Transfer สากล (ไม่ต้องตรงกัน)"
   }
 }

@@ -17,10 +17,11 @@
 | ผลการตรวจสอบ | วิธีการเช็ค (Verification Logic) | หมายเหตุ |
 | :--- | :--- | :--- |
 | **`is_bank_match`** | เช็คชื่อธนาคารต้นทางจาก **OCR** เทียบกับธนาคารต้นทางจาก **QR Code** (`qr_data.sender_bank`) | ตรงกันเป็น `true` (อ้างอิงจาก `bank_code.json`) |
-| **`is_trans_ref_match`** | เช็คหมายเลขอ้างอิงรายการจาก **OCR** เทียบกับ **QR Code** (`qr_data.transaction_ref`) | Case-Insensitive (ตัวพิมพ์เล็ก-ใหญ่เทียบเท่ากัน) |
+| **`is_trans_ref_match`** | เช็คหมายเลขอ้างอิงรายการจาก **OCR** เทียบกับ **QR Code** (`qr_data.transaction_ref`) | Case-Insensitive และแปลงตัวอักษรคล้ายกัน (`I` / `l` และ `0` / `O`) ให้เทียบเท่ากัน |
+| **`is_ref_match_expected`** | ระบุว่าธนาคารนี้เลขสลิปและ QR Code ควรตรงกันหรือไม่ | ดึงกฎจาก `bank_code.json` (`true`/`false`) |
 | **`is_amount_match`** | เช็คจำนวนเงินจากค่าที่กำหนดใน **Frontend (`ocr_expected.amount`)** เทียบกับ **OCR** (`ocr_data.amount`) | ยอดเงินตรงกันเป็น `true` (แก้ปัญหา OCR สับสน `O` กับ `0`) |
 | **`is_receiver_match`** | เช็คชื่อผู้รับเงินจาก **Frontend (`ocr_expected.receiver_name`)** เทียบกับ **OCR** (`ocr_data.receiver_name`) | **Strict Exact Match:** ต้องสะกดตรงกันเป๊ะทุกพยัญชนะ สระ และการันต์ |
-| **`is_slip_edited`** | เช็คว่ารูปสลิปถูกตัดต่อ/ดัดแปลงหรือไม่ | สามารถเปิด-ปิดการเช็คผ่านพารามิเตอร์ `check_slip_edited: true/false` ได้ |
+| **`is_slip_edited`** | เช็คว่ารูปสลิปถูกตัดต่อ/ดัดแปลงหรือไม่ | `false`: รูปไม่ได้ผ่านการตัดต่อ (เขียว), `true`: รูปผ่านการตัดต่อ (แดง) *(ตรรกะตรวจจับรอพัฒนาเพิ่มเติม)* |
 
 ---
 
@@ -32,7 +33,7 @@
   "image": "data:image/png;base64,...",
   "ocr_expected": {
     "amount": 100.00,
-    "target_account": "0067834507"
+    "receiver_name": "สมศักดิ์"
   },
   "check_slip_edited": false
 }
@@ -45,6 +46,10 @@
   "found_qr": true,
   "elapsed_seconds": 1.15,
   "elapsed_ms": 1150,
+  "expected_result": {
+    "amount": 1.00,
+    "receiver_name": "จิตรภาณุกรณ์ หวังอาษา"
+  },
   "qr_data": {
     "raw_qr": "004600060000010103069022062641160876063499104DD2D",
     "qr_type": {
@@ -90,7 +95,9 @@
       }
     },
     "is_bank_match": true,
-    "is_trans_ref_match": true,
+    "is_trans_ref_match": false,
+    "is_ref_match_expected": false,
+    "ref_notes": "หน้าสลิปแสดงหมายเลขใบเสร็จ (ตัวเลขล้วน) ส่วนใน QR Code เป็นรหัสเฉพาะของระบบกลาง เช่น DM... (ไม่ต้องตรงกัน)",
     "is_amount_match": true,
     "is_receiver_match": true,
     "is_slip_edited": false
@@ -145,3 +152,5 @@ npm run dev
 | **Web UI (หน้าทดสอบสแกนสลิป)** | **`http://localhost:8586`** | หน้าเว็บสำหรับอัปโหลด/ทดสอบสแกน QR และดูผล OCR |
 | **API สแกน/ตรวจสอบสลิป** | **`http://localhost:8586/api/v1/qr-verify/scan`** | Endpoint หลักสำหรับส่ง Base64 รูปภาพเข้ามาตรวจสอบ |
 | **EasyOCR Microservice (Direct)** | **`http://localhost:8587/ocr`** | Service สำหรับประมวลผล OCR สลิปภาษาไทยโดยเฉพาะ |
+
+https://thai-qr-payment.js.org/th/reference/spec/
