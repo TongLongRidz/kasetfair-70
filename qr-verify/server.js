@@ -567,16 +567,21 @@ function extractAmount(qrRaw) {
  */
 async function scanQRCode(imageInput) {
   let image;
-  if (typeof imageInput === "string" && imageInput.startsWith("data:")) {
-    const base64Data = imageInput.replace(/^data:[^;]+;base64,/, "");
-    const buffer = Buffer.from(base64Data, "base64");
-    image = await Jimp.read(buffer);
-  } else if (Buffer.isBuffer(imageInput)) {
-    image = await Jimp.read(imageInput);
-  } else if (typeof imageInput === "string") {
-    image = await Jimp.read(imageInput);
-  } else {
-    throw new Error("Invalid image input format");
+  try {
+    if (typeof imageInput === "string" && imageInput.startsWith("data:")) {
+      const base64Data = imageInput.replace(/^data:[^;]+;base64,/, "");
+      const buffer = Buffer.from(base64Data, "base64");
+      image = await Jimp.read(buffer);
+    } else if (Buffer.isBuffer(imageInput)) {
+      image = await Jimp.read(imageInput);
+    } else if (typeof imageInput === "string") {
+      image = await Jimp.read(imageInput);
+    } else {
+      throw new Error("Invalid image input format");
+    }
+  } catch (err) {
+    console.warn("Jimp read error, returning null for QR scan:", err.message);
+    return null;
   }
 
   const imageData = {
@@ -589,7 +594,38 @@ async function scanQRCode(imageInput) {
   if (!qrCode) {
     return null;
   }
-  return qrCode.data;
+
+  let croppedBase64 = null;
+  try {
+    // Calculate bounding box from QR location corners
+    const loc = qrCode.location;
+    const minX = Math.max(0, Math.min(loc.topLeftCorner.x, loc.bottomLeftCorner.x));
+    const maxX = Math.min(image.bitmap.width, Math.max(loc.topRightCorner.x, loc.bottomRightCorner.x));
+    const minY = Math.max(0, Math.min(loc.topLeftCorner.y, loc.topRightCorner.y));
+    const maxY = Math.min(image.bitmap.height, Math.max(loc.bottomLeftCorner.y, loc.bottomRightCorner.y));
+
+    let width = Math.max(10, maxX - minX);
+    let height = Math.max(10, maxY - minY);
+
+    // Add padding around QR Code (15%)
+    const padX = Math.round(width * 0.15);
+    const padY = Math.round(height * 0.15);
+
+    const cropX = Math.max(0, minX - padX);
+    const cropY = Math.max(0, minY - padY);
+    const cropW = Math.min(image.bitmap.width - cropX, width + padX * 2);
+    const cropH = Math.min(image.bitmap.height - cropY, height + padY * 2);
+
+    const croppedImage = image.clone().crop(cropX, cropY, cropW, cropH);
+    croppedBase64 = await croppedImage.getBase64Async(Jimp.MIME_PNG);
+  } catch (cropErr) {
+    console.warn("Failed to crop QR code image:", cropErr.message);
+  }
+
+  return {
+    data: qrCode.data,
+    cropped_base64: croppedBase64,
+  };
 }
 
 /**
@@ -695,13 +731,25 @@ app.get("/health", (req, res) => {
 app.post("/api/v1/qr-verify/scan", async (req, res) => {
   const scanStartTime = Date.now();
   try {
-    const { image, ocr_expected, expected_amount, expected_target, ocr_expected_amount, ocr_expected_target, check_slip_edited } = req.body;
+    const {
+      image,
+      ocr_expected,
+      expected_amount,
+      expected_target,
+      expected_receiver,
+      expected_receiver_name,
+      ocr_expected_amount,
+      ocr_expected_target,
+      ocr_expected_receiver,
+      ocr_expected_receiver_name,
+      check_slip_edited,
+    } = req.body;
     if (!image) {
       return res.status(400).json({ success: false, error: "Missing image parameter" });
     }
 
-    const qrRaw = await scanQRCode(image);
-    if (!qrRaw) {
+    const qrScanRes = await scanQRCode(image);
+    if (!qrScanRes || !qrScanRes.data) {
       const elapsedTotalMs = Date.now() - scanStartTime;
       return res.status(404).json({
         success: false,
@@ -711,6 +759,9 @@ app.post("/api/v1/qr-verify/scan", async (req, res) => {
         message: "ไม่พบ QR Code ในรูปภาพที่ระบุ",
       });
     }
+
+    const qrRaw = qrScanRes.data;
+    const croppedQrImage = qrScanRes.cropped_base64;
 
     const fullParsed = parseFullQRData(qrRaw);
     const scannedTarget = fullParsed.target_account;
@@ -794,20 +845,40 @@ app.post("/api/v1/qr-verify/scan", async (req, res) => {
       ? (Math.abs(ocrData.amount - expAmt) < 0.01)
       : (ocrData.amount !== null ? false : null);
 
-    // 4. is_receiver_match (Strict Exact Match: exact Thai spelling, tone marks, and karans required)
-    const cleanSpaces = (str) => String(str || "").replace(/\s+/g, " ").trim().toLowerCase();
+    // 4. is_receiver_match (Flexible Partial Match: substrings, token words, and prefix removal)
+    const normalizeName = (str) => {
+      if (!str) return "";
+      let s = String(str).toLowerCase().trim();
+      // Remove prefixes (นาย, นาง, นางสาว, น.ส., Mr., Mrs., etc.)
+      s = s.replace(/^(นาย|นางสาว|นาง|น\.ส\.|นส\.|mr\.?|mrs\.?|miss|ms\.?)\s*/g, "");
+      // Remove non-alphanumeric/non-Thai characters except spaces
+      s = s.replace(/[^\u0E00-\u0E7Fa-z0-9\s]/g, "");
+      // Normalize whitespace
+      return s.replace(/\s+/g, " ").trim();
+    };
 
-    const isReceiverMatch = (ocrData.receiver_name && expReceiver)
-      ? (
-          cleanSpaces(ocrData.receiver_name) === cleanSpaces(expReceiver) ||
-          cleanSpaces(ocrData.receiver_name).includes(cleanSpaces(expReceiver)) ||
-          cleanSpaces(expReceiver).includes(cleanSpaces(ocrData.receiver_name))
-        )
-      : (ocrData.receiver_name ? false : null);
+    const recOCR = normalizeName(ocrData.receiver_name);
+    const recExp = normalizeName(expReceiver);
+
+    let isReceiverMatch = null;
+    if (recOCR && recExp) {
+      const ocrTokens = recOCR.split(" ").filter(Boolean);
+      const expTokens = recExp.split(" ").filter(Boolean);
+
+      // Check substring inclusion or token overlap
+      const hasSubstringMatch = recOCR.includes(recExp) || recExp.includes(recOCR);
+      const hasTokenOverlap = ocrTokens.some((tok) => tok.length > 1 && recExp.includes(tok)) ||
+                              expTokens.some((tok) => tok.length > 1 && recOCR.includes(tok));
+
+      isReceiverMatch = hasSubstringMatch || hasTokenOverlap;
+    } else if (ocrData.receiver_name) {
+      isReceiverMatch = false;
+    }
 
     // QR Data Object
     const qrData = {
       raw_qr: qrRaw,
+      cropped_qr_image: croppedQrImage,
       qr_type: fullParsed.qr_type_obj,
       sender_bank: fullParsed.sender_bank,
       transaction_ref: fullParsed.transaction_ref,

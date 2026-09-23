@@ -77,6 +77,7 @@ func main() {
 		v1.GET("/toppings/:id", h.GetToppingByID)
 		v1.GET("/settings", h.GetSettings)
 		v1.GET("/settings/:key", h.GetSettingByKey)
+		v1.GET("/cash-transactions", h.GetCashTransactions)
 
 		// Public Orders & Queue Tracking (Display screens, Customer order/receipt/queue tracking)
 		v1.GET("/orders", h.GetOrders)
@@ -116,6 +117,11 @@ func main() {
 
 				// Admin System Settings Management
 				adminGroup.PUT("/settings/:key", h.UpdateSetting)
+
+				// Admin Cash Transaction Management
+				adminGroup.POST("/cash-transactions", h.CreateCashTransaction)
+				adminGroup.PUT("/cash-transactions/:id", h.UpdateCashTransaction)
+				adminGroup.DELETE("/cash-transactions/:id", h.DeleteCashTransaction)
 
 				// Uploads (Images)
 				adminGroup.POST("/upload", h.UploadImage)

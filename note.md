@@ -273,17 +273,22 @@
 | `topping_price` | INT | NOT NULL DEFAULT 0 | ราคาบวกเพิ่มต่อช็อต ณ เวลาที่สั่ง (0 บาทถ้าเป็น Fixed Topping ในคอมโบ) |
 | `is_included_in_combo` | BOOLEAN | DEFAULT FALSE | ท็อปปิ้งนี้ล็อกมาในเซ็ตคอมโบ หรือสั่งเพิ่มพิเศษ |
 
-#### 8. `expenses` (บันทึกรายจ่ายเท่านั้น)
+#### 8. `cash_transaction` (บันทึกรายรับ-รายจ่าย)
+ตารางบันทึกธุรกรรมทางการเงินทั้ง **รายรับ (Income)** และ **รายจ่าย (Expense)** เพื่อการบริหารบัญชีร้านอย่างเป็นระเบียบ
+
 | Column | Type | Attributes | Description |
 | :--- | :--- | :--- | :--- |
-| `id` | SERIAL | PRIMARY KEY | รหัสรายจ่าย |
-| `title` | VARCHAR(200) | NOT NULL | รายการค่าใช้จ่าย (เช่น ค่าน้ำแข็ง, ค่าแก้ว, ค่าถั่วเหลือง) |
-| `category` | VARCHAR(100) | NOT NULL | หมวดหมู่ (เช่น วัตถุดิบ, บรรจุภัณฑ์, ค่าแรง) |
-| `amount` | INT | NOT NULL | จำนวนเงิน (บาท) |
-| `expense_date` | DATE | NOT NULL; INDEX | วันที่เกิดรายจ่าย |
-| `recorded_by` | INT | REFERENCES `admin(id)` | Admin ผู้บันทึก |
+| `id` | SERIAL | PRIMARY KEY | รหัสธุรกรรมทางการเงิน |
+| `type` | VARCHAR(20) | NOT NULL; CHECK (`type` IN ('income', 'expense')) | ประเภทธุรกรรม: `income` (รายรับ), `expense` (รายจ่าย) |
+| `title` | VARCHAR(200) | NOT NULL | หัวข้อ/รายการ (เช่น "รายรับประจำวัน 21 ก.ย.", "ค่าน้ำแข็ง") |
+| `category` | VARCHAR(100) | NOT NULL | หมวดหมู่ (เช่น `ยอดขาย`, `วัตถุดิบ`, `บรรจุภัณฑ์`, `ค่าแรง`) |
+| `amount` | NUMERIC(12,2) | NOT NULL | จำนวนเงิน (บาท) |
+| `date_time` | TIMESTAMPTZ | NOT NULL; INDEX | วันและเวลาที่เกิดรายการ |
+| `order_id` | INT | NULL; REFERENCES `order(id)` ON DELETE SET NULL | รหัสออเดอร์ (FK อ้างอิงกรณีเป็นรายรับจากออเดอร์) |
+| `order_no` | VARCHAR(50) | NULL | เลขออเดอร์ (เช่น `#A001`, `#5`) |
+| `created_by` | INT | NULL; REFERENCES `admin(id)` | Admin ผู้บันทึก (NULL กรณีเป็นระบบบันทึกอัตโนมัติ) |
+| `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันและเวลาที่สร้างเรคคอร์ด |
 | `note` | TEXT | NULL | หมายเหตุเพิ่มเติม |
-| `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สร้าง |
 
 #### 9. `banners` (กลุ่มแบนเนอร์ประชาสัมพันธ์)
 | Column | Type | Attributes | Description |

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import AdminSidebar from "@/components/layouts/AdminSidebar";
 import {
   Search,
@@ -26,13 +27,13 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { getStoredToken } from "@/lib/auth";
-import OrderInspectionModal from "./components/OrderInspectionModal";
 
 export type PaymentVerificationStatus = "verified" | "pending" | "fraud";
 export type PaymentMethod = "promptpay_qr" | "cash";
 
 export interface SlipOrderItem {
   id: number;
+  uuid?: string;
   orderNo: string;
   queueNo: string;
   customerName: string;
@@ -58,12 +59,13 @@ export interface SlipOrderItem {
 }
 
 export default function SlipCheckManagementPage() {
+  const router = useRouter();
   const { success, error: toastError, info, warning } = useToast();
   // Settings policies: "immediate" (ต้องอัพรูปเลย) vs "later" (ไม่อัพรูป/อัพทีหลังได้)
-  const [promptpayUploadMode, setPromptpayUploadMode] = useState<"immediate" | "later">("immediate");
+  const [promptpayUploadMode, setPromptpayUploadMode] = useState<"immediate" | "later">("later");
   const [cashUploadMode, setCashUploadMode] = useState<"immediate" | "later">("later");
 
-  // Load settings policies from Backend API (with localStorage fallback)
+  // Load settings policies from Backend API
   useEffect(() => {
     const fetchSettings = async () => {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
@@ -88,18 +90,6 @@ export default function SlipCheckManagementPage() {
           }
         }
       } catch { }
-
-      // Fallbacks
-      try {
-        const savedPromptpay = localStorage.getItem("kaset_slip_upload_mode");
-        if (savedPromptpay === "later" || savedPromptpay === "immediate") {
-          setPromptpayUploadMode(savedPromptpay);
-        }
-        const savedCash = localStorage.getItem("kaset_cash_upload_mode");
-        if (savedCash === "later" || savedCash === "immediate") {
-          setCashUploadMode(savedCash);
-        }
-      } catch { }
     };
     fetchSettings();
   }, []);
@@ -113,7 +103,7 @@ export default function SlipCheckManagementPage() {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
       const token = getStoredToken();
-      await fetch(`${apiUrl}/api/v1/settings/slip_upload_mode`, {
+      const res = await fetch(`${apiUrl}/api/v1/settings/slip_upload_mode`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -124,14 +114,23 @@ export default function SlipCheckManagementPage() {
           description: "เงื่อนไขการแนบสลิป PromptPay: immediate (ต้องอัพสลิป) หรือ later (ไม่ต้องอัพ)",
         }),
       });
+
+      if (res.ok) {
+        if (mode === "later") {
+          info("PromptPay: ไม่อัพรูป / อัพทีหลังได้", "ตั้งค่ารูป PromptPay");
+        } else {
+          success("PromptPay: ต้องอัพโหลดสลิปทันที", "ตั้งค่ารูป PromptPay");
+        }
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toastError(errData.error || "ไม่สามารถบันทึกการตั้งค่าใน Database ได้", "เกิดข้อผิดพลาด");
+        // Rollback state if failed
+        setPromptpayUploadMode(mode === "immediate" ? "later" : "immediate");
+      }
     } catch (err) {
       console.error("Failed to update PromptPay setting:", err);
-    }
-
-    if (mode === "later") {
-      info("PromptPay: ไม่อัพรูป / อัพทีหลังได้", "ตั้งค่ารูป PromptPay");
-    } else {
-      success("PromptPay: ต้องอัพโหลดสลิปทันที", "ตั้งค่ารูป PromptPay");
+      toastError("เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์", "เกิดข้อผิดพลาด");
+      setPromptpayUploadMode(mode === "immediate" ? "later" : "immediate");
     }
   };
 
@@ -144,7 +143,7 @@ export default function SlipCheckManagementPage() {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
       const token = getStoredToken();
-      await fetch(`${apiUrl}/api/v1/settings/cash_upload_mode`, {
+      const res = await fetch(`${apiUrl}/api/v1/settings/cash_upload_mode`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -155,14 +154,23 @@ export default function SlipCheckManagementPage() {
           description: "เงื่อนไขการถ่ายรูปเงินสด: immediate (ต้องถ่ายรูป/อัพรูป) หรือ later (ไม่ต้องถ่ายรูป)",
         }),
       });
+
+      if (res.ok) {
+        if (mode === "later") {
+          info("เงินสด: ไม่ต้องถ่ายรูป", "ตั้งค่าถ่ายรูปเงินสด");
+        } else {
+          success("เงินสด: บังคับถ่ายรูป/อัพโหลดรูป", "ตั้งค่าถ่ายรูปเงินสด");
+        }
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toastError(errData.error || "ไม่สามารถบันทึกการตั้งค่าใน Database ได้", "เกิดข้อผิดพลาด");
+        // Rollback state if failed
+        setCashUploadMode(mode === "immediate" ? "later" : "immediate");
+      }
     } catch (err) {
       console.error("Failed to update Cash setting:", err);
-    }
-
-    if (mode === "later") {
-      info("เงินสด: ไม่ต้องถ่ายรูป", "ตั้งค่าถ่ายรูปเงินสด");
-    } else {
-      success("เงินสด: บังคับถ่ายรูป/อัพโหลดรูป", "ตั้งค่าถ่ายรูปเงินสด");
+      toastError("เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์", "เกิดข้อผิดพลาด");
+      setCashUploadMode(mode === "immediate" ? "later" : "immediate");
     }
   };
 
@@ -325,6 +333,7 @@ export default function SlipCheckManagementPage() {
 
           return {
             id: o.id,
+            uuid: o.uuid || o.order_uuid || String(o.id),
             orderNo: `#${o.id}`,
             queueNo: o.queue_no || `#${o.id}`,
             customerName: o.customer_name || (o.method === "walk-in" ? "ลูกค้าหน้าร้าน" : "ลูกค้าออนไลน์"),
@@ -983,7 +992,7 @@ export default function SlipCheckManagementPage() {
                       <td style={{ padding: "0.85rem 0.6rem" }}>
                         <button
                           type="button"
-                          onClick={() => setSelectedOrder(order)}
+                          onClick={() => router.push(`/admin/management/slip-check/${order.uuid || order.id}`)}
                           style={{
                             display: "inline-flex",
                             alignItems: "center",
@@ -1004,6 +1013,7 @@ export default function SlipCheckManagementPage() {
                           <span>รายละเอียด</span>
                         </button>
                       </td>
+
 
                       {/* สถานะตรวจสอบ */}
                       <td style={{ padding: "0.85rem 0.6rem" }}>
@@ -1194,7 +1204,7 @@ export default function SlipCheckManagementPage() {
                     >
                       <button
                         type="button"
-                        onClick={() => setSelectedOrder(order)}
+                        onClick={() => router.push(`/admin/management/slip-check/${order.uuid || order.id}`)}
                         style={{
                           width: "100%",
                           display: "inline-flex",
@@ -1309,16 +1319,7 @@ export default function SlipCheckManagementPage() {
           </div>
         </section>
       </main>
-
-      {/* POPUP MODAL 1: View Slip / Evidence & Quick Status Change */}
-      {selectedOrder && (
-        <OrderInspectionModal
-          order={selectedOrder}
-          onClose={() => setSelectedOrder(null)}
-          onSetStatus={handleSetStatus}
-          onUploadSlip={handleUploadSlip}
-        />
-      )}
     </div>
   );
 }
+

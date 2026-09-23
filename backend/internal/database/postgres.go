@@ -67,10 +67,11 @@ func ConnectPostgres(dsn string) (*PostgresDB, error) {
 		&model.OrderItem{},
 		&model.OrderItemTopping{},
 		&model.SystemSetting{},
+		&model.CashTransaction{},
 	); err != nil {
 		log.Printf("⚠️ AutoMigrate error: %v", err)
 	} else {
-		log.Println("✅ Database migration completed successfully (admin, product, topping, product_combo_recipe, order, order_item, order_item_topping, system_setting tables ready)")
+		log.Println("✅ Database migration completed successfully (admin, product, topping, product_combo_recipe, order, order_item, order_item_topping, system_setting, cash_transaction tables ready)")
 	}
 
 	// Seed Superadmin and Settings if not exists

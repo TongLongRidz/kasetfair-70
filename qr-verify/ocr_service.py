@@ -202,14 +202,16 @@ def parse_slip_fields(text_list, full_text):
         # Remove non-name artifacts like bank account masking (x-xxxx, xxx-xxxxxx-x), numbers
         text = re.sub(r'\b[xX*]+[-\d]+\b', '', text).strip()
         text = re.sub(r'\b\d{3,}[-\d]*\b', '', text).strip()
-        # Clean rogue noise symbols (quotes, degree, dashes, etc.)
-        text = re.sub(r'[\'"`~^°|•\-_/\\:]+', '', text)
+        # Clean rogue noise symbols (quotes, degree, dashes, dots, commas, etc.)
+        text = re.sub(r'[\'"`~^°|•\-_/\\:.,;]+', ' ', text)
         # Convert nikhahit (ํ U+0E4D) which OCR often misreads as thanthakhat (์ U+0E4C)
         text = text.replace('\u0E4D', '\u0E4C')
         # Fix duplicate or misplaced thanthakhat / karan (e.g. ์์ -> ์)
         text = re.sub(r'\u0E4C+', '\u0E4C', text)
         # Remove extra whitespace
         text = re.sub(r'\s+', ' ', text).strip()
+        # Remove any leftover leading punctuation or non-Thai/English characters
+        text = re.sub(r'^[^\u0E00-\u0E7Fa-zA-Z0-9]+', '', text).strip()
 
         # If what's left is too short, equals 'no', or contains footer noise text, reject
         if len(text) < 2 or text.lower() == 'no' or re.search(NOISE_WORDS, text, flags=re.IGNORECASE):
@@ -230,41 +232,43 @@ def parse_slip_fields(text_list, full_text):
             return False
         return True
 
-    # 5. Detect Sender & Receiver
-    # Priority:
-    # "จาก / From" -> sender
-    # "ไปยัง / ถึง / To / ผู้รับ" -> receiver
+    # 5. Detect Sender & Receiver (Top-to-Bottom Positional Rule)
+    # Sender always appears ABOVE Receiver in Thai bank slips.
+    sender_idx = -1
+    receiver_idx = -1
+
     for i, line in enumerate(text_list):
         cleaned_line = line.strip()
 
-        # Sender detection
-        if re.search(r'^(จาก|จาก:|ผู้โอน|from|sender)', cleaned_line, re.IGNORECASE):
-            # Check if name is on same line
+        # Sender detection ("จาก", "ผู้โอน", "from")
+        if sender_idx == -1 and re.search(r'^(จาก|จาก:|ผู้โอน|from|sender)', cleaned_line, re.IGNORECASE):
+            sender_idx = i
             inline = re.sub(r'^(จาก|จาก:|ผู้โอน|from|sender)[\s:]*', '', cleaned_line, flags=re.IGNORECASE).strip()
-            if inline and is_valid_name_candidate(inline):
-                res["sender_name"] = clean_name(inline)
+            c_inline = clean_name(inline) if inline else None
+            if c_inline and is_valid_name_candidate(c_inline):
+                res["sender_name"] = c_inline
             else:
-                # Look ahead up to 3 lines for a valid name candidate
                 for offset in range(1, 4):
                     if i + offset < len(text_list):
                         cand = text_list[i + offset].strip()
-                        if is_valid_name_candidate(cand):
-                            res["sender_name"] = clean_name(cand)
+                        c_cand = clean_name(cand)
+                        if c_cand and is_valid_name_candidate(c_cand):
+                            res["sender_name"] = c_cand
                             break
 
-        # Receiver detection (Keyword "ไปยัง", "ถึง", "ผู้รับ")
+        # Receiver detection ("ไปยัง", "ถึง", "ผู้รับ", "to") - Must be AFTER sender position
         elif re.search(r'^(ไปยัง|ถึง|ผู้รับ|to|receiver|โอนเข้าบัญชี)', cleaned_line, re.IGNORECASE):
-            # Check if name is on same line
+            if sender_idx != -1 and i < sender_idx:
+                continue # Ignore receiver keywords appearing before sender
+            receiver_idx = i
             inline = re.sub(r'^(ไปยัง|ถึง|ผู้รับ|to|receiver|โอนเข้าบัญชี)[\s:]*', '', cleaned_line, flags=re.IGNORECASE).strip()
             c_inline = clean_name(inline) if inline else None
             if c_inline and is_valid_name_candidate(c_inline):
                 res["receiver_name"] = c_inline
             else:
-                # Strictly look at the immediate next 1-2 lines only for receiver name
-                for offset in range(1, 3):
+                for offset in range(1, 4):
                     if i + offset < len(text_list):
                         cand = text_list[i + offset].strip()
-                        # Stop if encountering next section headers (e.g. จำนวนเงิน, บันทึกช่วยจำ, จาก)
                         if re.search(r'^(?:จำนวนเงิน|จำนวน|ยอดโอน|บันทึกช่วยจำ|จาก|โอนสำเร็จ)', cand, re.IGNORECASE):
                             break
                         c_cand = clean_name(cand)
@@ -272,22 +276,10 @@ def parse_slip_fields(text_list, full_text):
                             res["receiver_name"] = c_cand
                             break
 
-    # Fallback if sender_name or receiver_name not found via line index
-    if not res["receiver_name"] and "ไปยัง" in full_text:
-        after_payang = full_text.split("ไปยัง", 1)[1]
-        for sub_line in after_payang.split("\n")[:3]:  # Check only first 3 lines right after "ไปยัง"
-            sub_cleaned = sub_line.strip()
-            if re.search(r'^(?:จำนวนเงิน|จำนวน|ยอดโอน|บันทึกช่วยจำ|จาก|โอนสำเร็จ)', sub_cleaned, re.IGNORECASE):
-                break
-            if sub_cleaned and is_valid_name_candidate(sub_cleaned):
-                c_sub = clean_name(sub_cleaned)
-                if c_sub:
-                    res["receiver_name"] = c_sub
-                    break
-
+    # Fallback with Positional Guarantee (Sender first, then Receiver)
     if not res["sender_name"] and "จาก" in full_text:
         after_jak = full_text.split("จาก", 1)[1]
-        for sub_line in after_jak.split("\n")[:3]:
+        for sub_line in after_jak.split("\n")[:4]:
             sub_cleaned = sub_line.strip()
             if re.search(r'^(?:ไปยัง|จำนวนเงิน|จำนวน|ยอดโอน|บันทึกช่วยจำ|โอนสำเร็จ)', sub_cleaned, re.IGNORECASE):
                 break
@@ -295,6 +287,18 @@ def parse_slip_fields(text_list, full_text):
                 c_sub = clean_name(sub_cleaned)
                 if c_sub:
                     res["sender_name"] = c_sub
+                    break
+
+    if not res["receiver_name"] and "ไปยัง" in full_text:
+        after_payang = full_text.split("ไปยัง", 1)[1]
+        for sub_line in after_payang.split("\n")[:4]:
+            sub_cleaned = sub_line.strip()
+            if re.search(r'^(?:จำนวนเงิน|จำนวน|ยอดโอน|บันทึกช่วยจำ|จาก|โอนสำเร็จ)', sub_cleaned, re.IGNORECASE):
+                break
+            if sub_cleaned and is_valid_name_candidate(sub_cleaned):
+                c_sub = clean_name(sub_cleaned)
+                if c_sub:
+                    res["receiver_name"] = c_sub
                     break
 
     # Final sanitization
