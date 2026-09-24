@@ -493,67 +493,82 @@ export default function AdminExpensePage() {
             </div>
           </div>
 
-          {/* Ghost balancing card */}
-          <div className="admin-kpi-card admin-kpi-card-ghost" aria-hidden="true" />
-        </div>
-
-        {/* Main Top Navigation Tabs */}
-        <div style={{ marginTop: "1.25rem", marginBottom: "1.25rem", display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-          <button
-            type="button"
-            onClick={() => setActiveTab("records")}
+          {/* Card 4: Navigation / Selection Options matching slip-check card 4 */}
+          <div
+            className="admin-kpi-card animate-rise"
             style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "0.5rem",
-              padding: "0.6rem 1rem",
-              borderRadius: "0.75rem",
-              fontSize: "0.85rem",
-              fontWeight: activeTab === "records" ? 700 : 500,
-              fontFamily: "'Kanit', sans-serif",
-              border: "none",
-              cursor: "pointer",
-              backgroundColor: activeTab === "records" ? "var(--ink)" : "var(--card)",
-              color: activeTab === "records" ? "var(--cream)" : "var(--ink-soft)",
-              boxShadow: activeTab === "records" ? "0 4px 12px rgba(0,0,0,0.15)" : "0 1px 4px rgba(0,0,0,0.04)",
+              borderRadius: "1.25rem",
+              backgroundColor: "var(--card)",
+              padding: "1.1rem 1.25rem",
+              border: "1px solid rgba(50, 55, 65, 0.09)",
+              boxShadow: "0 2px 12px -2px rgba(0,0,0,0.03)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              boxSizing: "border-box",
               transition: "all 0.15s ease",
-              whiteSpace: "nowrap",
-              flex: "1 1 auto",
-              maxWidth: "fit-content",
             }}
           >
-            <Wallet size={16} style={{ flexShrink: 0 }} />
-            <span>บันทึกรายรับ-รายจ่าย</span>
-          </button>
+            <div style={{ marginBottom: "0.6rem" }}>
+              <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", fontWeight: 600, margin: 0 }}>
+                เมนูการจัดการระบบ
+              </p>
+            </div>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("qr_settings")}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "0.5rem",
-              padding: "0.6rem 1rem",
-              borderRadius: "0.75rem",
-              fontSize: "0.85rem",
-              fontWeight: activeTab === "qr_settings" ? 700 : 500,
-              fontFamily: "'Kanit', sans-serif",
-              border: "none",
-              cursor: "pointer",
-              backgroundColor: activeTab === "qr_settings" ? "var(--ink)" : "var(--card)",
-              color: activeTab === "qr_settings" ? "var(--cream)" : "var(--ink-soft)",
-              boxShadow: activeTab === "qr_settings" ? "0 4px 12px rgba(0,0,0,0.15)" : "0 1px 4px rgba(0,0,0,0.04)",
-              transition: "all 0.15s ease",
-              whiteSpace: "nowrap",
-              flex: "1 1 auto",
-              maxWidth: "fit-content",
-            }}
-          >
-            <QrCode size={16} style={{ flexShrink: 0 }} />
-            <span>จัดการ QR รับเงิน (พร้อมเพย์)</span>
-          </button>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+              {/* Option 1: บันทึกรายรับ-รายจ่าย */}
+              <button
+                type="button"
+                onClick={() => setActiveTab("records")}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "0.5rem",
+                  padding: "0.55rem 0.85rem",
+                  backgroundColor: activeTab === "records" ? "var(--ink)" : "rgba(50, 55, 65, 0.03)",
+                  color: activeTab === "records" ? "var(--cream)" : "var(--ink)",
+                  borderRadius: "0.75rem",
+                  border: activeTab === "records" ? "none" : "1px solid rgba(50, 55, 65, 0.08)",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  width: "100%",
+                  textAlign: "left",
+                }}
+              >
+                <span style={{ fontSize: "0.85rem", fontWeight: 700, lineHeight: 1.2, fontFamily: "'Kanit', sans-serif" }}>
+                  บันทึกรายรับ-รายจ่าย
+                </span>
+                <Wallet size={16} opacity={activeTab === "records" ? 1 : 0.6} />
+              </button>
+
+              {/* Option 2: จัดการ QR รับเงิน */}
+              <button
+                type="button"
+                onClick={() => setActiveTab("qr_settings")}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "0.5rem",
+                  padding: "0.55rem 0.85rem",
+                  backgroundColor: activeTab === "qr_settings" ? "var(--ink)" : "rgba(50, 55, 65, 0.03)",
+                  color: activeTab === "qr_settings" ? "var(--cream)" : "var(--ink)",
+                  borderRadius: "0.75rem",
+                  border: activeTab === "qr_settings" ? "none" : "1px solid rgba(50, 55, 65, 0.08)",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  width: "100%",
+                  textAlign: "left",
+                }}
+              >
+                <span style={{ fontSize: "0.85rem", fontWeight: 700, lineHeight: 1.2, fontFamily: "'Kanit', sans-serif" }}>
+                  จัดการ QR รับเงิน
+                </span>
+                <QrCode size={16} opacity={activeTab === "qr_settings" ? 1 : 0.6} />
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* ============================================================== */}
