@@ -1,4 +1,4 @@
-.PHONY: setup frontend backend db-up db-down build lint qr-verify qr-ocr qr-all
+.PHONY: setup frontend backend db-up db-down db-reset build lint qr-verify qr-ocr qr-all
 
 setup:
 	cd frontend && npm install
@@ -25,6 +25,9 @@ db-up:
 
 db-down:
 	docker compose stop postgres redis
+
+db-reset:
+	docker compose down -v
 
 build:
 	cd backend && CGO_ENABLED=0 go build -o bin/server ./cmd/api

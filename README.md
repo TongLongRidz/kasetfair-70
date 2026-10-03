@@ -120,6 +120,7 @@ make setup
 make setup      # ติดตั้ง dependencies ทั้งหมด (Frontend npm install + Backend go mod download)
 make db-up      # รัน PostgreSQL database container (พอร์ต 5488)
 make db-down    # หยุดการทำงานของ PostgreSQL database container
+make db-reset   # หยุดการทำงานและล้างข้อมูล database (docker compose down -v)
 make backend    # รัน Go Backend API (พอร์ต 8585)
 make frontend   # รัน Next.js Frontend dev server (พอร์ต 3050)
 make build      # Build ทั้ง backend binary และ frontend
