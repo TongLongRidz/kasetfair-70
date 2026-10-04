@@ -237,7 +237,7 @@ export default function QueuePage() {
           maxWidth: isFullscreen ? "1080px" : "680px",
           margin: "0 auto",
           padding: isFullscreen ? "1.5rem 2rem 3rem" : "1.5rem 1rem 3rem 1rem",
-          transition: "max-width 0.3s ease, padding 0.3s ease",
+          transition: "opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
           boxSizing: "border-box",
         }}
       >

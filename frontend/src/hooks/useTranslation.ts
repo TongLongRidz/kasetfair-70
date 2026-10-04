@@ -16,43 +16,17 @@ const STORAGE_KEY = process.env.NEXT_PUBLIC_LANG_STORAGE_KEY || "kaset_app_lang"
 export function useTranslation() {
   const [lang, setLangState] = useState<Locale>("th");
 
-  // Load language preference from localStorage on mount
-  useEffect(() => {
-    try {
-      const savedLang = localStorage.getItem(STORAGE_KEY) as Locale | null;
-      if (savedLang === "th" || savedLang === "en") {
-        setLangState(savedLang);
-      }
-    } catch (e) {
-      console.error("Failed to read locale from localStorage:", e);
-    }
-  }, []);
-
   const changeLanguage = useCallback((newLang: Locale) => {
     setLangState(newLang);
-    try {
-      localStorage.setItem(STORAGE_KEY, newLang);
-      window.dispatchEvent(new Event("languagechange"));
-    } catch (e) {
-      console.error("Failed to save locale to localStorage:", e);
-    }
+    window.dispatchEvent(new Event("languagechange"));
   }, []);
 
   // Listen to custom event for multi-component synchronization
   useEffect(() => {
-    const handleSync = () => {
-      try {
-        const current = localStorage.getItem(STORAGE_KEY) as Locale | null;
-        if (current === "th" || current === "en") {
-          setLangState(current);
-        }
-      } catch {}
-    };
+    const handleSync = () => {};
     window.addEventListener("languagechange", handleSync);
-    window.addEventListener("storage", handleSync);
     return () => {
       window.removeEventListener("languagechange", handleSync);
-      window.removeEventListener("storage", handleSync);
     };
   }, []);
 

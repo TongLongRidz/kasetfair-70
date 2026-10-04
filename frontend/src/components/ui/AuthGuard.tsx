@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { getStoredToken, getStoredUser } from "@/lib/auth";
+import { getStoredToken, getStoredUser, setStoredUser } from "@/lib/auth";
 import { Loader2 } from "lucide-react";
 
 interface AuthGuardProps {
@@ -24,21 +24,48 @@ export default function AuthGuard({ children, requireSuperAdmin = false }: AuthG
       return;
     }
 
-    const token = getStoredToken();
-    const user = getStoredUser();
+    const verifyAuth = async () => {
+      const token = getStoredToken();
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      
+      try {
+        const res = await fetch(`${apiUrl}/api/v1/auth/me`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          credentials: "include",
+        });
 
-    if (!token || !user) {
-      router.replace("/admin/login");
-      return;
-    }
+        if (!res.ok) {
+          router.replace("/admin/login");
+          return;
+        }
 
-    if (requireSuperAdmin && !user.is_superadmin) {
-      router.replace("/admin/management/dashboard");
-      return;
-    }
+        const userData = await res.json();
+        setStoredUser(userData);
 
-    setIsAuthorized(true);
-    setChecking(false);
+        if (requireSuperAdmin && !userData.is_superadmin) {
+          router.replace("/admin/management/dashboard");
+          return;
+        }
+
+        setIsAuthorized(true);
+      } catch {
+        // Dev fallback if backend unreachable but cookie token exists
+        const user = getStoredUser();
+        if (token && user) {
+          if (requireSuperAdmin && !user.is_superadmin) {
+            router.replace("/admin/management/dashboard");
+            return;
+          }
+          setIsAuthorized(true);
+        } else {
+          router.replace("/admin/login");
+        }
+      } finally {
+        setChecking(false);
+      }
+    };
+
+    verifyAuth();
   }, [router, pathname, requireSuperAdmin]);
 
   if (checking || !isAuthorized) {

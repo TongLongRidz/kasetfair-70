@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { getStoredToken } from "@/lib/auth";
 import { useToast } from "@/components/ui/toast";
+import CustomDropdown from "@/components/ui/CustomDropdown";
 import AddEditMenuModal from "./components/AddEditMenuModal";
 import ImageCropModal from "@/components/ui/modals/ImageCropModal";
 
@@ -54,7 +55,7 @@ interface MenuItem {
   comboRecipes?: any[];
 }
 
-const ITEMS_PER_PAGE = 5;
+const ITEMS_PER_PAGE = 6;
 
 export default function MenuManagementPage() {
   const { success, error: toastError, info } = useToast();
@@ -651,7 +652,7 @@ export default function MenuManagementPage() {
     >
       <AdminSidebar />
 
-      <main style={{ flex: 1, padding: "1.75rem 2.5rem", overflowY: "auto", minWidth: 0 }}>
+      <main style={{ flex: 1, padding: "1.75rem 2.5rem", minWidth: 0 }}>
         {/* Header Section */}
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
           <div>
@@ -674,57 +675,21 @@ export default function MenuManagementPage() {
         >
           {/* Controls Bar: Filter Tabs / Dropdown on Left & Add Button / Search on Right */}
           <div className="admin-controls-bar" style={{ marginBottom: 0 }}>
-            {/* Left Side: Filter Tabs (Desktop) */}
-            <div className="admin-filter-tabs">
-              {[
-                { id: "all", label: "ทุกเมนู" },
-                { id: "flavours", label: "รสชาติหลัก" },
-                { id: "combos", label: "เมนูคอมโบ" },
-              ].map((tab) => {
-                const isSelected = selectedCategory === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedCategory(tab.id);
-                      setCurrentPage(1);
-                    }}
-                    style={{
-                      padding: "0.4rem 0.85rem",
-                      borderRadius: "0.5rem",
-                      fontSize: "0.8rem",
-                      fontWeight: isSelected ? 700 : 500,
-                      fontFamily: "'Kanit', sans-serif",
-                      border: "none",
-                      cursor: "pointer",
-                      backgroundColor: isSelected ? "var(--ink)" : "transparent",
-                      color: isSelected ? "var(--cream)" : "var(--ink-soft)",
-                      transition: "all 0.15s ease",
-                      whiteSpace: "nowrap",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Left Side: Filter Dropdown (Mobile) */}
-            <div className="admin-filter-dropdown-wrapper">
-              <select
-                className="admin-filter-select"
+            {/* Left Side: Filter Dropdown */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <CustomDropdown
                 value={selectedCategory}
-                onChange={(e) => {
-                  setSelectedCategory(e.target.value);
+                onChange={(val) => {
+                  setSelectedCategory(val);
                   setCurrentPage(1);
                 }}
-              >
-                <option value="all">ทุกเมนู</option>
-                <option value="flavours">รสชาติหลัก</option>
-                <option value="combos">เมนูคอมโบ</option>
-              </select>
+                minWidth="200px"
+                options={[
+                  { value: "all", label: "หมวดหมู่ทั้งหมด (ทุกเมนู)" },
+                  { value: "flavours", label: "รสชาติหลัก" },
+                  { value: "combos", label: "เมนูคอมโบ" },
+                ]}
+              />
             </div>
 
             {/* Right Side: Add Menu Button (left of search) & Search Box */}

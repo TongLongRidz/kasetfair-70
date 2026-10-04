@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { getStoredToken } from "@/lib/auth";
 import { useToast } from "@/components/ui/toast";
+import CustomDropdown from "@/components/ui/CustomDropdown";
 import AddEditToppingModal from "./components/AddEditToppingModal";
 import ImageCropModal from "@/components/ui/modals/ImageCropModal";
 
@@ -556,7 +557,7 @@ export default function ToppingsManagementPage() {
     >
       <AdminSidebar />
 
-      <main style={{ flex: 1, padding: "1.75rem 2.5rem", overflowY: "auto", minWidth: 0 }}>
+      <main style={{ flex: 1, padding: "1.75rem 2.5rem", minWidth: 0 }}>
         {/* Header Section */}
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
           <div>
@@ -579,59 +580,22 @@ export default function ToppingsManagementPage() {
         >
           {/* Controls Bar: Filter Tabs / Dropdown on Left & Add Button / Search on Right */}
           <div className="admin-controls-bar" style={{ marginBottom: 0 }}>
-            {/* Left Side: Filter Tabs (Desktop) */}
-            <div className="admin-filter-tabs">
-              {[
-                { id: "all", label: "ทั้งหมด" },
-                { id: "available", label: "พร้อมขาย" },
-                { id: "soldout", label: "ขายหมด" },
-                { id: "hidden", label: "ซ่อนอยู่" },
-              ].map((tab) => {
-                const isSelected = statusFilter === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => {
-                      setStatusFilter(tab.id as any);
-                      setCurrentPage(1);
-                    }}
-                    style={{
-                      padding: "0.4rem 0.85rem",
-                      borderRadius: "0.5rem",
-                      fontSize: "0.8rem",
-                      fontWeight: isSelected ? 700 : 500,
-                      fontFamily: "'Kanit', sans-serif",
-                      border: "none",
-                      cursor: "pointer",
-                      backgroundColor: isSelected ? "var(--ink)" : "transparent",
-                      color: isSelected ? "var(--cream)" : "var(--ink-soft)",
-                      transition: "all 0.15s ease",
-                      whiteSpace: "nowrap",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Left Side: Filter Dropdown (Mobile) */}
-            <div className="admin-filter-dropdown-wrapper">
-              <select
-                className="admin-filter-select"
+            {/* Left Side: Filter Dropdown */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <CustomDropdown
                 value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value as any);
+                onChange={(val) => {
+                  setStatusFilter(val as any);
                   setCurrentPage(1);
                 }}
-              >
-                <option value="all">ทั้งหมด</option>
-                <option value="available">พร้อมขาย</option>
-                <option value="soldout">ขายหมด</option>
-                <option value="hidden">ซ่อนอยู่</option>
-              </select>
+                minWidth="160px"
+                options={[
+                  { value: "all", label: "สถานะทั้งหมด" },
+                  { value: "available", label: "พร้อมขาย" },
+                  { value: "soldout", label: "ขายหมด" },
+                  { value: "hidden", label: "ซ่อนอยู่" },
+                ]}
+              />
             </div>
 
             {/* Right Side: Add Topping Button (left of search) & Search Box */}

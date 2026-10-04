@@ -16,6 +16,9 @@ interface AddEditModalProps {
   setFormName: (v: string) => void;
   formPassword: string;
   setFormPassword: (v: string) => void;
+  formRoleId: number | "";
+  setFormRoleId: (v: number | "") => void;
+  rolesList: Array<{ id: number; name: string }>;
   formIsActivate: boolean;
   setFormIsActivate: (v: boolean) => void;
   formIsSuperadmin: boolean;
@@ -37,6 +40,9 @@ export default function AddEditModal({
   setFormName,
   formPassword,
   setFormPassword,
+  formRoleId,
+  setFormRoleId,
+  rolesList,
   formIsActivate,
   setFormIsActivate,
   formIsSuperadmin,
@@ -177,6 +183,36 @@ export default function AddEditModal({
                 color: "var(--ink)",
               }}
             />
+          </div>
+
+          {/* Role Dropdown */}
+          <div>
+            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.3rem", color: "var(--ink)" }}>
+              บทบาท (Role)
+            </label>
+            <select
+              value={formRoleId}
+              onChange={(e) => setFormRoleId(e.target.value ? Number(e.target.value) : "")}
+              style={{
+                width: "100%",
+                padding: "0.65rem 0.85rem",
+                borderRadius: "0.6rem",
+                backgroundColor: "var(--cream)",
+                border: "1px solid rgba(50, 55, 65, 0.15)",
+                fontFamily: "inherit",
+                fontSize: "0.9rem",
+                outline: "none",
+                color: "var(--ink)",
+                cursor: "pointer",
+              }}
+            >
+              <option value="">-- เลือกบทบาท (ระบุภายหลังได้) --</option>
+              {rolesList.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Password */}

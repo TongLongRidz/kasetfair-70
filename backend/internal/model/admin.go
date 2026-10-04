@@ -12,6 +12,8 @@ type Admin struct {
 	Name         string    `gorm:"type:varchar(100);not null" json:"name"`
 	IsActivate   bool      `gorm:"default:false;not null" json:"is_activate"`
 	IsSuperadmin bool      `gorm:"default:false;not null" json:"is_superadmin"`
+	RoleID       *uint     `gorm:"index" json:"role_id"`
+	Role         *Role     `gorm:"foreignKey:RoleID" json:"role,omitempty"`
 	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt    time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
@@ -27,6 +29,8 @@ type AdminResponse struct {
 	Name         string    `json:"name"`
 	IsActivate   bool      `json:"is_activate"`
 	IsSuperadmin bool      `json:"is_superadmin"`
+	RoleID       *uint     `json:"role_id,omitempty"`
+	Role         *Role     `json:"role,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
@@ -39,6 +43,8 @@ func (a *Admin) ToResponse() AdminResponse {
 		Name:         a.Name,
 		IsActivate:   a.IsActivate,
 		IsSuperadmin: a.IsSuperadmin,
+		RoleID:       a.RoleID,
+		Role:         a.Role,
 		CreatedAt:    a.CreatedAt,
 		UpdatedAt:    a.UpdatedAt,
 	}
@@ -48,6 +54,7 @@ type CreateAdminRequest struct {
 	Username string `json:"username" binding:"required,min=3,max=50"`
 	Password string `json:"password" binding:"required,min=6"`
 	Name     string `json:"name" binding:"required,min=1,max=100"`
+	RoleID   *uint  `json:"role_id,omitempty"`
 }
 
 type UpdateAdminRequest struct {
@@ -55,6 +62,7 @@ type UpdateAdminRequest struct {
 	Password     *string `json:"password,omitempty"`
 	IsActivate   *bool   `json:"is_activate,omitempty"`
 	IsSuperadmin *bool   `json:"is_superadmin,omitempty"`
+	RoleID       *uint   `json:"role_id,omitempty"`
 }
 
 type LoginRequest struct {

@@ -69,6 +69,7 @@ func main() {
 		// Public Auth
 		v1.POST("/auth/login", h.Login)
 		v1.POST("/admin/login", h.Login) // alias for convenience
+		v1.POST("/auth/logout", h.Logout)
 
 		// Public Menu & Topping Read (Customer or Public viewing)
 		v1.GET("/products", h.GetProducts)
@@ -78,11 +79,15 @@ func main() {
 		v1.GET("/settings", h.GetSettings)
 		v1.GET("/settings/:key", h.GetSettingByKey)
 		v1.GET("/cash-transactions", h.GetCashTransactions)
+		v1.GET("/dashboard/stats", h.GetDashboardStats)
 
 		// Public Orders & Queue Tracking (Display screens, Customer order/receipt/queue tracking)
 		v1.GET("/orders", h.GetOrders)
 		v1.GET("/orders/:id", h.GetOrderByID)
 		v1.POST("/orders", h.CreateOrder)
+		v1.GET("/roles", h.GetRoles)
+		v1.PUT("/roles/:id/permissions", h.UpdateRolePermissions)
+		v1.GET("/permissions", h.GetPermissions)
 
 		// Protected Admin Routes (Requires valid JWT and is_activate == true)
 		if postgresDB != nil && postgresDB.DB != nil {
@@ -90,6 +95,7 @@ func main() {
 			adminGroup.Use(middleware.AuthMiddleware(postgresDB.DB, cfg.JWTSecret))
 			{
 				adminGroup.GET("/auth/me", h.GetMe)
+				adminGroup.GET("/admin/me", h.GetMe) // alias for convenience
 				adminGroup.GET("/admins", h.GetAdmins)
 				adminGroup.GET("/admins/:uuid", h.GetAdminByUUID)
 				adminGroup.POST("/admins", h.CreateAdmin)
@@ -124,7 +130,6 @@ func main() {
 				adminGroup.DELETE("/cash-transactions/:id", h.DeleteCashTransaction)
 
 				// Uploads (Images)
-				adminGroup.POST("/upload", h.UploadImage)
 				adminGroup.DELETE("/upload", h.DeleteUpload)
 			}
 		}

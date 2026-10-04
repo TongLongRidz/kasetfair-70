@@ -1299,7 +1299,7 @@ export default function OrderInspectionPage() {
                                 height: "100%",
                                 backgroundColor: riskColor,
                                 borderRadius: "5px",
-                                transition: "width 0.4s ease, background-color 0.4s ease",
+                                transition: "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
                               }}
                             />
                           </div>

@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { getStoredToken } from "@/lib/auth";
+import CustomDropdown from "@/components/ui/CustomDropdown";
 
 export type PaymentVerificationStatus = "verified" | "pending" | "fraud";
 export type PaymentMethod = "promptpay_qr" | "cash";
@@ -75,7 +76,6 @@ export default function SlipCheckManagementPage() {
           const data = await res.json();
           if (data.value === "later" || data.value === "immediate") {
             setPromptpayUploadMode(data.value);
-            localStorage.setItem("kaset_slip_upload_mode", data.value);
           }
         }
       } catch { }
@@ -86,7 +86,6 @@ export default function SlipCheckManagementPage() {
           const data = await res.json();
           if (data.value === "later" || data.value === "immediate") {
             setCashUploadMode(data.value);
-            localStorage.setItem("kaset_cash_upload_mode", data.value);
           }
         }
       } catch { }
@@ -96,9 +95,6 @@ export default function SlipCheckManagementPage() {
 
   const handleTogglePromptpayMode = async (mode: "immediate" | "later") => {
     setPromptpayUploadMode(mode);
-    try {
-      localStorage.setItem("kaset_slip_upload_mode", mode);
-    } catch { }
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
@@ -109,6 +105,7 @@ export default function SlipCheckManagementPage() {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
+        credentials: "include",
         body: JSON.stringify({
           value: mode,
           description: "เงื่อนไขการแนบสลิป PromptPay: immediate (ต้องอัพสลิป) หรือ later (ไม่ต้องอัพ)",
@@ -123,7 +120,10 @@ export default function SlipCheckManagementPage() {
         }
       } else {
         const errData = await res.json().catch(() => ({}));
-        toastError(errData.error || "ไม่สามารถบันทึกการตั้งค่าใน Database ได้", "เกิดข้อผิดพลาด");
+        const errMsg = res.status === 401 
+          ? "กรุณาเข้าสู่ระบบ Admin ก่อนเปลี่ยนการตั้งค่า" 
+          : (errData.error || "ไม่สามารถบันทึกการตั้งค่าใน Database ได้");
+        toastError(errMsg, "เกิดข้อผิดพลาด");
         // Rollback state if failed
         setPromptpayUploadMode(mode === "immediate" ? "later" : "immediate");
       }
@@ -136,9 +136,6 @@ export default function SlipCheckManagementPage() {
 
   const handleToggleCashMode = async (mode: "immediate" | "later") => {
     setCashUploadMode(mode);
-    try {
-      localStorage.setItem("kaset_cash_upload_mode", mode);
-    } catch { }
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
@@ -149,6 +146,7 @@ export default function SlipCheckManagementPage() {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
+        credentials: "include",
         body: JSON.stringify({
           value: mode,
           description: "เงื่อนไขการถ่ายรูปเงินสด: immediate (ต้องถ่ายรูป/อัพรูป) หรือ later (ไม่ต้องถ่ายรูป)",
@@ -163,7 +161,10 @@ export default function SlipCheckManagementPage() {
         }
       } else {
         const errData = await res.json().catch(() => ({}));
-        toastError(errData.error || "ไม่สามารถบันทึกการตั้งค่าใน Database ได้", "เกิดข้อผิดพลาด");
+        const errMsg = res.status === 401 
+          ? "กรุณาเข้าสู่ระบบ Admin ก่อนเปลี่ยนการตั้งค่า" 
+          : (errData.error || "ไม่สามารถบันทึกการตั้งค่าใน Database ได้");
+        toastError(errMsg, "เกิดข้อผิดพลาด");
         // Rollback state if failed
         setCashUploadMode(mode === "immediate" ? "later" : "immediate");
       }
@@ -543,17 +544,112 @@ export default function SlipCheckManagementPage() {
     <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "var(--cream)", fontFamily: "'Kanit', sans-serif" }}>
       <AdminSidebar />
 
-      <main style={{ flex: 1, padding: "1.75rem 2.5rem", overflowY: "auto", minWidth: 0 }}>
-        {/* Header Section */}
+      <main style={{ flex: 1, padding: "1.75rem 2.5rem", minWidth: 0 }}>
+        {/* Header Section with Inline Upload Policy Controls */}
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
           <div>
             <h1 style={{ fontSize: "1.75rem", fontWeight: 800, lineHeight: 1.2, margin: 0 }}>
               การตรวจสอบการชำระเงิน
             </h1>
           </div>
+
+          {/* Upload Policy Control Bar in Header */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "1rem",
+              backgroundColor: "var(--card)",
+              padding: "0.5rem 1rem",
+              borderRadius: "1rem",
+              border: "1px solid rgba(50, 55, 65, 0.1)",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.02)",
+              flexWrap: "wrap",
+            }}
+          >
+            <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)", fontWeight: 700 }}>
+              เงื่อนไขรูปภาพ:
+            </span>
+
+            {/* PromptPay Toggle */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <QrCode size={14} color="var(--teal)" />
+              <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--ink)" }}>พร้อมเพย์:</span>
+              <button
+                type="button"
+                onClick={() => handleTogglePromptpayMode(promptpayUploadMode === "immediate" ? "later" : "immediate")}
+                style={{
+                  position: "relative",
+                  width: "40px",
+                  height: "22px",
+                  borderRadius: "11px",
+                  border: "none",
+                  backgroundColor: promptpayUploadMode === "immediate" ? "var(--teal)" : "#cbd5e1",
+                  cursor: "pointer",
+                  transition: "background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                  padding: 0,
+                  outline: "none",
+                }}
+                title={promptpayUploadMode === "immediate" ? "ต้องอัพสลิปทันที (กดเพื่อเปลี่ยน)" : "ไม่อัพ/อัพทีหลังได้ (กดเพื่อเปลี่ยน)"}
+              >
+                <span
+                  style={{
+                    position: "absolute",
+                    top: "2px",
+                    left: promptpayUploadMode === "immediate" ? "20px" : "2px",
+                    width: "18px",
+                    height: "18px",
+                    borderRadius: "50%",
+                    backgroundColor: "#ffffff",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                    transition: "left 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                  }}
+                />
+              </button>
+            </div>
+
+            <div style={{ width: "1px", height: "16px", backgroundColor: "rgba(50,55,65,0.12)" }} />
+
+            {/* Cash Toggle */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <Banknote size={14} color="#b45309" />
+              <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--ink)" }}>เงินสด:</span>
+              <button
+                type="button"
+                onClick={() => handleToggleCashMode(cashUploadMode === "immediate" ? "later" : "immediate")}
+                style={{
+                  position: "relative",
+                  width: "40px",
+                  height: "22px",
+                  borderRadius: "11px",
+                  border: "none",
+                  backgroundColor: cashUploadMode === "immediate" ? "var(--teal)" : "#cbd5e1",
+                  cursor: "pointer",
+                  transition: "background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                  padding: 0,
+                  outline: "none",
+                }}
+                title={cashUploadMode === "immediate" ? "ต้องถ่ายรูปทันที (กดเพื่อเปลี่ยน)" : "ไม่ต้องถ่ายรูป (กดเพื่อเปลี่ยน)"}
+              >
+                <span
+                  style={{
+                    position: "absolute",
+                    top: "2px",
+                    left: cashUploadMode === "immediate" ? "20px" : "2px",
+                    width: "18px",
+                    height: "18px",
+                    borderRadius: "50%",
+                    backgroundColor: "#ffffff",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                    transition: "left 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                  }}
+                />
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* 4 KPI Cards Grid */}
+        {/* 3 Pure Metric Cards Grid matching Expense layout */}
         <div
           className="admin-kpi-grid"
           style={{
@@ -561,45 +657,58 @@ export default function SlipCheckManagementPage() {
             marginBottom: "1.5rem",
           }}
         >
-          {/* Card 1: ยังไม่ได้ยืนยัน */}
+          {/* Card 1: รอตรวจสอบ */}
           <div
             className="admin-kpi-card animate-rise"
             style={{
               borderRadius: "1.25rem",
               backgroundColor: "var(--card)",
               padding: "1.25rem 1.35rem",
-              border: "1px solid rgba(50, 55, 65, 0.09)",
-              boxShadow: "0 2px 12px -2px rgba(0,0,0,0.03)",
+              border: "1px solid rgba(245, 158, 11, 0.22)",
+              boxShadow: "0 4px 16px -2px rgba(245, 158, 11, 0.06)",
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
               boxSizing: "border-box",
-              transition: "all 0.15s ease",
             }}
           >
-            <div>
-              <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", fontWeight: 500, margin: 0 }}>
-                ยังไม่ได้ยืนยัน (รอตรวจสอบ)
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", fontWeight: 600, margin: 0 }}>
+                รอตรวจสอบ
               </p>
+              <div
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "0.75rem",
+                  backgroundColor: "rgba(245, 158, 11, 0.12)",
+                  color: "#f59e0b",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "1px solid rgba(245, 158, 11, 0.25)",
+                }}
+              >
+                <Clock size={18} />
+              </div>
             </div>
             <div style={{ marginTop: "0.5rem", marginBottom: "0.35rem" }}>
               <p
+                className="font-display"
                 style={{
                   fontSize: "1.85rem",
                   fontWeight: 800,
-                  fontFamily: "'Kanit', sans-serif",
                   color: "#f59e0b",
-                  letterSpacing: "-0.01em",
-                  lineHeight: 1.15,
                   margin: 0,
+                  lineHeight: 1.15,
                 }}
               >
                 {pendingCount}
               </p>
             </div>
             <div>
-              <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 400, lineHeight: 1.3, margin: 0 }}>
-                รอตรวจสอบสลิป / เงินสด
+              <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 400, margin: 0 }}>
+                ออเดอร์รอตรวจสอบสลิป/เงินสด
               </p>
             </div>
           </div>
@@ -611,207 +720,108 @@ export default function SlipCheckManagementPage() {
               borderRadius: "1.25rem",
               backgroundColor: "var(--card)",
               padding: "1.25rem 1.35rem",
-              border: "1px solid rgba(50, 55, 65, 0.09)",
-              boxShadow: "0 2px 12px -2px rgba(0,0,0,0.03)",
+              border: "1px solid rgba(75, 155, 140, 0.22)",
+              boxShadow: "0 4px 16px -2px rgba(75, 155, 140, 0.06)",
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
               boxSizing: "border-box",
-              transition: "all 0.15s ease",
             }}
           >
-            <div>
-              <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", fontWeight: 500, margin: 0 }}>
-                ยืนยันแล้ว (ผ่าน)
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", fontWeight: 600, margin: 0 }}>
+                ยืนยันแล้ว
               </p>
+              <div
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "0.75rem",
+                  backgroundColor: "rgba(75, 155, 140, 0.12)",
+                  color: "var(--teal)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "1px solid rgba(75, 155, 140, 0.25)",
+                }}
+              >
+                <CheckCircle2 size={18} />
+              </div>
             </div>
             <div style={{ marginTop: "0.5rem", marginBottom: "0.35rem" }}>
               <p
+                className="font-display"
                 style={{
                   fontSize: "1.85rem",
                   fontWeight: 800,
-                  fontFamily: "'Kanit', sans-serif",
                   color: "var(--teal)",
-                  letterSpacing: "-0.01em",
-                  lineHeight: 1.15,
                   margin: 0,
+                  lineHeight: 1.15,
                 }}
               >
                 {verifiedCount}
               </p>
             </div>
             <div>
-              <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 400, lineHeight: 1.3, margin: 0 }}>
-                ชำระเงินถูกต้อง พร้อมทำเครื่องดื่ม
+              <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 400, margin: 0 }}>
+                ชำระเงินถูกต้อง พร้อมส่งทำเครื่องดื่ม
               </p>
             </div>
           </div>
 
-          {/* Card 3: เนียนเลยนะครับ (ปฏิเสธ) */}
+          {/* Card 3: เนียนเลยนะครับ (ไม่ผ่าน) */}
           <div
             className="admin-kpi-card animate-rise"
             style={{
               borderRadius: "1.25rem",
               backgroundColor: "var(--card)",
               padding: "1.25rem 1.35rem",
-              border: "1px solid rgba(50, 55, 65, 0.09)",
-              boxShadow: "0 2px 12px -2px rgba(0,0,0,0.03)",
+              border: "1px solid rgba(220, 38, 38, 0.22)",
+              boxShadow: "0 4px 16px -2px rgba(220, 38, 38, 0.06)",
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
               boxSizing: "border-box",
-              transition: "all 0.15s ease",
             }}
           >
-            <div>
-              <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", fontWeight: 500, margin: 0 }}>
-                เนียนเลยนะครับ (ไม่ผ่าน)
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", fontWeight: 600, margin: 0 }}>
+                เนียนเลยนะครับ
               </p>
+              <div
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "0.75rem",
+                  backgroundColor: "rgba(220, 38, 38, 0.12)",
+                  color: "#dc2626",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "1px solid rgba(220, 38, 38, 0.25)",
+                }}
+              >
+                <AlertTriangle size={18} />
+              </div>
             </div>
             <div style={{ marginTop: "0.5rem", marginBottom: "0.35rem" }}>
               <p
+                className="font-display"
                 style={{
                   fontSize: "1.85rem",
                   fontWeight: 800,
-                  fontFamily: "'Kanit', sans-serif",
-                  color: "#ef4444",
-                  letterSpacing: "-0.01em",
-                  lineHeight: 1.15,
+                  color: "#dc2626",
                   margin: 0,
+                  lineHeight: 1.15,
                 }}
               >
                 {fraudCount}
               </p>
             </div>
             <div>
-              <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 400, lineHeight: 1.3, margin: 0 }}>
+              <p style={{ fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 400, margin: 0 }}>
                 สลิปไม่ถูกต้อง / ปฏิเสธรายการ
               </p>
-            </div>
-          </div>
-
-          {/* Card 4: ตั้งค่าเงื่อนไขรูปภาพการชำระเงิน */}
-          <div
-            className="admin-kpi-card animate-rise"
-            style={{
-              borderRadius: "1.25rem",
-              backgroundColor: "var(--card)",
-              padding: "1.1rem 1.25rem",
-              border: "1px solid rgba(50, 55, 65, 0.09)",
-              boxShadow: "0 2px 12px -2px rgba(0,0,0,0.03)",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-              boxSizing: "border-box",
-              transition: "all 0.15s ease",
-            }}
-          >
-            <div style={{ marginBottom: "0.6rem" }}>
-              <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", fontWeight: 600, margin: 0 }}>
-                เงื่อนไขการอัพโหลดรูปภาพ
-              </p>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-              {/* PromptPay QR Toggle Row */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "0.5rem",
-                  padding: "0.4rem 0.6rem",
-                  backgroundColor: "rgba(50, 55, 65, 0.025)",
-                  borderRadius: "0.75rem",
-                  border: "1px solid rgba(50, 55, 65, 0.05)",
-                }}
-              >
-                <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--ink)", lineHeight: 1.2 }}>
-                  พร้อมเพย์ QR:
-                </span>
-
-                <button
-                  type="button"
-                  onClick={() => handleTogglePromptpayMode(promptpayUploadMode === "immediate" ? "later" : "immediate")}
-                  style={{
-                    position: "relative",
-                    width: "44px",
-                    height: "24px",
-                    borderRadius: "12px",
-                    border: "none",
-                    backgroundColor: promptpayUploadMode === "immediate" ? "var(--teal)" : "#cbd5e1",
-                    cursor: "pointer",
-                    transition: "background-color 0.2s ease",
-                    padding: 0,
-                    outline: "none",
-                  }}
-                  title={promptpayUploadMode === "immediate" ? "เปิดอยู่ (กดเพื่อปิด)" : "ปิดอยู่ (กดเพื่อเปิด)"}
-                >
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: "2px",
-                      left: promptpayUploadMode === "immediate" ? "22px" : "2px",
-                      width: "20px",
-                      height: "20px",
-                      borderRadius: "50%",
-                      backgroundColor: "#ffffff",
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-                      transition: "left 0.2s ease",
-                    }}
-                  />
-                </button>
-              </div>
-
-              {/* Cash Toggle Row */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "0.5rem",
-                  padding: "0.4rem 0.6rem",
-                  backgroundColor: "rgba(50, 55, 65, 0.025)",
-                  borderRadius: "0.75rem",
-                  border: "1px solid rgba(50, 55, 65, 0.05)",
-                }}
-              >
-                <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--ink)", whiteSpace: "nowrap" }}>
-                  เงินสด:
-                </span>
-
-                <button
-                  type="button"
-                  onClick={() => handleToggleCashMode(cashUploadMode === "immediate" ? "later" : "immediate")}
-                  style={{
-                    position: "relative",
-                    width: "44px",
-                    height: "24px",
-                    borderRadius: "12px",
-                    border: "none",
-                    backgroundColor: cashUploadMode === "immediate" ? "var(--teal)" : "#cbd5e1",
-                    cursor: "pointer",
-                    transition: "background-color 0.2s ease",
-                    padding: 0,
-                    outline: "none",
-                  }}
-                  title={cashUploadMode === "immediate" ? "เปิดอยู่ (กดเพื่อปิด)" : "ปิดอยู่ (กดเพื่อเปิด)"}
-                >
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: "2px",
-                      left: cashUploadMode === "immediate" ? "22px" : "2px",
-                      width: "20px",
-                      height: "20px",
-                      borderRadius: "50%",
-                      backgroundColor: "#ffffff",
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-                      transition: "left 0.2s ease",
-                    }}
-                  />
-                </button>
-              </div>
             </div>
           </div>
         </div>
@@ -827,63 +837,27 @@ export default function SlipCheckManagementPage() {
           }}
         >
 
-          {/* Controls Bar: Filter Tabs & Search / Sort */}
+          {/* Controls Bar: Filter Dropdown on Left & Search on Right */}
           <div className="admin-controls-bar">
-            {/* Filter Tabs (Desktop) */}
-            <div className="admin-filter-tabs">
-              {[
-                { id: "all", label: `ทั้งหมด (${orders.length})` },
-                { id: "pending", label: `รอตรวจสอบ (${pendingCount})` },
-                { id: "verified", label: `ยืนยันแล้ว (${verifiedCount})` },
-                { id: "fraud", label: `สลิปไม่ถูกต้อง (${fraudCount})` },
-              ].map((tab) => {
-                const isSelected = statusFilter === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      setStatusFilter(tab.id as any);
-                      setPage(1);
-                    }}
-                    style={{
-                      padding: "0.4rem 0.85rem",
-                      borderRadius: "0.5rem",
-                      fontSize: "0.8rem",
-                      fontWeight: isSelected ? 700 : 500,
-                      fontFamily: "'Kanit', sans-serif",
-                      border: "none",
-                      cursor: "pointer",
-                      backgroundColor: isSelected ? "var(--ink)" : "transparent",
-                      color: isSelected ? "var(--cream)" : "var(--ink-soft)",
-                      transition: "all 0.15s ease",
-                      whiteSpace: "nowrap",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Filter Dropdown (Mobile) */}
-            <div className="admin-filter-dropdown-wrapper">
-              <select
-                className="admin-filter-select"
+            {/* Left Side: Filter Dropdown */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <CustomDropdown
                 value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value as any);
+                onChange={(val) => {
+                  setStatusFilter(val as any);
                   setPage(1);
                 }}
-              >
-                <option value="all">ทั้งหมด ({orders.length})</option>
-                <option value="pending">รอตรวจสอบ ({pendingCount})</option>
-                <option value="verified">ยืนยันแล้ว ({verifiedCount})</option>
-                <option value="fraud">สลิปไม่ถูกต้อง ({fraudCount})</option>
-              </select>
+                minWidth="180px"
+                options={[
+                  { value: "all", label: `ทั้งหมด (${orders.length})` },
+                  { value: "pending", label: `รอตรวจสอบ (${pendingCount})` },
+                  { value: "verified", label: `ยืนยันแล้ว (${verifiedCount})` },
+                  { value: "fraud", label: `สลิปไม่ถูกต้อง (${fraudCount})` },
+                ]}
+              />
             </div>
 
-            {/* Search */}
+            {/* Right Side: Search */}
             <div className="admin-search-wrapper">
               <div className="admin-search-box">
                 <Search size={15} color="var(--ink-soft)" style={{ flexShrink: 0 }} />
@@ -956,9 +930,10 @@ export default function SlipCheckManagementPage() {
                   return (
                     <tr
                       key={order.id}
+                      className="hover:bg-[rgba(50,55,65,0.025)]"
                       style={{
                         borderBottom: "1px solid rgba(50, 55, 65, 0.06)",
-                        transition: "background-color 0.15s ease",
+                        transition: "background-color 0.15s cubic-bezier(0.16, 1, 0.3, 1)",
                       }}
                     >
                       {/* วันที่ */}
@@ -967,13 +942,13 @@ export default function SlipCheckManagementPage() {
                       </td>
 
                       {/* หมายเลขคิว */}
-                      <td style={{ padding: "0.85rem 0.6rem", fontWeight: 800, fontSize: "1rem", color: "var(--ink)" }}>
+                      <td style={{ padding: "0.85rem 0.6rem", fontWeight: 800, fontSize: "1.05rem", color: "var(--ink)" }}>
                         {order.queueNo}
                       </td>
 
                       {/* วิธีชำระ */}
                       <td style={{ padding: "0.85rem 0.6rem" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.8rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.825rem", fontWeight: 600 }}>
                           {order.paymentMethod === "promptpay_qr" ? (
                             <>
                               <QrCode size={15} color="var(--teal)" />
@@ -1005,15 +980,20 @@ export default function SlipCheckManagementPage() {
                             fontWeight: 600,
                             color: "var(--ink)",
                             cursor: "pointer",
-                            transition: "all 0.15s ease",
+                            transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
                           }}
-                          onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--teal)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(50, 55, 65, 0.15)")}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = "var(--teal)";
+                            e.currentTarget.style.backgroundColor = "rgba(75, 155, 140, 0.08)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = "rgba(50, 55, 65, 0.15)";
+                            e.currentTarget.style.backgroundColor = "var(--cream)";
+                          }}
                         >
                           <span>รายละเอียด</span>
                         </button>
                       </td>
-
 
                       {/* สถานะตรวจสอบ */}
                       <td style={{ padding: "0.85rem 0.6rem" }}>
@@ -1022,21 +1002,26 @@ export default function SlipCheckManagementPage() {
                             style={{
                               display: "inline-flex",
                               alignItems: "center",
-                              gap: "0.3rem",
+                              gap: "0.35rem",
                               borderRadius: "9999px",
                               padding: "0.25rem 0.75rem",
                               fontSize: "0.75rem",
                               fontWeight: 700,
                               backgroundColor: isPending
-                                ? "rgba(224, 83, 83, 0.15)"
+                                ? "rgba(245, 158, 11, 0.12)"
                                 : isVerified
-                                  ? "rgba(34, 197, 94, 0.15)"
-                                  : "rgba(185, 28, 28, 0.2)",
+                                  ? "rgba(34, 197, 94, 0.12)"
+                                  : "rgba(220, 38, 38, 0.12)",
                               color: isPending
-                                ? "#dc2626"
+                                ? "#d97706"
                                 : isVerified
                                   ? "#16a34a"
-                                  : "#991b1b",
+                                  : "#dc2626",
+                              border: isPending
+                                ? "1px solid rgba(245, 158, 11, 0.25)"
+                                : isVerified
+                                  ? "1px solid rgba(34, 197, 94, 0.25)"
+                                  : "1px solid rgba(220, 38, 38, 0.25)",
                             }}
                           >
                             {isPending && <Clock size={12} />}
@@ -1069,8 +1054,16 @@ export default function SlipCheckManagementPage() {
 
                 {paginatedOrders.length === 0 && (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: "center", padding: "2.5rem 0", color: "var(--ink-soft)" }}>
-                      ไม่พบข้อมูลรายการชำระเงินตามเงื่อนไขที่ระบุ
+                    <td colSpan={7} style={{ textAlign: "center", padding: "3.5rem 1rem", color: "var(--ink-soft)" }}>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
+                        <ShieldCheck size={38} color="var(--teal)" style={{ opacity: 0.6 }} />
+                        <p style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--ink)", margin: 0 }}>
+                          {loading ? "กำลังโหลดข้อมูลออเดอร์..." : "ยังไม่มีข้อมูลรายการชำระเงินตามเงื่อนไขที่ระบุ"}
+                        </p>
+                        <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)", margin: 0 }}>
+                          เมื่อมีออเดอร์ชำระเงินรายการใหม่เข้ามา ระบบจะแสดงรายการและสลิปอัตโนมัติ
+                        </p>
+                      </div>
                     </td>
                   </tr>
                 )}

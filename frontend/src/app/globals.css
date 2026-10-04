@@ -156,6 +156,7 @@ textarea {
 html {
   scroll-behavior: smooth;
   scrollbar-gutter: stable;
+  overflow-x: hidden;
 }
 
 body {
@@ -163,7 +164,9 @@ body {
   color: var(--ink);
   font-family: 'Kanit', sans-serif;
   min-height: 100vh;
+  max-width: 100vw;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
   overflow-y: scroll;
 }
 
@@ -199,17 +202,13 @@ body {
   font-family: 'Kanit', sans-serif;
 }
 
-/* Admin area font class */
+/* Unified system font family (Kanit) */
 .admin-theme,
 .admin-theme *,
 .admin-theme button,
 .admin-theme input,
 .admin-theme select,
-.admin-theme textarea {
-  font-family: 'Kanit', sans-serif;
-}
-
-/* Specific Kanit theme for POS front desk */
+.admin-theme textarea,
 .kanit-theme,
 .kanit-theme *,
 .kanit-theme button,
@@ -220,27 +219,14 @@ body {
 }
 
 .kanit-theme .font-mono,
-.kanit-theme .font-mono * {
-  font-family: 'IBM Plex Mono', monospace !important;
-}
-
-.kanit-theme .font-display,
-.kanit-theme .font-display * {
-  font-family: 'Anton', sans-serif !important;
-}
-
+.kanit-theme .font-mono *,
 .admin-theme .font-mono,
 .admin-theme .font-mono * {
   font-family: 'IBM Plex Mono', monospace !important;
 }
 
-.admin-theme .font-display,
-.admin-theme .font-display * {
-  font-family: 'Anton', sans-serif !important;
-}
-
 .font-display {
-  font-family: 'Anton', sans-serif;
+  font-family: 'Kanit', sans-serif;
 }
 
 .font-mono {
@@ -264,7 +250,7 @@ body {
   animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-@keyframes badge-bounce {
+@keyframes badge-pulse {
 
   0%,
   100% {
@@ -277,7 +263,7 @@ body {
 }
 
 .animate-badge {
-  animation: badge-bounce 3s ease-in-out infinite;
+  animation: badge-pulse 3s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
 
 @keyframes slide-up {
@@ -609,9 +595,43 @@ html.lock-scroll {
   }
 }
 
+/* Scrollbar Gutter Stable - Prevents content layout shift when scrollbar appears */
+.admin-sidebar-scroll-container {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(50, 55, 65, 0.18) transparent;
+}
+
+.admin-sidebar-scroll-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.admin-sidebar-scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.admin-sidebar-scroll-container::-webkit-scrollbar-thumb {
+  background: rgba(50, 55, 65, 0.18);
+  border-radius: 9999px;
+}
+
+.admin-sidebar-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: var(--teal);
+}
+
 /* Admin Responsive Layout (Desktop Sidebar vs Mobile Top Navbar) */
+.admin-sidebar-desktop-wrapper {
+  display: block;
+}
+
 .admin-sidebar-desktop {
   display: flex !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  bottom: 0 !important;
+  height: 100vh !important;
+  z-index: 50 !important;
 }
 
 .admin-topbar-mobile {
@@ -654,6 +674,7 @@ html.lock-scroll {
 }
 
 @media (max-width: 768px) {
+  .admin-sidebar-desktop-wrapper,
   .admin-sidebar-desktop {
     display: none !important;
   }
@@ -701,17 +722,16 @@ html.lock-scroll {
   }
 }
 
-/* Base admin-kpi-grid for tablet / standard desktop: 3 columns */
+/* Responsive 3-card metric grid: 3 equal columns on desktop, 1 column on mobile */
 .admin-kpi-grid {
   display: grid !important;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.85rem;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 1rem;
 }
 
-/* Wide screens: max 6 columns */
-@media (min-width: 1400px) {
+@media (max-width: 900px) {
   .admin-kpi-grid {
-    grid-template-columns: repeat(6, 1fr) !important;
+    grid-template-columns: repeat(1, 1fr) !important;
   }
 }
 
@@ -768,7 +788,7 @@ html.lock-scroll {
   }
 }
 
-/* Responsive Menu Products Grid */
+/* Responsive Menu Products Grid (Max 3 items per row) */
 .menu-products-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -803,19 +823,19 @@ html.lock-scroll {
 
 @media (min-width: 1024px) {
   .menu-products-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 1.1rem;
   }
 }
 
 @media (min-width: 1280px) {
   .menu-products-grid {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 1.15rem;
   }
 }
 
-/* Responsive Toppings Grid */
+/* Responsive Toppings Grid (Max 3 items per row) */
 .toppings-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -850,21 +870,21 @@ html.lock-scroll {
 
 @media (min-width: 1024px) {
   .toppings-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 1.1rem;
   }
 }
 
 @media (min-width: 1280px) {
   .toppings-grid {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 1.15rem;
   }
 }
 
 @media (min-width: 1536px) {
   .toppings-grid {
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 1.2rem;
   }
 }
@@ -1243,3 +1263,10 @@ html.lock-scroll {
     display: inline;
   }
 }
+
+/* Permissions Page Responsive Rules */
+@media (max-width: 900px) {
+  .permissions-layout {
+    grid-template-columns: 1fr !important;
+  }
+}

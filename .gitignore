@@ -8,6 +8,11 @@ node_modules/
 out/
 build/
 dist/
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
 
 # Logs
 *.log

@@ -105,13 +105,6 @@ export default function POSPaymentPage() {
         return;
       }
 
-      // Load PromptPay settings if configured
-      const savedAccount = localStorage.getItem("kaset_promptpay_account");
-      if (savedAccount) setPromptpayAccount(savedAccount);
-
-      const savedName = localStorage.getItem("kaset_promptpay_name");
-      if (savedName) setPromptpayName(savedName);
-
       // Slip & Cash upload mode policies
       const fetchSettings = async () => {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
@@ -121,7 +114,6 @@ export default function POSPaymentPage() {
             const data = await res.json();
             if (data.value === "later" || data.value === "immediate") {
               setSlipUploadMode(data.value);
-              localStorage.setItem("kaset_slip_upload_mode", data.value);
             }
           }
         } catch { }
@@ -131,7 +123,6 @@ export default function POSPaymentPage() {
             const data = await res.json();
             if (data.value) {
               setPromptpayAccount(data.value);
-              localStorage.setItem("kaset_promptpay_account", data.value);
             }
           }
         } catch { }
@@ -141,7 +132,6 @@ export default function POSPaymentPage() {
             const data = await res.json();
             if (data.value) {
               setPromptpayName(data.value);
-              localStorage.setItem("kaset_promptpay_name", data.value);
             }
           }
         } catch { }
@@ -151,19 +141,9 @@ export default function POSPaymentPage() {
             const data = await res.json();
             if (data.value === "later" || data.value === "immediate") {
               setCashUploadMode(data.value);
-              localStorage.setItem("kaset_cash_upload_mode", data.value);
             }
           }
         } catch { }
-
-        const savedSlipMode = localStorage.getItem("kaset_slip_upload_mode");
-        if (savedSlipMode === "later" || savedSlipMode === "immediate") {
-          setSlipUploadMode(savedSlipMode);
-        }
-        const savedCashMode = localStorage.getItem("kaset_cash_upload_mode");
-        if (savedCashMode === "later" || savedCashMode === "immediate") {
-          setCashUploadMode(savedCashMode);
-        }
       };
       fetchSettings();
     } catch (e) {
@@ -206,6 +186,8 @@ export default function POSPaymentPage() {
     }
   }, [grandTotal, promptpayAccount]);
 
+  const [slipRawFile, setSlipRawFile] = useState<File | null>(null);
+
   // Handle Slip Upload
   const handleFileChange = (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -213,6 +195,7 @@ export default function POSPaymentPage() {
       return;
     }
     setSlipFileName(file.name);
+    setSlipRawFile(file);
     const reader = new FileReader();
     reader.onload = (e) => {
       setSlipImage(e.target?.result as string);
@@ -270,14 +253,41 @@ export default function POSPaymentPage() {
 
     setIsSubmitting(true);
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+    const token = getStoredToken();
 
     try {
+      let finalSlipUrl: string | null = slipImage || null;
+
+      // If raw file present, upload to server first
+      if (slipRawFile) {
+        try {
+          const formData = new FormData();
+          formData.append("file", slipRawFile);
+          formData.append("folder", "slips");
+
+          const uploadRes = await fetch(`${apiUrl}/api/v1/upload`, {
+            method: "POST",
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            body: formData,
+          });
+
+          if (uploadRes.ok) {
+            const uploadData = await uploadRes.json();
+            if (uploadData.url) {
+              finalSlipUrl = uploadData.url;
+            }
+          }
+        } catch (uploadErr) {
+          console.error("Failed to upload slip file to server, using fallback:", uploadErr);
+        }
+      }
+
       const orderPayload = {
         method: "walk-in",
         total_amount: grandTotal,
         payment_method: paymentMethod,
         received_amount: paymentMethod === "cash" ? cashNum : null,
-        slip_url: slipImage || null,
+        slip_url: finalSlipUrl,
         note: null,
         items: cart.map((c) => ({
           product_id: Number(c.productId),
@@ -294,7 +304,6 @@ export default function POSPaymentPage() {
         })),
       };
 
-      const token = getStoredToken();
       const res = await fetch(`${apiUrl}/api/v1/orders`, {
         method: "POST",
         headers: {
@@ -327,23 +336,7 @@ export default function POSPaymentPage() {
       }
     } catch (err) {
       console.error("Failed to create order via API", err);
-      // Fallback in case backend is offline
-      const queueNumber = `A${String(Math.floor(1 + Math.random() * 999)).padStart(3, "0")}`;
-      const orderId = Math.floor(1000 + Math.random() * 9000);
-
-      setOrderSuccessQueue({
-        queueNumber,
-        orderId,
-        total: grandTotal,
-        paymentMethod,
-        change: paymentMethod === "cash" ? change : 0,
-        itemsCount: totalCups,
-        slipUrl: slipImage,
-      });
-
-      try {
-        localStorage.removeItem(CART_STORAGE_KEY);
-      } catch { }
+      alert("ไม่สามารถสร้างออเดอร์ได้ เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
     } finally {
       setIsSubmitting(false);
     }

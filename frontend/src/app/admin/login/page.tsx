@@ -28,6 +28,7 @@ export default function AdminLoginPage() {
       const res = await fetch(`${apiUrl}/api/v1/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           username: username.trim(),
           password: password.trim(),
@@ -45,22 +46,7 @@ export default function AdminLoginPage() {
       setAuthSession(data.token, data.admin);
       window.location.href = "/admin/management/dashboard";
     } catch {
-      // Fallback for development if backend is not running
-      if (username === "admin" && password === "admin123") {
-        setAuthSession("mock_dev_token", {
-          id: 1,
-          uuid: "mock-superadmin-uuid",
-          username: "admin",
-          name: "ผู้ดูแลระบบทดสอบ (Dev Admin)",
-          is_activate: true,
-          is_superadmin: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-        window.location.href = "/admin/management/dashboard";
-      } else {
-        setErrorMessage("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์ กรุณาลองใหม่อีกครั้ง");
-      }
+      setErrorMessage("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์ กรุณาลองใหม่อีกครั้ง");
     } finally {
       setIsLoading(false);
     }

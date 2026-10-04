@@ -19,9 +19,10 @@
 ### 🛠️ ฝั่งผู้ดูแลระบบ (Admin Portal - `/admin`)
 | ลำดับ | หมวดหมู่ | หน้า (Route) | คำอธิบาย / ความสามารถ | สถานะ |
 | :--- | :--- | :--- | :--- | :---: |
-| 1 | Auth | `/admin/login` | หน้าล็อกอินผู้ดูแลระบบ (JWT Token) | ✅ **เสร็จแล้ว** |
-| 2 | Management | `/admin/management/administrator` | **จัดการแอดมิน**: เพิ่ม/แก้ไข/ลบ, ตั้ง Superadmin, เปิด/ปิดสถานะ | ✅ **เสร็จแล้ว** |
-| 3 | Management | `/admin/management/menu` | **จัดการเมนู**: เพิ่ม/แก้ไข/ลบ, อัปโหลด+Cropรูป 1:1, สลับลำดับ (Drag & Drop / Reorder), ราคาร้อน/เย็น, แนะนำ, ซ่อน, ขายหมด, **สูตรคอมโบ (`product_combo_recipe`)** เลือกเครื่องดื่มเบส + ท็อปปิ้งในเซ็ต, Pagination 5 รายการ/หน้า | ✅ **เสร็จแล้ว** |
+| 1 | Auth | `/admin/login` | หน้าล็อกอินผู้ดูแลระบบ (JWT Token via HttpOnly Cookie, Security XSS Protection) | ✅ **เสร็จแล้ว** |
+| 2 | Management | `/admin/management/administrator` | **จัดการแอดมิน**: เพิ่ม/แก้ไข/ลบ, ตั้ง Superadmin, เปิด/ปิดสถานะ, เลือกบทบาท Role | ✅ **เสร็จแล้ว** |
+| 3 | Management | `/admin/management/permissions` | **จัดการสิทธิ์ (Permissions)**: แสดงรายการบทบาท (Roles) และสิทธิ์การใช้งาน (Permissions) ในระบบ | ✅ **เสร็จแล้ว** |
+| 4 | Management | `/admin/management/menu` | **จัดการเมนู**: เพิ่ม/แก้ไข/ลบ, อัปโหลด+Cropรูป 1:1, สลับลำดับ (Drag & Drop / Reorder), ราคาร้อน/เย็น, แนะนำ, ซ่อน, ขายหมด, **สูตรคอมโบ (`product_combo_recipe`)** เลือกเครื่องดื่มเบส + ท็อปปิ้งในเซ็ต, Pagination 5 รายการ/หน้า | ✅ **เสร็จแล้ว** |
 | 4 | Management | `/admin/management/toppings` | **จัดการท็อปปิ้ง**: เพิ่ม/แก้ไข/ลบ, อัปโหลด+Cropรูป 1:1, สลับลำดับ (Reorder), เลือกร้อน/เย็น, ซ่อน, ขายหมด, Pagination 6 รายการ/หน้า | ✅ **เสร็จแล้ว** |
 | 5 | Management | `/admin/management/dashboard` | แดชบอร์ดสรุปยอดขาย รายรับ-รายจ่าย กราฟแนวโน้ม และสถิติ | ⏳ Pending |
 | 6 | Management | `/admin/management/expense` | บันทึกรายจ่ายและต้นทุนประจำวัน | ⏳ Pending |
@@ -88,9 +89,14 @@
 
 ## 2. ผู้ดูแลระบบ (Admin Portal - `/admin`)
 
-### 2.1 การเข้าถึงและความปลอดภัย (Authentication)
-- ล็อกอินด้วย **Username / Password** สำหรับผู้ดูแลระบบ (`admins`)
-- ระบบ Session / JWT และการบันทึก Admin ผู้ปฏิบัติงานในการอนุมัติสลิปและบันทึกค่าใช้จ่าย
+### 2.1 การเข้าถึงและความปลอดภัย (Authentication & Security Architecture)
+- **ระบบยืนยันตัวตน (Authentication):** ล็อกอินด้วย Username / Password สำหรับผู้ดูแลระบบ (`admins`)
+- **การรักษาความปลอดภัย (XSS Prevention & HttpOnly Cookie):**
+  - จัดเก็บ JWT Token ผ่าน **`HttpOnly` Cookie (`admin_token`)** พร้อมตัวเลือก `SameSite=Lax` เพื่อป้องกันการถูกขโมย Token จากการโจมตีแบบ XSS (Cross-Site Scripting)
+  - **นโยบายยกเลิกการใช้ `localStorage` สำหรับความปลอดภัย:** ยกเลิกการเก็บ JWT Token และข้อมูลผู้ใช้ Admin ใน `localStorage` โดยสิ้นเชิง (ข้อมูล Admin User จะจัดเก็บใน In-Memory State หน้าร้านผ่านการยืนยันตัวตนกับ `/api/v1/admin/me` ใน `AuthGuard`)
+  - `localStorage` ได้รับการจำกัดขอบเขตให้จัดเก็บเฉพาะข้อมูลตะกร้าสินค้า (`kaset_pos_cart`) เท่านั้น
+- **การเชื่อมต่อฐานข้อมูลจริงแบบ 100% (No Mockup Data Policy):** ลบข้อมูล Mockup ในระบบผู้ดูแลระบบ และระบบขาย POS ทั้งหมด เปลี่ยนเป็นการเชื่อมต่อและรับ-ส่งข้อมูลกับ Go Backend API & PostgreSQL Database โดยตรง หากการเชื่อมต่อขัดข้องระบบจะแจ้งเตือนข้อผิดพลาดตามจริง
+- **การออกจากระบบ (Logout):** ให้บริการ API `POST /api/v1/auth/logout` สำหรับเคลียร์ `HttpOnly` Cookie และคืนค่า Memory State หน้าร้าน
 
 ### 2.2 ระบบจัดการเมนูสินค้า (Product Management)
 - **จัดการสินค้า (`products`):**
@@ -120,13 +126,13 @@
     - **`A` (หน้าร้าน / Walk-in):** เช่น `A01`, `A02`, `A03`... สำหรับลูกค้าที่มาสั่งซื้อและรอรับที่หน้าร้าน
     - **`B` (ออนไลน์ / Online Pre-order):** เช่น `B01`, `B02`, `B03`... สำหรับลูกค้าที่สั่งจองล่วงหน้าผ่านเว็บ
     - **`C` (ร้านค้า / Partner):** เช่น `C01`, `C02`, `C03`... สำหรับออเดอร์จากร้านค้าพาร์ทเนอร์/ตัวแทนจำหน่าย
-- **ระบบขายหน้าร้าน (POS Walk-in):**
-  - หน้าจอแตะเลือกเมนู ปรับระดับความหวาน และเลือกท็อปปิ้งได้รวดเร็ว
+- **ระบบขายหน้าร้าน (POS Walk-in & Payment):**
+  - หน้าจอแตะเลือกเมนู ปรับระดับความหวาน และเลือกท็อปปิ้ง
   - ช่องทางชำระเงิน:
     - **เงินสด (`cash`):** ใส่จำนวนเงินที่รับ คำนวณเงินทอนอัตโนมัติ
-    - **พร้อมเพย์ (`promptpay`):** แสดง QR Code ให้ลูกค้าสแกนจ่าย และแนบรูปสลิป
-  - ช่องกรอกเบอร์โทรลูกค้า (ไม่บังคับ / Optional) สำหรับสะสมแต้ม/ใช้แต้มแลกสิทธิ์
-  - สร้างออเดอร์พร้อมระบุ `method = 'walkin'` และออกหมายเลขคิว `AXX` ทันที
+    - **พร้อมเพย์ (`promptpay`):** แสดง Dynamic QR Code และแนบสลิป
+  - **การอัปโหลดไฟล์สลิป/หลักฐานเงินสด (Multipart File Upload API):** อัปโหลดรูปภาพไปยัง Endpoint เปิดสาธารณะ `/api/v1/upload` (โฟลเดอร์ `slips`) แล้วนำ `fileURL` มาบันทึกลงฟิลด์ `slip_url` ในตาราง `order`
+  - สร้างออเดอร์พร้อมระบุ `method = 'walk-in'` และออกหมายเลขคิว `AXX` ทันทีเรียบร้อย
 - **ระบบตรวจสอบสลิปและอนุมัติออเดอร์ (Slip Verification):**
   - แสดงรายการออเดอร์ที่แนบสลิปเข้ามา ตรวจสอบรูปภาพสลิป ยอดเงิน วันเวลา และหมายเลขคิว
   - **ระบบตั้งค่าสวิตช์เงื่อนไขการอัปโหลดรูปภาพ (`slip_upload_mode` & `cash_upload_mode`):**
@@ -185,9 +191,36 @@
 | `password_hash` | VARCHAR(255) | NOT NULL | รหัสผ่านที่ผ่านการ Hash (Bcrypt) |
 | `name` | VARCHAR(100) | NOT NULL | ชื่อ-นามสกุล/ชื่อเรียก |
 | `is_activate` | BOOLEAN | DEFAULT FALSE | สถานะการเปิดใช้บัญชี |
-| `is_superadmin` | BOOLEAN | DEFAULT FALSE | สถานะการเปิดใช้บัญชี |
+| `is_superadmin` | BOOLEAN | DEFAULT FALSE | สถานะ Superadmin |
+| `role_id` | INT | NULL REFERENCES `role(id)` | รหัสบทบาทหลัก (FK) |
 | `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สร้าง |
 | `updated_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่แก้ไขล่าสุด |
+
+#### 1.1 `role` (ตารางบทบาทหน้าที่) ✅
+| Column | Type | Attributes | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | SERIAL | PRIMARY KEY | รหัสบทบาท |
+| `name` | VARCHAR(50) | UNIQUE, NOT NULL | ชื่อบทบาท (`superadmin`, `admin`, `accounting`, `cashier`, `barista`) |
+| `description` | TEXT | NULL | รายละเอียดขอบเขตหน้าที่ของบทบาท |
+| `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สร้าง |
+| `updated_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่แก้ไขล่าสุด |
+
+#### 1.2 `permission` (ตารางสิทธิ์การใช้งานในระบบ) ✅
+| Column | Type | Attributes | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | SERIAL | PRIMARY KEY | รหัสสิทธิ์ |
+| `name` | VARCHAR(100) | UNIQUE, NOT NULL | ชื่อสิทธิ์ Granular view & edit (เช่น `dashboard.view`, `expense.edit`, `slip_check.view`, `menu.edit`, `pos_front.edit`, `kitchen.edit`) |
+| `description` | TEXT | NULL | รายละเอียดสิทธิ์การเข้าถึงและการทำงาน |
+| `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่สร้าง |
+| `updated_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่แก้ไขล่าสุด |
+
+#### 1.3 `permission_role` (ตารางความสัมพันธ์ระหว่างสิทธิ์และบทบาท) ✅
+| Column | Type | Attributes | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | SERIAL | PRIMARY KEY | รหัสแมปปิ้ง |
+| `role_id` | INT | REFERENCES `role(id)` ON DELETE CASCADE | รหัสบทบาท (FK) |
+| `permission_id` | INT | REFERENCES `permission(id)` ON DELETE CASCADE | รหัสสิทธิ์ (FK) |
+| `created_at` | TIMESTAMPTZ | DEFAULT NOW() | วันที่เชื่อมโยง |
 
 #### 2. `product` (รายการสินค้า - ทั้งเมนูปกติและเซ็ตคอมโบ) ✅
 | Column | Type | Attributes | Description |

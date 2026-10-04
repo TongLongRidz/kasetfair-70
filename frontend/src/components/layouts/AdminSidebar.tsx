@@ -19,6 +19,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   UserCog,
+  Shield,
   ShieldCheck,
   Menu,
   X,
@@ -40,6 +41,8 @@ const managementSubItems: MenuItem[] = [
   { label: "จัดการเมนูเครื่องดื่ม", path: "/admin/management/menu", icon: Coffee },
   { label: "จัดการท็อปปิ้ง", path: "/admin/management/toppings", icon: Candy },
   { label: "จัดการแบนเนอร์", path: "/admin/management/banner", icon: ImageIcon },
+  { label: "จัดการบทบาท (Roles)", path: "/admin/management/roles", icon: Shield },
+  { label: "จัดการสิทธิ์ (Permissions)", path: "/admin/management/permissions", icon: ShieldCheck },
   { label: "จัดการบัญชีแอดมิน", path: "/admin/management/administrator", icon: UserCog },
 ];
 
@@ -137,38 +140,12 @@ export default function AdminSidebar() {
   // Hydrate client-stored preferences after mount to prevent hydration mismatch
   useEffect(() => {
     setCurrentUser(getStoredUser());
-    try {
-      const savedCollapsed = localStorage.getItem("admin_sidebar_collapsed");
-      if (savedCollapsed !== null) {
-        const val = savedCollapsed === "true";
-        cachedCollapsed = val;
-        setIsCollapsed(val);
-      }
-      const savedMgmt = localStorage.getItem("admin_sidebar_mgmt_open");
-      if (savedMgmt !== null) {
-        const val = savedMgmt === "true";
-        cachedManagementOpen = val;
-        setIsManagementOpen(val);
-      }
-      const savedPos = localStorage.getItem("admin_sidebar_pos_open");
-      if (savedPos !== null) {
-        const val = savedPos === "true";
-        cachedPosOpen = val;
-        setIsPosOpen(val);
-      }
-    } catch {
-      // Ignore localStorage errors (e.g. incognito/sandboxed)
-    }
   }, []);
 
-  // Sync to module-level cache and localStorage whenever state changes
   const toggleCollapsed = () => {
     setIsCollapsed((prev) => {
       const next = !prev;
       cachedCollapsed = next;
-      try {
-        localStorage.setItem("admin_sidebar_collapsed", String(next));
-      } catch { }
       return next;
     });
   };
@@ -177,9 +154,6 @@ export default function AdminSidebar() {
     setIsManagementOpen((prev) => {
       const next = !prev;
       cachedManagementOpen = next;
-      try {
-        localStorage.setItem("admin_sidebar_mgmt_open", String(next));
-      } catch { }
       return next;
     });
   };
@@ -188,9 +162,6 @@ export default function AdminSidebar() {
     setIsPosOpen((prev) => {
       const next = !prev;
       cachedPosOpen = next;
-      try {
-        localStorage.setItem("admin_sidebar_pos_open", String(next));
-      } catch { }
       return next;
     });
   };
@@ -210,38 +181,46 @@ export default function AdminSidebar() {
       {/* ------------------------------------------------------------- */}
       {/* 1. DESKTOP SIDEBAR (Visible on > 768px screens)              */}
       {/* ------------------------------------------------------------- */}
-      <aside
-        className="font-thai admin-sidebar-desktop"
+      <div
+        className="admin-sidebar-desktop-wrapper"
         style={{
           width: isCollapsed ? "72px" : "270px",
           flexShrink: 0,
-          position: "sticky",
-          top: 0,
-          height: "100vh",
-          backgroundColor: "var(--card)",
-          borderRight: "1px solid rgba(50, 55, 65, 0.1)",
-          padding: isCollapsed ? "1.25rem 0.5rem" : "1.25rem 1rem",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "space-between",
-          overflowY: "auto",
-          boxShadow: "2px 0 12px rgba(0, 0, 0, 0.02)",
-          fontFamily: "'Kanit', sans-serif",
-          zIndex: 50,
-          transition: "width 0.2s ease, padding 0.2s ease",
+          transition: "width 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
         }}
       >
-        <div>
-          {/* Brand Header + Collapse/Expand Toggle Button */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: isCollapsed ? "center" : "space-between",
-              paddingBottom: "1.25rem",
-              borderBottom: "1px solid rgba(50, 55, 65, 0.08)",
-            }}
-          >
+        <aside
+          className="font-thai admin-sidebar-desktop"
+          style={{
+            width: isCollapsed ? "72px" : "270px",
+            position: "fixed",
+            top: 0,
+            left: 0,
+            bottom: 0,
+            height: "100vh",
+            backgroundColor: "var(--card)",
+            borderRight: "1px solid rgba(50, 55, 65, 0.1)",
+            padding: isCollapsed ? "1.25rem 0.5rem" : "1.25rem 1rem",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            boxShadow: "2px 0 12px rgba(0, 0, 0, 0.02)",
+            fontFamily: "'Kanit', sans-serif",
+            zIndex: 50,
+            transition: "width 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+          }}
+        >
+        {/* Brand Header + Collapse/Expand Toggle Button */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: isCollapsed ? "center" : "space-between",
+            paddingBottom: "1.25rem",
+            borderBottom: "1px solid rgba(50, 55, 65, 0.08)",
+            flexShrink: 0,
+          }}
+        >
             {!isCollapsed && (
               <div
                 style={{
@@ -306,8 +285,17 @@ export default function AdminSidebar() {
             </button>
           </div>
 
-          {/* Navigation List */}
-          <nav style={{ marginTop: "1.25rem", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+          {/* Scrollable Navigation List with Stable Gutter */}
+          <div
+            className="admin-sidebar-scroll-container"
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              marginTop: "1rem",
+              paddingRight: "2px",
+            }}
+          >
+            <nav style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
             {/* Collapsed Compact View */}
             {isCollapsed ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", alignItems: "center" }}>
@@ -550,6 +538,7 @@ export default function AdminSidebar() {
           </button>
         </div>
       </aside>
+    </div>
 
       {/* ------------------------------------------------------------- */}
       {/* 2. MOBILE TOP NAVBAR (Visible on <= 768px screens)            */}

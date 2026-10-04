@@ -27,7 +27,7 @@ export default function OrderSuccessModal({ data, onNextOrder }: OrderSuccessMod
     if (!data) return;
 
     // Generate QR code for tracking order status (order/[uuid])
-    const uuid = data.orderUuid || `mock-${data.orderId}-${Date.now().toString(36)}`;
+    const uuid = data.orderUuid || String(data.orderId);
     const trackingUrl = typeof window !== "undefined"
       ? `${window.location.origin}/order/${uuid}`
       : `http://localhost:3050/order/${uuid}`;

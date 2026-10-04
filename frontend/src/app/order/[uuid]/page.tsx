@@ -128,23 +128,6 @@ export default function OrderTrackingPage() {
     };
   }, []);
 
-  // Auto-cache order to localStorage for returning visits
-  useEffect(() => {
-    if (order?.uuid) {
-      try {
-        const saved = JSON.parse(localStorage.getItem("recent_orders") || "[]");
-        const filtered = saved.filter((o: { uuid: string }) => o.uuid !== order.uuid);
-        filtered.unshift({
-          uuid: order.uuid,
-          queue_no: order.queue_no,
-          created_at: order.created_at,
-        });
-        localStorage.setItem("recent_orders", JSON.stringify(filtered.slice(0, 10)));
-      } catch (e) {
-        console.error("Failed to save order to localStorage", e);
-      }
-    }
-  }, [order?.uuid, order?.queue_no, order?.created_at]);
 
   const handleSaveImage = async () => {
     if (!receiptRef.current) return;

@@ -6,10 +6,10 @@ setup:
 	cd qr-verify && npm install
 
 frontend:
-	cd frontend && npm run dev
+	powershell -NoProfile -Command "Set-Location frontend; npm run dev"
 
 backend:
-	cd backend && go run ./cmd/api
+	powershell -NoProfile -Command "Set-Location backend; go run ./cmd/api"
 
 qr-verify:
 	cd qr-verify && npm run dev
@@ -35,4 +35,5 @@ build:
 
 lint:
 	cd frontend && npm run lint
+
 

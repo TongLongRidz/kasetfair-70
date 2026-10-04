@@ -17,7 +17,7 @@ import {
   Loader2,
   MoreVertical,
 } from "lucide-react";
-import { getStoredToken, getStoredUser, AdminUser } from "@/lib/auth";
+import { getStoredToken, getStoredUser, AdminUser, RoleItem } from "@/lib/auth";
 import KebabMenu from "@/components/ui/KebabMenu";
 import AddEditModal from "./components/AddEditModal";
 import AdminDeleteModal from "./components/AdminDeleteModal";
@@ -26,12 +26,14 @@ import { useToast } from "@/components/ui/toast";
 export default function AdminListPage() {
   const { success, error: toastError, info } = useToast();
   const [admins, setAdmins] = useState<AdminUser[]>([]);
+  const [rolesList, setRolesList] = useState<RoleItem[]>([]);
   const [total, setTotal] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 5;
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive" | "superadmin">("all");
+  const [roleFilter, setRoleFilter] = useState<number | "">("");
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Kebab dropdown state
@@ -47,6 +49,7 @@ export default function AdminListPage() {
   const [formUsername, setFormUsername] = useState<string>("");
   const [formName, setFormName] = useState<string>("");
   const [formPassword, setFormPassword] = useState<string>("");
+  const [formRoleId, setFormRoleId] = useState<number | "">("");
   const [formIsActivate, setFormIsActivate] = useState<boolean>(false);
   const [formIsSuperadmin, setFormIsSuperadmin] = useState<boolean>(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -62,7 +65,30 @@ export default function AdminListPage() {
   const currentUser = getStoredUser();
   const isCurrentSuper = !!currentUser?.is_superadmin;
 
-  // Close kebab menu when clicking outside (identical to slip-check)
+  // Fetch Roles list
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        const token = getStoredToken();
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+        const res = await fetch(`${apiUrl}/api/v1/roles`, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          credentials: "include",
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setRolesList(json.data || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch roles:", err);
+      }
+    };
+    fetchRoles();
+  }, []);
+
+  // Close kebab menu when clicking outside
   useEffect(() => {
     const handleDocumentClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -85,11 +111,13 @@ export default function AdminListPage() {
       });
       if (searchQuery.trim()) params.append("q", searchQuery.trim());
       if (statusFilter !== "all") params.append("status", statusFilter);
+      if (roleFilter !== "") params.append("role_id", roleFilter.toString());
 
       const res = await fetch(`${apiUrl}/api/v1/admins?${params.toString()}`, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
+        credentials: "include",
       });
 
       if (res.ok) {
@@ -98,63 +126,18 @@ export default function AdminListPage() {
         setTotal(data.total || 0);
         setTotalPages(data.total_pages || 1);
       } else {
-        setMockAdmins();
+        setAdmins([]);
+        setTotal(0);
+        setTotalPages(1);
       }
     } catch {
-      setMockAdmins();
+      setAdmins([]);
+      setTotal(0);
+      setTotalPages(1);
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, pageSize, searchQuery, statusFilter]);
-
-  const setMockAdmins = () => {
-    const mockList: AdminUser[] = [
-      {
-        id: 1,
-        uuid: "550e8400-e29b-41d4-a716-446655440000",
-        username: "superadmin",
-        name: "Super Administrator",
-        is_activate: true,
-        is_superadmin: true,
-        created_at: "2026-09-01 08:00:00",
-        updated_at: "2026-09-01 08:00:00",
-      },
-      {
-        id: 2,
-        uuid: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-        username: "somchai_staff",
-        name: "สมชาย ใจดี (บาริสต้า)",
-        is_activate: true,
-        is_superadmin: false,
-        created_at: "2026-09-02 10:30:00",
-        updated_at: "2026-09-02 10:30:00",
-      },
-      {
-        id: 3,
-        uuid: "7ca7b810-9dad-11d1-80b4-00c04fd430c9",
-        username: "somying_cashier",
-        name: "สมหญิง รักบริการ (แคชเชียร์)",
-        is_activate: false,
-        is_superadmin: false,
-        created_at: "2026-09-03 14:15:00",
-        updated_at: "2026-09-03 14:15:00",
-      },
-    ];
-
-    const filtered = mockList.filter((a) => {
-      const q = searchQuery.toLowerCase();
-      const matchQ = a.username.toLowerCase().includes(q) || a.name.toLowerCase().includes(q) || a.uuid.toLowerCase().includes(q);
-      if (!matchQ) return false;
-      if (statusFilter === "active") return a.is_activate;
-      if (statusFilter === "inactive") return !a.is_activate;
-      if (statusFilter === "superadmin") return a.is_superadmin;
-      return true;
-    });
-
-    setAdmins(filtered);
-    setTotal(filtered.length);
-    setTotalPages(Math.max(1, Math.ceil(filtered.length / pageSize)));
-  };
+  }, [currentPage, pageSize, searchQuery, statusFilter, roleFilter]);
 
   useEffect(() => {
     fetchAdmins();
@@ -167,6 +150,7 @@ export default function AdminListPage() {
     setFormUsername("");
     setFormName("");
     setFormPassword("");
+    setFormRoleId("");
     setFormIsActivate(false);
     setFormIsSuperadmin(false);
     setFormError(null);
@@ -180,6 +164,7 @@ export default function AdminListPage() {
     setFormUsername(admin.username);
     setFormName(admin.name);
     setFormPassword("");
+    setFormRoleId(admin.role_id || admin.role?.id || "");
     setFormIsActivate(admin.is_activate);
     setFormIsSuperadmin(admin.is_superadmin);
     setFormError(null);
@@ -220,12 +205,14 @@ export default function AdminListPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
+          credentials: "include",
           body: JSON.stringify({
             username: formUsername.trim(),
             name: formName.trim(),
             password: formPassword.trim(),
+            role_id: formRoleId || undefined,
           }),
         });
 
@@ -239,19 +226,7 @@ export default function AdminListPage() {
         success(`สร้างบัญชีแอดมิน "${formUsername.trim()}" เรียบร้อยแล้ว`, "สร้างสำเร็จ");
         fetchAdmins();
       } catch {
-        const newMock: AdminUser = {
-          id: Date.now(),
-          uuid: `mock-uuid-${Date.now()}`,
-          username: formUsername.trim(),
-          name: formName.trim(),
-          is_activate: false,
-          is_superadmin: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        setAdmins((prev) => [newMock, ...prev]);
-        setIsFormModalOpen(false);
-        success(`สร้างบัญชีแอดมิน "${formUsername.trim()}" เรียบร้อยแล้ว`, "สร้างสำเร็จ");
+        setFormError("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
       } finally {
         setIsSubmitting(false);
       }
@@ -263,8 +238,9 @@ export default function AdminListPage() {
         return;
       }
 
-      const payload: { name: string; password?: string; is_activate?: boolean; is_superadmin?: boolean } = {
+      const payload: { name: string; password?: string; is_activate?: boolean; is_superadmin?: boolean; role_id?: number } = {
         name: formName.trim(),
+        role_id: formRoleId ? Number(formRoleId) : undefined,
       };
 
       if (formPassword.trim()) {
@@ -288,8 +264,9 @@ export default function AdminListPage() {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
+          credentials: "include",
           body: JSON.stringify(payload),
         });
 
@@ -342,8 +319,9 @@ export default function AdminListPage() {
       const res = await fetch(`${apiUrl}/api/v1/admins/${selectedAdmin.uuid}`, {
         method: "DELETE",
         headers: {
-          Authorization: `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
+        credentials: "include",
       });
 
       const data = await res.json();
@@ -383,7 +361,7 @@ export default function AdminListPage() {
     >
       <AdminSidebar />
 
-      <main style={{ flex: 1, padding: "1.75rem 2.5rem", overflowY: "auto", minWidth: 0 }}>
+      <main style={{ flex: 1, padding: "1.75rem 2.5rem", minWidth: 0 }}>
         {/* Header Section */}
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
           <div>
@@ -406,47 +384,11 @@ export default function AdminListPage() {
             flexDirection: "column",
           }}
         >
-          {/* Controls Bar: Filter Tabs & Search Bar / Add Button */}
+          {/* Controls Bar: Status & Role Dropdown Filters & Search Bar / Add Button */}
           <div className="admin-controls-bar">
-            {/* Filter Tabs (Desktop) */}
-            <div className="admin-filter-tabs">
-              {[
-                { id: "all", label: "ทั้งหมด" },
-                { id: "active", label: "เปิดใช้งาน" },
-                { id: "inactive", label: "รอเปิดใช้งาน" },
-                { id: "superadmin", label: "Super Admin" },
-              ].map((tab) => {
-                const isSelected = statusFilter === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      setStatusFilter(tab.id as any);
-                      setCurrentPage(1);
-                    }}
-                    style={{
-                      padding: "0.4rem 0.85rem",
-                      borderRadius: "0.5rem",
-                      fontSize: "0.8rem",
-                      fontWeight: isSelected ? 700 : 500,
-                      fontFamily: "'Kanit', sans-serif",
-                      border: "none",
-                      cursor: "pointer",
-                      backgroundColor: isSelected ? "var(--ink)" : "transparent",
-                      color: isSelected ? "var(--cream)" : "var(--ink-soft)",
-                      transition: "all 0.15s ease",
-                      whiteSpace: "nowrap",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Filter Dropdown (Mobile) */}
-            <div className="admin-filter-dropdown-wrapper">
+            {/* Filter Dropdowns (Status & Role) */}
+            <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", alignItems: "center" }}>
+              {/* Status Filter Dropdown */}
               <select
                 className="admin-filter-select"
                 value={statusFilter}
@@ -454,11 +396,52 @@ export default function AdminListPage() {
                   setStatusFilter(e.target.value as any);
                   setCurrentPage(1);
                 }}
+                style={{
+                  padding: "0.45rem 0.85rem",
+                  borderRadius: "0.6rem",
+                  backgroundColor: "var(--cream)",
+                  border: "1px solid rgba(50, 55, 65, 0.15)",
+                  fontSize: "0.825rem",
+                  fontWeight: 600,
+                  fontFamily: "'Kanit', sans-serif",
+                  color: "var(--ink)",
+                  outline: "none",
+                  cursor: "pointer",
+                }}
               >
-                <option value="all">ทั้งหมด</option>
-                <option value="active">บัญชีที่ถูกเปิดใช้งาน</option>
-                <option value="inactive">บัญชีที่รอเปิดใช้งาน</option>
-                <option value="superadmin">Super Admin</option>
+                <option value="all">สถานะ: ทั้งหมด</option>
+                <option value="active">เปิดใช้งาน</option>
+                <option value="inactive">ปิดใช้งาน / รอการอนุมัติ</option>
+                <option value="superadmin">เฉพาะ Super Admin</option>
+              </select>
+
+              {/* Role Filter Dropdown */}
+              <select
+                className="admin-filter-select"
+                value={roleFilter}
+                onChange={(e) => {
+                  setRoleFilter(e.target.value ? Number(e.target.value) : "");
+                  setCurrentPage(1);
+                }}
+                style={{
+                  padding: "0.45rem 0.85rem",
+                  borderRadius: "0.6rem",
+                  backgroundColor: "var(--cream)",
+                  border: "1px solid rgba(50, 55, 65, 0.15)",
+                  fontSize: "0.825rem",
+                  fontWeight: 600,
+                  fontFamily: "'Kanit', sans-serif",
+                  color: "var(--ink)",
+                  outline: "none",
+                  cursor: "pointer",
+                }}
+              >
+                <option value="">บทบาท (Role): ทั้งหมด</option>
+                {rolesList.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -505,7 +488,7 @@ export default function AdminListPage() {
                   <th style={{ padding: "0.6rem", width: "45px", textAlign: "center", color: "var(--ink)" }}>#</th>
                   <th style={{ padding: "0.6rem", color: "var(--ink)" }}>ชื่อผู้ใช้งาน</th>
                   <th style={{ padding: "0.6rem", color: "var(--ink)" }}>ชื่อ</th>
-                  <th style={{ padding: "0.6rem", color: "var(--ink)" }}>ระดับสิทธิ์</th>
+                  <th style={{ padding: "0.6rem", color: "var(--ink)" }}>บทบาท / สิทธิ์</th>
                   <th style={{ padding: "0.6rem", color: "var(--ink)" }}>สถานะบัญชี</th>
                   <th style={{ padding: "0.6rem", color: "var(--ink)" }}>วันที่สร้าง</th>
                   <th style={{ padding: "0.6rem", width: "45px", textAlign: "right" }}></th>
@@ -534,6 +517,7 @@ export default function AdminListPage() {
                       const isSelf = currentUser?.uuid === admin.uuid;
                       const isKebabOpen = activeKebabUuid === admin.uuid;
                       const runningNumber = (currentPage - 1) * pageSize + idx + 1;
+                      const roleName = admin.role?.name || (admin.is_superadmin ? "Super Admin" : "Admin");
 
                       return (
                         <tr
@@ -608,7 +592,7 @@ export default function AdminListPage() {
                                   color: "var(--teal)",
                                 }}
                               >
-                                <ShieldCheck size={13} /> Superadmin
+                                <ShieldCheck size={13} /> {roleName}
                               </span>
                             ) : (
                               <span
@@ -624,7 +608,7 @@ export default function AdminListPage() {
                                   color: "var(--ink-soft)",
                                 }}
                               >
-                                <User size={13} /> Admin
+                                <User size={13} /> {roleName}
                               </span>
                             )}
                           </td>
@@ -1093,6 +1077,9 @@ export default function AdminListPage() {
         setFormName={setFormName}
         formPassword={formPassword}
         setFormPassword={setFormPassword}
+        formRoleId={formRoleId}
+        setFormRoleId={setFormRoleId}
+        rolesList={rolesList}
         formIsActivate={formIsActivate}
         setFormIsActivate={setFormIsActivate}
         formIsSuperadmin={formIsSuperadmin}

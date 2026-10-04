@@ -51,29 +51,15 @@ func (h *AppHandler) GetSettingByKey(c *gin.Context) {
 	var setting model.SystemSetting
 	if err := h.DB.DB.Where("key = ?", key).First(&setting).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			// If not found in DB, return default if known
-			if key == "slip_upload_mode" {
-				c.JSON(http.StatusOK, gin.H{
-					"key":   key,
-					"value": "immediate",
-				})
-				return
+			// If not found in DB, return default value without throwing 404
+			defaultVal := ""
+			if key == "slip_upload_mode" || key == "cash_upload_mode" {
+				defaultVal = "later"
 			}
-			if key == "promptpay_target" {
-				c.JSON(http.StatusOK, gin.H{
-					"key":   key,
-					"value": "",
-				})
-				return
-			}
-			if key == "promptpay_name" {
-				c.JSON(http.StatusOK, gin.H{
-					"key":   key,
-					"value": "",
-				})
-				return
-			}
-			c.JSON(http.StatusNotFound, gin.H{"error": "Setting not found"})
+			c.JSON(http.StatusOK, gin.H{
+				"key":   key,
+				"value": defaultVal,
+			})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query setting: " + err.Error()})

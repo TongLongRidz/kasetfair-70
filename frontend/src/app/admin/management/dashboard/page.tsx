@@ -655,6 +655,42 @@ export default function AdminDashboardPage() {
   const [trendWeek, setTrendWeek] = useState<number>(2); // 1 = Week 1, 2 = Week 2 (Current)
   const [hourlyDayIndex, setHourlyDayIndex] = useState<number>(13); // Index 0-13 for daily hourly sales pagination
 
+  // Live DB Dashboard State
+  const [liveKpis, setLiveKpis] = useState<any>(null);
+  const [liveChannels, setLiveChannels] = useState<any>(null);
+  const [liveTopProducts, setLiveTopProducts] = useState<any[]>([]);
+  const [liveTrend, setLiveTrend] = useState<TrendItem[] | null>(null);
+  const [liveMaxBar, setLiveMaxBar] = useState<number | null>(null);
+  const [liveTodayHourly, setLiveTodayHourly] = useState<DayHourlyData | null>(null);
+  const [dbLoading, setDbLoading] = useState<boolean>(true);
+
+  // Fetch real DB metrics from backend API
+  const fetchDashboardStats = async (selectedRange: string) => {
+    setDbLoading(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      const param = selectedRange === "วันนี้" ? "today" : "all";
+      const res = await fetch(`${apiUrl}/api/v1/dashboard/stats?range=${param}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.kpis) setLiveKpis(json.kpis);
+        if (json.channels) setLiveChannels(json.channels);
+        if (json.top_products) setLiveTopProducts(json.top_products);
+        if (json.trend && json.trend.length > 0) setLiveTrend(json.trend);
+        if (json.max_bar) setLiveMaxBar(json.max_bar);
+        if (json.today_hourly) setLiveTodayHourly(json.today_hourly);
+      }
+    } catch (err) {
+      console.error("Failed to fetch dashboard stats from DB:", err);
+    } finally {
+      setDbLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardStats(range);
+  }, [range]);
+
   // Scroll trigger refs for graph animations
   const trendView = useInView(0.15);
   const channelView = useInView(0.15);
@@ -663,13 +699,48 @@ export default function AdminDashboardPage() {
 
   // Dynamic Data based on Range
   const currentData = DATA_BY_RANGE[range];
-  const { kpis, trend, maxBar, channels, topProducts, peakHours, orders } = currentData;
+  const trend = liveTrend !== null ? liveTrend : currentData.trend;
+  const maxBar = liveMaxBar || currentData.maxBar;
+
+  const kpis: KPIData[] = liveKpis ? [
+    { label: "รายรับรวม", value: liveKpis.total_revenue || "฿0", sub: "คำนวณสุทธิจากฐานข้อมูล PostgreSQL", tone: "teal" },
+    { label: "รายจ่ายรวม", value: liveKpis.total_expenses || "฿0", sub: "จากระบบบันทึกธุรกรรมการเงิน", tone: "orange" },
+    { label: "กำไรสุทธิ", value: liveKpis.net_profit || "฿0", sub: "รายรับสุทธิหักรายจ่ายจริง", tone: "teal" },
+    { label: "จำนวนออเดอร์", value: `${liveKpis.total_orders || 0} รายการ`, sub: "ออเดอร์ในระบบทั้งหมด", tone: "plain" },
+    { label: "จำนวนแก้ว", value: `${liveKpis.total_cups || 0} แก้ว`, sub: "จำนวนแก้วที่ขายได้จริง", tone: "plain" },
+    { label: "สลิปรอตรวจ", value: `${liveKpis.pending_slips || 0} รายการ`, sub: `ค้างตรวจสอบ ${liveKpis.pending_amount || "฿0"}`, tone: "orange" },
+  ] : [
+    { label: "รายรับรวม", value: "฿0", sub: "กำลังเชื่อมต่อ Database...", tone: "teal" },
+    { label: "รายจ่ายรวม", value: "฿0", sub: "กำลังเชื่อมต่อ Database...", tone: "orange" },
+    { label: "กำไรสุทธิ", value: "฿0", sub: "กำลังเชื่อมต่อ Database...", tone: "teal" },
+    { label: "จำนวนออเดอร์", value: "0 รายการ", sub: "กำลังเชื่อมต่อ Database...", tone: "plain" },
+    { label: "จำนวนแก้ว", value: "0 แก้ว", sub: "กำลังเชื่อมต่อ Database...", tone: "plain" },
+    { label: "สลิปรอตรวจ", value: "0 รายการ", sub: "กำลังเชื่อมต่อ Database...", tone: "orange" },
+  ];
+
+  const channels = liveChannels ? {
+    total: liveChannels.total || "฿0",
+    online: {
+      pct: liveChannels.online?.pct || 0,
+      amount: liveChannels.online?.amount || "฿0",
+      dashArray: `${(liveChannels.online?.pct || 0) * 0.88} ${(100 - (liveChannels.online?.pct || 0)) * 0.88}`,
+      dashOffset: "0",
+    },
+    walkin: {
+      pct: liveChannels.walkin?.pct || 0,
+      amount: liveChannels.walkin?.amount || "฿0",
+      dashArray: `${(liveChannels.walkin?.pct || 0) * 0.88} ${(100 - (liveChannels.walkin?.pct || 0)) * 0.88}`,
+      dashOffset: `-${(liveChannels.online?.pct || 0) * 0.88}`,
+    },
+  } : currentData.channels;
+
+  const topProducts: TopProductItem[] = liveTopProducts || [];
 
   // 7 Days per week page (starting from Sunday)
   const currentWeekTrend = trend.slice((trendWeek - 1) * 7, trendWeek * 7);
 
-  // Selected Day's Hourly Cup Sales Data
-  const currentHourlyData = DAILY_HOURLY_SALES[hourlyDayIndex] || DAILY_HOURLY_SALES[DAILY_HOURLY_SALES.length - 1];
+  // Selected Day's Hourly Cup Sales Data (Live DB or Fallback Mockup)
+  const currentHourlyData: DayHourlyData = liveTodayHourly || DAILY_HOURLY_SALES[hourlyDayIndex] || DAILY_HOURLY_SALES[DAILY_HOURLY_SALES.length - 1];
 
   // Reset page when range changes
   const handleRangeChange = (newRange: (typeof ranges)[number]) => {
@@ -693,7 +764,7 @@ export default function AdminDashboardPage() {
       <AdminSidebar />
 
       {/* Main Content Area */}
-      <main style={{ flex: 1, padding: "1.75rem 2.5rem", overflowY: "auto", minWidth: 0 }}>
+      <main style={{ flex: 1, padding: "1.75rem 2.5rem", minWidth: 0 }}>
         {/* Header & Date Range Filter */}
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
           <div>
@@ -976,273 +1047,295 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* Chart Visualizations (Scrollable only for graph visual on mobile) */}
-            <ScrollableChartWrapper>
+            {currentWeekTrend.every((t) => t.rev === 0 && t.exp === 0) ? (
               <div
-                key={`trend-chart-${range}-${chartType}-${trendWeek}`}
-                style={{ minWidth: "500px" }}
+                style={{
+                  height: "220px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: "rgba(50, 55, 65, 0.02)",
+                  borderRadius: "0.85rem",
+                  border: "1px dashed rgba(50, 55, 65, 0.15)",
+                  margin: "1rem 0 0.5rem",
+                  color: "var(--ink-soft)",
+                  gap: "0.4rem",
+                }}
               >
-                {chartType === "bar" ? (
-                  /* Bar visualization with scroll-triggered left-to-right animation */
-                  <div style={{ display: "flex", height: "220px", alignItems: "flex-end", gap: "0.75rem" }}>
-                    {currentWeekTrend.map((t, idx) => {
-                      const delayMs = idx * 60;
-                      return (
-                        <div
-                          key={t.d}
-                          className={trendView.isInView ? "animate-rise" : ""}
-                          style={{
-                            flex: 1,
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "flex-end",
-                            gap: "0.5rem",
-                            height: "100%",
-                            animationDelay: `${delayMs}ms`,
-                            animationFillMode: "both",
-                          }}
-                        >
-                          <div style={{ display: "flex", width: "100%", height: "100%", alignItems: "flex-end", justifyContent: "center", gap: "0.35rem", borderBottom: "1px solid rgba(50, 55, 65, 0.08)", paddingBottom: "2px" }}>
-                            <div
-                              title={`รายรับ: ฿${t.rev.toLocaleString()}`}
-                              className={trendView.isInView ? "animate-bar-grow" : ""}
-                              style={{
-                                width: "36%",
-                                borderRadius: "4px 4px 0 0",
-                                backgroundColor: "var(--teal)",
-                                height: `${(t.rev / maxBar) * 100}%`,
-                                animationDelay: `${delayMs}ms`,
-                                animationFillMode: "both",
-                                transition: "height 0.5s ease",
-                              }}
-                            />
-                            <div
-                              title={`รายจ่าย: ฿${t.exp.toLocaleString()}`}
-                              className={trendView.isInView ? "animate-bar-grow" : ""}
-                              style={{
-                                width: "36%",
-                                borderRadius: "4px 4px 0 0",
-                                backgroundColor: "var(--warm)",
-                                height: `${(t.exp / maxBar) * 100}%`,
-                                animationDelay: `${delayMs + 30}ms`,
-                                animationFillMode: "both",
-                                transition: "height 0.5s ease",
-                              }}
-                            />
-                          </div>
-                          <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 500, whiteSpace: "nowrap" }}>{t.d}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  /* Line visualization with scroll-triggered SVG drawing animation */
-                  (() => {
-                    const revPts = currentWeekTrend.map((t, idx) => ({
-                      x: (idx / (currentWeekTrend.length - 1)) * 600,
-                      y: 150 - (t.rev / maxBar) * 130,
-                    }));
-                    const revCum = [0];
-                    for (let i = 1; i < revPts.length; i++) {
-                      const dx = revPts[i].x - revPts[i - 1].x;
-                      const dy = revPts[i].y - revPts[i - 1].y;
-                      revCum.push(revCum[i - 1] + Math.sqrt(dx * dx + dy * dy));
-                    }
-                    const revTotal = revCum[revCum.length - 1] || 600;
-
-                    const expPts = currentWeekTrend.map((t, idx) => ({
-                      x: (idx / (currentWeekTrend.length - 1)) * 600,
-                      y: 150 - (t.exp / maxBar) * 130,
-                    }));
-                    const expCum = [0];
-                    for (let i = 1; i < expPts.length; i++) {
-                      const dx = expPts[i].x - expPts[i - 1].x;
-                      const dy = expPts[i].y - expPts[i - 1].y;
-                      expCum.push(expCum[i - 1] + Math.sqrt(dx * dx + dy * dy));
-                    }
-                    const expTotal = expCum[expCum.length - 1] || 600;
-
-                    const lineDurationMs = 850;
-                    const expDelayMs = 45;
-
-                    const revKeyframes = revPts
-                      .map((pt, i) => {
-                        const pct = ((revCum[i] / revTotal) * 100).toFixed(2);
-                        return `${pct}% { width: ${pt.x.toFixed(1)}px; }`;
-                      })
-                      .join(" ");
-
-                    const expKeyframes = expPts
-                      .map((pt, i) => {
-                        const pct = ((expCum[i] / expTotal) * 100).toFixed(2);
-                        return `${pct}% { width: ${pt.x.toFixed(1)}px; }`;
-                      })
-                      .join(" ");
-
-                    const animSec = (lineDurationMs / 1000).toFixed(2);
-
-                    return (
-                      <div style={{ display: "flex", flexDirection: "column", height: "220px", justifyContent: "flex-end" }}>
-                        <div style={{ position: "relative", width: "100%", height: "175px" }}>
-                          <svg viewBox="0 0 600 160" preserveAspectRatio="none" style={{ width: "100%", height: "100%", overflow: "visible" }}>
-                            <defs>
-                              <style>{`
-                                @keyframes drawRevLine {
-                                  0% { stroke-dashoffset: ${revTotal.toFixed(2)}px; opacity: 1; }
-                                  100% { stroke-dashoffset: 0px; opacity: 1; }
-                                }
-                                @keyframes drawExpLine {
-                                  0% { stroke-dashoffset: ${expTotal.toFixed(2)}px; opacity: 1; }
-                                  100% { stroke-dashoffset: 0px; opacity: 1; }
-                                }
-                                @keyframes revClipWipe { ${revKeyframes} }
-                                @keyframes expClipWipe { ${expKeyframes} }
-
-                                .animate-rev-line {
-                                  stroke-dasharray: ${revTotal.toFixed(2)}px;
-                                  stroke-dashoffset: ${revTotal.toFixed(2)}px;
-                                  animation: drawRevLine ${animSec}s linear forwards;
-                                }
-                                .animate-exp-line {
-                                  stroke-dasharray: ${expTotal.toFixed(2)}px;
-                                  stroke-dashoffset: ${expTotal.toFixed(2)}px;
-                                  animation: drawExpLine ${animSec}s linear forwards;
-                                  animation-delay: ${expDelayMs}ms;
-                                }
-                                .animate-rev-area-wipe {
-                                  animation: revClipWipe ${animSec}s linear forwards;
-                                }
-                                .animate-exp-area-wipe {
-                                  animation: expClipWipe ${animSec}s linear forwards;
-                                  animation-delay: ${expDelayMs}ms;
-                                }
-                              `}</style>
-                              <linearGradient id="tealGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" stopColor="var(--teal)" stopOpacity="0.25" />
-                                <stop offset="100%" stopColor="var(--teal)" stopOpacity="0.0" />
-                              </linearGradient>
-                              <linearGradient id="warmGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" stopColor="var(--warm)" stopOpacity="0.2" />
-                                <stop offset="100%" stopColor="var(--warm)" stopOpacity="0.0" />
-                              </linearGradient>
-                              <clipPath id="revAreaClip">
-                                <rect className={trendView.isInView ? "animate-rev-area-wipe" : ""} x="0" y="0" width="0" height="160" />
-                              </clipPath>
-                              <clipPath id="expAreaClip">
-                                <rect className={trendView.isInView ? "animate-exp-area-wipe" : ""} x="0" y="0" width="0" height="160" />
-                              </clipPath>
-                            </defs>
-
-                            {/* Revenue Area */}
-                            <polygon
-                              clipPath="url(#revAreaClip)"
-                              fill="url(#tealGrad)"
-                              points={`0,160 ${revPts.map((p) => `${p.x},${p.y}`).join(" ")} 600,160`}
-                            />
-
-                            {/* Expense Area */}
-                            <polygon
-                              clipPath="url(#expAreaClip)"
-                              fill="url(#warmGrad)"
-                              points={`0,160 ${expPts.map((p) => `${p.x},${p.y}`).join(" ")} 600,160`}
-                            />
-
-                            {/* Revenue Polyline */}
-                            <polyline
-                              className={trendView.isInView ? "animate-rev-line" : ""}
-                              fill="none"
-                              stroke="var(--teal)"
-                              strokeWidth="3"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              points={revPts.map((p) => `${p.x},${p.y}`).join(" ")}
-                            />
-                            {/* Expense Line */}
-                            <polyline
-                              className={trendView.isInView ? "animate-exp-line" : ""}
-                              fill="none"
-                              stroke="var(--warm)"
-                              strokeWidth="3"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              points={expPts.map((p) => `${p.x},${p.y}`).join(" ")}
-                            />
-
-                            {/* Revenue Dots (Pops up at exact millisecond line tip touches point) */}
-                            {currentWeekTrend.map((t, idx) => {
-                              const pt = revPts[idx];
-                              const delayMs = Math.round((revCum[idx] / revTotal) * lineDurationMs);
-                              return (
-                                <circle
-                                  key={`rev-${t.d}`}
-                                  className={trendView.isInView ? "animate-pop-dot" : ""}
-                                  style={{
-                                    animationDelay: `${delayMs}ms`,
-                                    opacity: trendView.isInView ? undefined : 0,
-                                  }}
-                                  cx={pt.x}
-                                  cy={pt.y}
-                                  r="4.5"
-                                  fill="var(--card)"
-                                  stroke="var(--teal)"
-                                  strokeWidth="2.5"
-                                />
-                              );
-                            })}
-
-                            {/* Expense Dots (Pops up at exact millisecond line tip touches point) */}
-                            {currentWeekTrend.map((t, idx) => {
-                              const pt = expPts[idx];
-                              const delayMs = expDelayMs + Math.round((expCum[idx] / expTotal) * lineDurationMs);
-                              return (
-                                <circle
-                                  key={`exp-${t.d}`}
-                                  className={trendView.isInView ? "animate-pop-dot" : ""}
-                                  style={{
-                                    animationDelay: `${delayMs}ms`,
-                                    opacity: trendView.isInView ? undefined : 0,
-                                  }}
-                                  cx={pt.x}
-                                  cy={pt.y}
-                                  r="4.5"
-                                  fill="var(--card)"
-                                  stroke="var(--warm)"
-                                  strokeWidth="2.5"
-                                />
-                              );
-                            })}
-                          </svg>
-                        </div>
-
-                        {/* Day Labels along bottom */}
-                        <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid rgba(50, 55, 65, 0.08)", paddingTop: "0.5rem", marginTop: "0.25rem" }}>
-                          {currentWeekTrend.map((t, idx) => {
-                            const delayMs = Math.round((idx / (currentWeekTrend.length - 1)) * lineDurationMs);
-                            return (
-                              <span
-                                key={t.d}
-                                className={trendView.isInView ? "animate-rise" : ""}
+                <LineChartIcon size={32} style={{ opacity: 0.35 }} />
+                <p style={{ fontSize: "0.875rem", fontWeight: 600 }}>ยังไม่มีข้อมูลแนวโน้มรายรับ-รายจ่าย</p>
+                <p style={{ fontSize: "0.75rem", opacity: 0.8 }}>กราฟแนวโน้มจะเริ่มวาดอัตโนมัติเมื่อมีรายการรายรับหรือรายจ่ายบันทึกเข้ามา</p>
+              </div>
+            ) : (
+              <ScrollableChartWrapper>
+                <div
+                  key={`trend-chart-${range}-${chartType}-${trendWeek}`}
+                  style={{ minWidth: "500px" }}
+                >
+                  {chartType === "bar" ? (
+                    /* Bar visualization with scroll-triggered left-to-right animation */
+                    <div style={{ display: "flex", height: "220px", alignItems: "flex-end", gap: "0.75rem" }}>
+                      {currentWeekTrend.map((t, idx) => {
+                        const delayMs = idx * 60;
+                        return (
+                          <div
+                            key={t.d}
+                            className={trendView.isInView ? "animate-rise" : ""}
+                            style={{
+                              flex: 1,
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              justifyContent: "flex-end",
+                              gap: "0.5rem",
+                              height: "100%",
+                              animationDelay: `${delayMs}ms`,
+                              animationFillMode: "both",
+                            }}
+                          >
+                            <div style={{ display: "flex", width: "100%", height: "100%", alignItems: "flex-end", justifyContent: "center", gap: "0.35rem", borderBottom: "1px solid rgba(50, 55, 65, 0.08)", paddingBottom: "2px" }}>
+                              <div
+                                title={`รายรับ: ฿${t.rev.toLocaleString()}`}
+                                className={trendView.isInView ? "animate-bar-grow" : ""}
                                 style={{
-                                  fontSize: "0.75rem",
-                                  color: "var(--ink-soft)",
-                                  fontWeight: 500,
-                                  textAlign: "center",
-                                  width: "45px",
+                                  width: "36%",
+                                  borderRadius: "4px 4px 0 0",
+                                  backgroundColor: "var(--teal)",
+                                  height: `${(t.rev / maxBar) * 100}%`,
                                   animationDelay: `${delayMs}ms`,
                                   animationFillMode: "both",
+                                  transition: "transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1)",
                                 }}
-                              >
-                                {t.d}
-                              </span>
-                            );
-                          })}
+                              />
+                              <div
+                                title={`รายจ่าย: ฿${t.exp.toLocaleString()}`}
+                                className={trendView.isInView ? "animate-bar-grow" : ""}
+                                style={{
+                                  width: "36%",
+                                  borderRadius: "4px 4px 0 0",
+                                  backgroundColor: "var(--warm)",
+                                  height: `${(t.exp / maxBar) * 100}%`,
+                                  animationDelay: `${delayMs + 30}ms`,
+                                  animationFillMode: "both",
+                                  transition: "transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1)",
+                                }}
+                              />
+                            </div>
+                            <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 500, whiteSpace: "nowrap" }}>{t.d}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    /* Line visualization with scroll-triggered SVG drawing animation */
+                    (() => {
+                      const revPts = currentWeekTrend.map((t, idx) => ({
+                        x: (idx / (currentWeekTrend.length - 1)) * 600,
+                        y: 150 - (t.rev / maxBar) * 130,
+                      }));
+                      const revCum = [0];
+                      for (let i = 1; i < revPts.length; i++) {
+                        const dx = revPts[i].x - revPts[i - 1].x;
+                        const dy = revPts[i].y - revPts[i - 1].y;
+                        revCum.push(revCum[i - 1] + Math.sqrt(dx * dx + dy * dy));
+                      }
+                      const revTotal = revCum[revCum.length - 1] || 600;
+
+                      const expPts = currentWeekTrend.map((t, idx) => ({
+                        x: (idx / (currentWeekTrend.length - 1)) * 600,
+                        y: 150 - (t.exp / maxBar) * 130,
+                      }));
+                      const expCum = [0];
+                      for (let i = 1; i < expPts.length; i++) {
+                        const dx = expPts[i].x - expPts[i - 1].x;
+                        const dy = expPts[i].y - expPts[i - 1].y;
+                        expCum.push(expCum[i - 1] + Math.sqrt(dx * dx + dy * dy));
+                      }
+                      const expTotal = expCum[expCum.length - 1] || 600;
+
+                      const lineDurationMs = 850;
+                      const expDelayMs = 45;
+
+                      const revKeyframes = revPts
+                        .map((pt, i) => {
+                          const pct = ((revCum[i] / revTotal) * 100).toFixed(2);
+                          return `${pct}% { width: ${pt.x.toFixed(1)}px; }`;
+                        })
+                        .join(" ");
+
+                      const expKeyframes = expPts
+                        .map((pt, i) => {
+                          const pct = ((expCum[i] / expTotal) * 100).toFixed(2);
+                          return `${pct}% { width: ${pt.x.toFixed(1)}px; }`;
+                        })
+                        .join(" ");
+
+                      const animSec = (lineDurationMs / 1000).toFixed(2);
+
+                      return (
+                        <div style={{ display: "flex", flexDirection: "column", height: "220px", justifyContent: "flex-end" }}>
+                          <div style={{ position: "relative", width: "100%", height: "175px" }}>
+                            <svg viewBox="0 0 600 160" preserveAspectRatio="none" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+                              <defs>
+                                <style>{`
+                                  @keyframes drawRevLine {
+                                    0% { stroke-dashoffset: ${revTotal.toFixed(2)}px; opacity: 1; }
+                                    100% { stroke-dashoffset: 0px; opacity: 1; }
+                                  }
+                                  @keyframes drawExpLine {
+                                    0% { stroke-dashoffset: ${expTotal.toFixed(2)}px; opacity: 1; }
+                                    100% { stroke-dashoffset: 0px; opacity: 1; }
+                                  }
+                                  @keyframes revClipWipe { ${revKeyframes} }
+                                  @keyframes expClipWipe { ${expKeyframes} }
+
+                                  .animate-rev-line {
+                                    stroke-dasharray: ${revTotal.toFixed(2)}px;
+                                    stroke-dashoffset: ${revTotal.toFixed(2)}px;
+                                    animation: drawRevLine ${animSec}s linear forwards;
+                                  }
+                                  .animate-exp-line {
+                                    stroke-dasharray: ${expTotal.toFixed(2)}px;
+                                    stroke-dashoffset: ${expTotal.toFixed(2)}px;
+                                    animation: drawExpLine ${animSec}s linear forwards;
+                                    animation-delay: ${expDelayMs}ms;
+                                  }
+                                  .animate-rev-area-wipe {
+                                    animation: revClipWipe ${animSec}s linear forwards;
+                                  }
+                                  .animate-exp-area-wipe {
+                                    animation: expClipWipe ${animSec}s linear forwards;
+                                    animation-delay: ${expDelayMs}ms;
+                                  }
+                                `}</style>
+                                <linearGradient id="tealGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                  <stop offset="0%" stopColor="var(--teal)" stopOpacity="0.25" />
+                                  <stop offset="100%" stopColor="var(--teal)" stopOpacity="0.0" />
+                                </linearGradient>
+                                <linearGradient id="warmGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                  <stop offset="0%" stopColor="var(--warm)" stopOpacity="0.2" />
+                                  <stop offset="100%" stopColor="var(--warm)" stopOpacity="0.0" />
+                                </linearGradient>
+                                <clipPath id="revAreaClip">
+                                  <rect className={trendView.isInView ? "animate-rev-area-wipe" : ""} x="0" y="0" width="0" height="160" />
+                                </clipPath>
+                                <clipPath id="expAreaClip">
+                                  <rect className={trendView.isInView ? "animate-exp-area-wipe" : ""} x="0" y="0" width="0" height="160" />
+                                </clipPath>
+                              </defs>
+
+                              {/* Revenue Area */}
+                              <polygon
+                                clipPath="url(#revAreaClip)"
+                                fill="url(#tealGrad)"
+                                points={`0,160 ${revPts.map((p) => `${p.x},${p.y}`).join(" ")} 600,160`}
+                              />
+
+                              {/* Expense Area */}
+                              <polygon
+                                clipPath="url(#expAreaClip)"
+                                fill="url(#warmGrad)"
+                                points={`0,160 ${expPts.map((p) => `${p.x},${p.y}`).join(" ")} 600,160`}
+                              />
+
+                              {/* Revenue Polyline */}
+                              <polyline
+                                className={trendView.isInView ? "animate-rev-line" : ""}
+                                fill="none"
+                                stroke="var(--teal)"
+                                strokeWidth="3"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                points={revPts.map((p) => `${p.x},${p.y}`).join(" ")}
+                              />
+                              {/* Expense Line */}
+                              <polyline
+                                className={trendView.isInView ? "animate-exp-line" : ""}
+                                fill="none"
+                                stroke="var(--warm)"
+                                strokeWidth="3"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                points={expPts.map((p) => `${p.x},${p.y}`).join(" ")}
+                              />
+
+                              {/* Revenue Dots (Pops up at exact millisecond line tip touches point) */}
+                              {currentWeekTrend.map((t, idx) => {
+                                const pt = revPts[idx];
+                                const delayMs = Math.round((revCum[idx] / revTotal) * lineDurationMs);
+                                return (
+                                  <circle
+                                    key={`rev-${t.d}`}
+                                    className={trendView.isInView ? "animate-pop-dot" : ""}
+                                    style={{
+                                      animationDelay: `${delayMs}ms`,
+                                      opacity: trendView.isInView ? undefined : 0,
+                                    }}
+                                    cx={pt.x}
+                                    cy={pt.y}
+                                    r="4.5"
+                                    fill="var(--card)"
+                                    stroke="var(--teal)"
+                                    strokeWidth="2.5"
+                                  />
+                                );
+                              })}
+
+                              {/* Expense Dots (Pops up at exact millisecond line tip touches point) */}
+                              {currentWeekTrend.map((t, idx) => {
+                                const pt = expPts[idx];
+                                const delayMs = expDelayMs + Math.round((expCum[idx] / expTotal) * lineDurationMs);
+                                return (
+                                  <circle
+                                    key={`exp-${t.d}`}
+                                    className={trendView.isInView ? "animate-pop-dot" : ""}
+                                    style={{
+                                      animationDelay: `${delayMs}ms`,
+                                      opacity: trendView.isInView ? undefined : 0,
+                                    }}
+                                    cx={pt.x}
+                                    cy={pt.y}
+                                    r="4.5"
+                                    fill="var(--card)"
+                                    stroke="var(--warm)"
+                                    strokeWidth="2.5"
+                                  />
+                                );
+                              })}
+                            </svg>
+                          </div>
+
+                          {/* Day Labels along bottom */}
+                          <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid rgba(50, 55, 65, 0.08)", paddingTop: "0.5rem", marginTop: "0.25rem" }}>
+                            {currentWeekTrend.map((t, idx) => {
+                              const delayMs = Math.round((idx / (currentWeekTrend.length - 1)) * lineDurationMs);
+                              return (
+                                <span
+                                  key={t.d}
+                                  className={trendView.isInView ? "animate-rise" : ""}
+                                  style={{
+                                    fontSize: "0.75rem",
+                                    color: "var(--ink-soft)",
+                                    fontWeight: 500,
+                                    textAlign: "center",
+                                    width: "45px",
+                                    animationDelay: `${delayMs}ms`,
+                                    animationFillMode: "both",
+                                  }}
+                                >
+                                  {t.d}
+                                </span>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })()
-                )}
-              </div>
-            </ScrollableChartWrapper>
+                      );
+                    })()
+                  )}
+                </div>
+              </ScrollableChartWrapper>
+            )}
           </section>
 
 
@@ -1480,23 +1573,25 @@ export default function AdminDashboardPage() {
                   </div>
 
                   {/* Peak badge */}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.25rem",
-                      backgroundColor: "rgba(235, 148, 93, 0.12)",
-                      color: "var(--warm)",
-                      padding: "0.25rem 0.55rem",
-                      borderRadius: "9999px",
-                      fontSize: "0.75rem",
-                      fontWeight: 600,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    <Flame size={12} />
-                    <span>พีค {currentHourlyData.peakSlot}</span>
-                  </div>
+                  {currentHourlyData.totalCups > 0 && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.25rem",
+                        backgroundColor: "rgba(235, 148, 93, 0.12)",
+                        color: "var(--warm)",
+                        padding: "0.25rem 0.55rem",
+                        borderRadius: "9999px",
+                        fontSize: "0.75rem",
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      <Flame size={12} />
+                      <span>พีค {currentHourlyData.peakSlot}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1532,145 +1627,168 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* Hourly Cups Bar Chart with scroll-triggered animation & permanent custom sliderbar */}
-              <ScrollableChartWrapper>
+              {/* Empty State when no data available for the day */}
+              {currentHourlyData.totalCups === 0 ? (
                 <div
-                  key={`hourly-chart-${range}-${hourlyDayIndex}`}
                   style={{
-                    display: "grid",
-                    gridTemplateColumns: `repeat(${currentHourlyData.slots.length}, 1fr)`,
-                    alignItems: "flex-end",
-                    gap: "0.4rem",
                     height: "175px",
-                    paddingTop: "1.25rem",
-                    paddingBottom: "0.35rem",
-                    width: "100%",
-                    minWidth: "620px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: "rgba(50, 55, 65, 0.02)",
+                    borderRadius: "0.85rem",
+                    border: "1px dashed rgba(50, 55, 65, 0.15)",
+                    margin: "0.5rem 0",
+                    color: "var(--ink-soft)",
+                    gap: "0.4rem",
                   }}
                 >
-                  {currentHourlyData.slots.map((slot, slotIdx) => {
-                    const pct = Math.min(100, Math.max(14, (slot.cups / currentHourlyData.maxCups) * 100));
-                    const isPeak = slot.cups === Math.max(...currentHourlyData.slots.map((s) => s.cups));
-                    const onlinePct = slot.cups > 0 ? (slot.online / slot.cups) * 100 : 50;
-                    const walkinPct = 100 - onlinePct;
-                    const delayMs = slotIdx * 45;
+                  <BarChart2 size={32} style={{ opacity: 0.35 }} />
+                  <p style={{ fontSize: "0.875rem", fontWeight: 600 }}>ยังไม่มีข้อมูลยอดขายในวันนี้</p>
+                  <p style={{ fontSize: "0.75rem", opacity: 0.8 }}>กราฟจะแสดงอัตโนมัติเมื่อมีคำสั่งซื้อสำเร็จเข้ามาในระบบ</p>
+                </div>
+              ) : (
+                /* Hourly Cups Bar Chart with scroll-triggered animation & permanent custom sliderbar */
+                <ScrollableChartWrapper>
+                  <div
+                    key={`hourly-chart-${range}-${hourlyDayIndex}`}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: `repeat(${currentHourlyData.slots.length}, 1fr)`,
+                      alignItems: "flex-end",
+                      gap: "0.4rem",
+                      height: "175px",
+                      paddingTop: "1.25rem",
+                      paddingBottom: "0.35rem",
+                      width: "100%",
+                      minWidth: "620px",
+                    }}
+                  >
+                    {currentHourlyData.slots.map((slot, slotIdx) => {
+                      const pct = Math.min(100, Math.max(14, (slot.cups / currentHourlyData.maxCups) * 100));
+                      const isPeak = slot.cups > 0 && slot.cups === Math.max(...currentHourlyData.slots.map((s) => s.cups));
+                      const onlinePct = slot.cups > 0 ? (slot.online / slot.cups) * 100 : 50;
+                      const walkinPct = 100 - onlinePct;
+                      const delayMs = slotIdx * 45;
 
-                    return (
-                      <div
-                        key={slot.time}
-                        className={hourlyView.isInView ? "animate-rise" : ""}
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          height: "100%",
-                          justifyContent: "flex-end",
-                          backgroundColor: isPeak ? "rgba(235, 148, 93, 0.09)" : "transparent",
-                          borderRadius: "0.85rem",
-                          padding: "0.35rem 0.15rem",
-                          border: isPeak ? "1px solid rgba(235, 148, 93, 0.3)" : "1px solid transparent",
-                          position: "relative",
-                          animationDelay: `${delayMs}ms`,
-                          animationFillMode: "both",
-                          transition: "all 0.2s ease",
-                        }}
-                      >
-                        {/* Cup Count Top Label & Peak Badge */}
+                      return (
                         <div
+                          key={slot.time}
+                          className={hourlyView.isInView ? "animate-rise" : ""}
                           style={{
-                            fontSize: isPeak ? "0.85rem" : "0.78rem",
-                            fontWeight: isPeak ? 800 : 700,
-                            color: isPeak ? "var(--warm)" : "var(--ink)",
-                            marginBottom: "0.35rem",
                             display: "flex",
                             flexDirection: "column",
                             alignItems: "center",
-                            gap: "0.15rem",
-                          }}
-                        >
-                          {isPeak && (
-                            <div
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "0.2rem",
-                                backgroundColor: "var(--warm)",
-                                color: "#ffffff",
-                                padding: "0.12rem 0.45rem",
-                                borderRadius: "9999px",
-                                fontSize: "0.65rem",
-                                fontWeight: 700,
-                                boxShadow: "0 2px 8px rgba(235, 148, 93, 0.4)",
-                                marginBottom: "0.1rem",
-                                whiteSpace: "nowrap",
-                                lineHeight: 1,
-                              }}
-                            >
-                              <Flame size={10} fill="#ffffff" />
-                              <span>พีคสุด</span>
-                            </div>
-                          )}
-                          <span>{slot.cups}</span>
-                        </div>
-
-                        {/* Stacked / Segmented Cup Volume Bar */}
-                        <div
-                          className={hourlyView.isInView ? "animate-bar-grow" : ""}
-                          style={{
-                            width: "100%",
-                            maxWidth: isPeak ? "44px" : "40px",
-                            height: `${pct}%`,
-                            borderRadius: "0.5rem 0.5rem 0.25rem 0.25rem",
-                            overflow: "hidden",
-                            display: "flex",
-                            flexDirection: "column-reverse",
-                            boxShadow: isPeak ? "0 6px 20px rgba(235, 148, 93, 0.35)" : "0 2px 6px rgba(0,0,0,0.04)",
-                            border: isPeak ? "2px solid var(--warm)" : "1px solid rgba(50, 55, 65, 0.08)",
+                            height: "100%",
+                            justifyContent: "flex-end",
+                            backgroundColor: isPeak ? "rgba(235, 148, 93, 0.09)" : "transparent",
+                            borderRadius: "0.85rem",
+                            padding: "0.35rem 0.15rem",
+                            border: isPeak ? "1px solid rgba(235, 148, 93, 0.3)" : "1px solid transparent",
+                            position: "relative",
                             animationDelay: `${delayMs}ms`,
                             animationFillMode: "both",
-                            transition: "height 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.2s ease",
-                            backgroundColor: "rgba(50, 55, 65, 0.06)",
-                            transform: isPeak ? "scale(1.03)" : "none",
+                            transition: "all 0.2s ease",
                           }}
-                          title={`${slot.time} น. : ${slot.cups} แก้ว (ออนไลน์ ${slot.online} แก้ว, หน้าร้าน ${slot.walkin} แก้ว) - ฿${slot.revenue.toLocaleString()}`}
                         >
-                          {/* Online portion (Teal) */}
+                          {/* Cup Count Top Label & Peak Badge */}
                           <div
                             style={{
-                              height: `${onlinePct}%`,
-                              backgroundColor: "var(--teal)",
-                              width: "100%",
-                              transition: "height 0.3s ease",
+                              fontSize: isPeak ? "0.85rem" : "0.78rem",
+                              fontWeight: isPeak ? 800 : 700,
+                              color: isPeak ? "var(--warm)" : "var(--ink)",
+                              marginBottom: "0.35rem",
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              gap: "0.15rem",
                             }}
-                          />
-                          {/* Walk-in portion (Warm) */}
-                          <div
-                            style={{
-                              height: `${walkinPct}%`,
-                              backgroundColor: "var(--warm)",
-                              width: "100%",
-                              transition: "height 0.3s ease",
-                            }}
-                          />
-                        </div>
+                          >
+                            {isPeak && (
+                              <div
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "0.2rem",
+                                  backgroundColor: "var(--warm)",
+                                  color: "#ffffff",
+                                  padding: "0.12rem 0.45rem",
+                                  borderRadius: "9999px",
+                                  fontSize: "0.65rem",
+                                  fontWeight: 700,
+                                  boxShadow: "0 2px 8px rgba(235, 148, 93, 0.4)",
+                                  marginBottom: "0.1rem",
+                                  whiteSpace: "nowrap",
+                                  lineHeight: 1,
+                                }}
+                              >
+                                <Flame size={10} fill="#ffffff" />
+                                <span>พีคสุด</span>
+                              </div>
+                            )}
+                            <span>{slot.cups}</span>
+                          </div>
 
-                        {/* Time Label Bottom */}
-                        <div
-                          style={{
-                            marginTop: "0.45rem",
-                            fontSize: "0.75rem",
-                            color: isPeak ? "var(--warm)" : "var(--ink-soft)",
-                            fontWeight: isPeak ? 800 : 500,
-                            textAlign: "center",
-                          }}
-                        >
-                          {slot.time}
+                          {/* Stacked / Segmented Cup Volume Bar */}
+                          <div
+                            className={hourlyView.isInView ? "animate-bar-grow" : ""}
+                            style={{
+                              width: "100%",
+                              maxWidth: isPeak ? "44px" : "40px",
+                              height: `${pct}%`,
+                              borderRadius: "0.5rem 0.5rem 0.25rem 0.25rem",
+                              overflow: "hidden",
+                              display: "flex",
+                              flexDirection: "column-reverse",
+                              boxShadow: isPeak ? "0 6px 20px rgba(235, 148, 93, 0.35)" : "0 2px 6px rgba(0,0,0,0.04)",
+                              border: isPeak ? "2px solid var(--warm)" : "1px solid rgba(50, 55, 65, 0.08)",
+                              animationDelay: `${delayMs}ms`,
+                              animationFillMode: "both",
+                              transition: "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+                              backgroundColor: "rgba(50, 55, 65, 0.06)",
+                              transform: isPeak ? "scale(1.03)" : "none",
+                            }}
+                            title={`${slot.time} น. : ${slot.cups} แก้ว (ออนไลน์ ${slot.online} แก้ว, หน้าร้าน ${slot.walkin} แก้ว) - ฿${slot.revenue.toLocaleString()}`}
+                          >
+                            {/* Online portion (Teal) */}
+                            <div
+                              style={{
+                                height: `${onlinePct}%`,
+                                backgroundColor: "var(--teal)",
+                                width: "100%",
+                                transition: "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                              }}
+                            />
+                            {/* Walk-in portion (Warm) */}
+                            <div
+                              style={{
+                                height: `${walkinPct}%`,
+                                backgroundColor: "var(--warm)",
+                                width: "100%",
+                                transition: "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                              }}
+                            />
+                          </div>
+
+                          {/* Time Label Bottom */}
+                          <div
+                            style={{
+                              marginTop: "0.45rem",
+                              fontSize: "0.75rem",
+                              color: isPeak ? "var(--warm)" : "var(--ink-soft)",
+                              fontWeight: isPeak ? 800 : 500,
+                              textAlign: "center",
+                            }}
+                          >
+                            {slot.time}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </ScrollableChartWrapper>
+                      );
+                    })}
+                  </div>
+                </ScrollableChartWrapper>
+              )}
             </div>
 
             {/* Bottom Insight Footer */}
@@ -1690,7 +1808,7 @@ export default function AdminDashboardPage() {
                 ยอดขายวัน{currentHourlyData.shortLabel}: รวม <strong>{currentHourlyData.totalCups} แก้ว</strong> ({currentHourlyData.totalRev})
               </span>
               <span style={{ fontWeight: 600, color: "var(--teal)" }}>
-                ช่วงเวลาขายดีสุด: {currentHourlyData.peakSlot}
+                ช่วงเวลาขายดีสุด: {currentHourlyData.totalCups > 0 ? currentHourlyData.peakSlot : "-"}
               </span>
             </div>
           </section>
@@ -1715,43 +1833,59 @@ export default function AdminDashboardPage() {
               </Link>
             </div>
             <div style={{ marginTop: "1rem", display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-
-              {topProducts.map((p, i) => (
+              {topProducts.length === 0 ? (
                 <div
-                  key={p.name}
-                  className={topProductsView.isInView ? "animate-rise" : ""}
                   style={{
-                    animationDelay: `${i * 60}ms`,
-                    animationFillMode: "both",
+                    padding: "2rem 1rem",
+                    textAlign: "center",
+                    color: "var(--ink-soft)",
+                    fontSize: "0.825rem",
+                    backgroundColor: "rgba(50, 55, 65, 0.02)",
+                    borderRadius: "0.75rem",
+                    border: "1px dashed rgba(50, 55, 65, 0.12)",
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.825rem" }}>
-                    <span style={{ fontWeight: 600 }}>
-                      <span className="font-mono" style={{ marginRight: "0.35rem", color: "var(--ink-soft)", fontSize: "0.75rem" }}>
-                        {i + 1}.
-                      </span>
-                      {p.name}
-                    </span>
-                    <span style={{ color: "var(--ink-soft)" }}>{p.cups} แก้ว</span>
-                  </div>
-                  <div style={{ marginTop: "0.35rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <div style={{ flex: 1, height: "0.45rem", borderRadius: "9999px", backgroundColor: "rgba(50, 55, 65, 0.08)", overflow: "hidden" }}>
-                      <div
-                        className={topProductsView.isInView ? "animate-bar-grow-right" : ""}
-                        style={{
-                          height: "100%",
-                          borderRadius: "9999px",
-                          backgroundColor: "var(--teal)",
-                          width: `${p.pct}%`,
-                          animationDelay: `${i * 90}ms`,
-                          animationFillMode: "both",
-                        }}
-                      />
-                    </div>
-                    <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--ink)" }}>{p.amount}</span>
-                  </div>
+                  <p style={{ fontWeight: 600 }}>ยังไม่มีข้อมูลอันดับเมนูขายดี</p>
+                  <p style={{ fontSize: "0.75rem", opacity: 0.8, marginTop: "0.2rem" }}>ระบบจะจัดอันดับอัตโนมัติเมื่อมีออเดอร์เข้ามา</p>
                 </div>
-              ))}
+              ) : (
+                topProducts.map((p, i) => (
+                  <div
+                    key={p.name}
+                    className={topProductsView.isInView ? "animate-rise" : ""}
+                    style={{
+                      animationDelay: `${i * 60}ms`,
+                      animationFillMode: "both",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.825rem" }}>
+                      <span style={{ fontWeight: 600 }}>
+                        <span className="font-mono" style={{ marginRight: "0.35rem", color: "var(--ink-soft)", fontSize: "0.75rem" }}>
+                          {i + 1}.
+                        </span>
+                        {p.name}
+                      </span>
+                      <span style={{ color: "var(--ink-soft)" }}>{p.cups} แก้ว</span>
+                    </div>
+                    <div style={{ marginTop: "0.35rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <div style={{ flex: 1, height: "0.45rem", borderRadius: "9999px", backgroundColor: "rgba(50, 55, 65, 0.08)", overflow: "hidden" }}>
+                        <div
+                          className={topProductsView.isInView ? "animate-bar-grow-right" : ""}
+                          style={{
+                            height: "100%",
+                            borderRadius: "9999px",
+                            backgroundColor: "var(--teal)",
+                            width: `${p.pct}%`,
+                            animationDelay: `${i * 90}ms`,
+                            animationFillMode: "both",
+                          }}
+                        />
+                      </div>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--ink)" }}>{p.amount}</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </section>
         </div>

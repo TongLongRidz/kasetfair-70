@@ -440,7 +440,10 @@ func (h *AppHandler) VerifyOrderSlip(c *gin.Context) {
 	}
 
 	// Retrieve admin from context (set by AuthMiddleware)
-	adminVal, exists := c.Get("admin")
+	adminVal, exists := c.Get("current_admin")
+	if !exists {
+		adminVal, exists = c.Get("admin")
+	}
 	var adminID *uint
 	if exists {
 		if currentAdmin, ok := adminVal.(*model.Admin); ok && currentAdmin != nil {
