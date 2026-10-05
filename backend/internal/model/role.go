@@ -6,13 +6,13 @@ import (
 
 type Role struct {
 	ID          uint         `gorm:"primaryKey;autoIncrement" json:"id"`
-	Name        string       `gorm:"type:varchar(50);uniqueIndex;not null" json:"name"`
+	Key         string       `gorm:"column:key;type:varchar(50);uniqueIndex;not null" json:"key"`
 	NameTH      string       `gorm:"type:varchar(100)" json:"name_th"`
 	NameEN      string       `gorm:"type:varchar(100)" json:"name_en"`
 	Description string       `gorm:"type:varchar(255)" json:"description"`
 	CreatedAt   time.Time    `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt   time.Time    `gorm:"autoUpdateTime" json:"updated_at"`
-	Permissions []Permission `gorm:"many2many:permission_role;" json:"permissions,omitempty"`
+	Permissions []Permission `gorm:"many2many:permission_role;foreignKey:ID;joinForeignKey:role_id;References:ID;joinReferences:permission_id" json:"permissions,omitempty"`
 }
 
 func (Role) TableName() string {

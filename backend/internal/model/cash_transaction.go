@@ -16,6 +16,9 @@ type CashTransaction struct {
 	CreatedBy *uint     `gorm:"index" json:"created_by"`
 	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
 	Note      string    `gorm:"type:text" json:"note"`
+
+	// Link to Debt table when type == "expense" and paid by staff first
+	Debt *Debt `gorm:"foreignKey:CashTransactionID;constraint:OnDelete:CASCADE" json:"debt,omitempty"`
 }
 
 func (CashTransaction) TableName() string {

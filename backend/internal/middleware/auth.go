@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"kaset-fair-backend/internal/database"
 	"kaset-fair-backend/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -16,15 +17,18 @@ import (
 type JWTClaims struct {
 	UUID         string `json:"uuid"`
 	Username     string `json:"username"`
+	SessionID    string `json:"session_id"`
 	IsSuperadmin bool   `json:"is_superadmin"`
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(admin *model.Admin, secret string, duration time.Duration) (string, error) {
+func GenerateToken(admin *model.Staff, sessionID string, secret string, duration time.Duration) (string, error) {
+	isSuper := admin.Role != nil && admin.Role.Key == "super_admin"
 	claims := JWTClaims{
 		UUID:         admin.UUID,
 		Username:     admin.Username,
-		IsSuperadmin: admin.IsSuperadmin,
+		SessionID:    sessionID,
+		IsSuperadmin: isSuper,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -36,7 +40,7 @@ func GenerateToken(admin *model.Admin, secret string, duration time.Duration) (s
 	return token.SignedString([]byte(secret))
 }
 
-func AuthMiddleware(db *gorm.DB, secret string) gin.HandlerFunc {
+func AuthMiddleware(db *gorm.DB, rdb *database.RedisClient, secret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		var tokenString string
@@ -45,7 +49,7 @@ func AuthMiddleware(db *gorm.DB, secret string) gin.HandlerFunc {
 			tokenString = strings.TrimPrefix(authHeader, "Bearer ")
 		} else {
 			// Check cookie if header not found
-			cookie, err := c.Cookie("admin_token")
+			cookie, err := c.Cookie("token")
 			if err == nil && cookie != "" {
 				tokenString = cookie
 			}
@@ -77,8 +81,25 @@ func AuthMiddleware(db *gorm.DB, secret string) gin.HandlerFunc {
 			return
 		}
 
-		var admin model.Admin
-		if err := db.Where("uuid = ?", claims.UUID).First(&admin).Error; err != nil {
+		// -----------------------------------------------------------------------------
+		// Redis Session Validation Check
+		// -----------------------------------------------------------------------------
+		if rdb != nil && claims.SessionID != "" {
+			_, isValid, err := rdb.ValidateSession(c.Request.Context(), claims.SessionID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal session verification error"})
+				c.Abort()
+				return
+			}
+			if !isValid {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Session expired or revoked. Please log in again."})
+				c.Abort()
+				return
+			}
+		}
+
+		var admin model.Staff
+		if err := db.Preload("Role.Permissions").Where("uuid = ?", claims.UUID).First(&admin).Error; err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: admin account not found"})
 			c.Abort()
 			return
@@ -92,6 +113,7 @@ func AuthMiddleware(db *gorm.DB, secret string) gin.HandlerFunc {
 
 		// Store in gin context
 		c.Set("current_admin", &admin)
+		c.Set("session_id", claims.SessionID)
 		c.Next()
 	}
 }
@@ -105,9 +127,9 @@ func RequireSuperAdmin() gin.HandlerFunc {
 			return
 		}
 
-		admin, ok := val.(*model.Admin)
-		if !ok || !admin.IsSuperadmin {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden: Superadmin access required"})
+		admin, ok := val.(*model.Staff)
+		if !ok || admin.Role == nil || (admin.Role.Key != "super_admin" && admin.Role.Key != "admin") {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden: Admin/Superadmin access required"})
 			c.Abort()
 			return
 		}

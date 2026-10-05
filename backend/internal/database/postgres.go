@@ -62,7 +62,7 @@ func ConnectPostgres(dsn string) (*PostgresDB, error) {
 		&model.Role{},
 		&model.Permission{},
 		&model.PermissionRole{},
-		&model.Admin{},
+		&model.Staff{},
 		&model.Product{},
 		&model.Topping{},
 		&model.ProductComboRecipe{},
@@ -71,17 +71,18 @@ func ConnectPostgres(dsn string) (*PostgresDB, error) {
 		&model.OrderItemTopping{},
 		&model.SystemSetting{},
 		&model.CashTransaction{},
+		&model.Debt{},
 	); err != nil {
 		log.Printf("⚠️ AutoMigrate error: %v", err)
 	} else {
-		log.Println("✅ Database migration completed successfully (role, permission, permission_role, admin, product, topping, order, cash_transaction tables ready)")
+		log.Println("✅ Database migration completed successfully (role, permission, permission_role, admin, product, topping, order, cash_transaction, debt tables ready)")
 	}
 
 	// Seed Roles, Permissions, Superadmin, Settings, Products, and Toppings
-	seedRolesAndPermissions(db)
-	seedSuperAdmin(db)
-	seedSettings(db)
-	seedProductsAndToppings(db)
+	SeedRolesAndPermissions(db)
+	SeedSuperAdmin(db)
+	SeedSettings(db)
+	SeedProductsAndToppings(db)
 
 	return &PostgresDB{DB: db}, nil
 }
@@ -111,9 +112,15 @@ func GenerateRandomPassword(length int) (string, error) {
 	return string(bytes), nil
 }
 
-func seedSuperAdmin(db *gorm.DB) {
+func SeedSuperAdmin(db *gorm.DB) {
+	var superRole model.Role
+	if err := db.Where("key = ?", "super_admin").First(&superRole).Error; err != nil {
+		log.Printf("⚠️ Superadmin role not found: %v", err)
+		return
+	}
+
 	var count int64
-	if err := db.Model(&model.Admin{}).Where("is_superadmin = ?", true).Count(&count).Error; err != nil {
+	if err := db.Model(&model.Staff{}).Where("role_id = ?", superRole.ID).Count(&count).Error; err != nil {
 		log.Printf("⚠️ Error checking superadmin count: %v", err)
 		return
 	}
@@ -134,13 +141,13 @@ func seedSuperAdmin(db *gorm.DB) {
 		return
 	}
 
-	superadmin := model.Admin{
+	superadmin := model.Staff{
 		UUID:         uuid.New().String(),
 		Username:     "superadmin",
 		PasswordHash: string(hashedPassword),
 		Name:         "Super Administrator",
 		IsActivate:   true,
-		IsSuperadmin: true,
+		RoleID:       &superRole.ID,
 	}
 
 	if err := db.Create(&superadmin).Error; err != nil {
@@ -157,7 +164,7 @@ func seedSuperAdmin(db *gorm.DB) {
 	log.Println("==================================================================")
 }
 
-func seedSettings(db *gorm.DB) {
+func SeedSettings(db *gorm.DB) {
 	defaultSettings := []model.SystemSetting{
 		{
 			Key:         "slip_upload_mode",
@@ -195,177 +202,7 @@ func seedSettings(db *gorm.DB) {
 	}
 }
 
-func seedRolesAndPermissions(db *gorm.DB) {
-	// 1. Seed Granular View & Edit Permissions for each admin feature page
-	permissions := []model.Permission{
-		// Dashboard
-		{Name: "dashboard.view", NameTH: "ดูแดชบอร์ด", NameEN: "View Dashboard", Description: "เข้าถึงและดูแดชบอร์ดสรุปยอดขาย สถิติ และกราฟแนวโน้ม"},
-
-		// Expense / Accounting
-		{Name: "expense.view", NameTH: "ดูรายรับ-รายจ่าย", NameEN: "View Expenses", Description: "ดูรายการรายรับ-รายจ่ายและสรุปการเงิน"},
-		{Name: "expense.edit", NameTH: "จัดการรายจ่าย", NameEN: "Edit Expenses", Description: "บันทึก แก้ไข หรือลบรายการรายจ่าย"},
-
-		// Slip Check
-		{Name: "slip_check.view", NameTH: "ดูสลิปและการชำระเงิน", NameEN: "View Slip Payments", Description: "ดูรายการการชำระเงินและรูปสลิป/หลักฐานเงินสด"},
-		{Name: "slip_check.edit", NameTH: "อนุมัติ/จัดการสลิป", NameEN: "Edit Slip Verification", Description: "อนุมัติ/ปฏิเสธสลิป และปรับเปลี่ยนนโยบาย Slip Policy"},
-
-		// Menu Management
-		{Name: "menu.view", NameTH: "ดูรายการเมนู", NameEN: "View Menu Items", Description: "ดูรายการเมนูเครื่องดื่ม สูตรคอมโบ และลำดับการแสดงผล"},
-		{Name: "menu.edit", NameTH: "จัดการเมนูและสินค้า", NameEN: "Edit Menu Items", Description: "เพิ่ม แก้ไข ลบ ซ่อน หรือจัดเรียงลำดับเมนูและท็อปปิ้ง"},
-
-		// Banner Management
-		{Name: "banner.view", NameTH: "ดูแบนเนอร์", NameEN: "View Banners", Description: "ดูแบนเนอร์และภาพประชาสัมพันธ์"},
-		{Name: "banner.edit", NameTH: "จัดการแบนเนอร์", NameEN: "Edit Banners", Description: "เพิ่ม แก้ไข หรือลบรูปแบนเนอร์ประชาสัมพันธ์"},
-
-		// Administrator & Roles Management
-		{Name: "administrator.view", NameTH: "ดูผู้ดูแลระบบ", NameEN: "View Admins", Description: "ดูรายชื่อแอดมิน บทบาท และสิทธิ์ในระบบ"},
-		{Name: "administrator.edit", NameTH: "จัดการแอดมินและบทบาท", NameEN: "Edit Admins & Roles", Description: "เพิ่ม แก้ไขสิทธิ์ เปิด/ปิดใช้งาน หรือลบบัญชีแอดมิน"},
-
-		// Permissions Management
-		{Name: "permission.view", NameTH: "ดูสิทธิ์การใช้งาน", NameEN: "View Permissions", Description: "ดูรายการบทบาทและสิทธิ์การใช้งาน (Permissions)"},
-		{Name: "permission.edit", NameTH: "จัดการสิทธิ์การใช้งาน", NameEN: "Edit Permissions", Description: "แก้ไขการกำหนดสิทธิ์สำหรับบทบาทต่างๆ ในระบบ"},
-
-		// QR Code Settings Management
-		{Name: "qrcode.view", NameTH: "ดู QR Code รับเงิน", NameEN: "View Payment QR Code", Description: "ดูตั้งค่า QR Code รับเงิน และข้อมูลบัญชีพร้อมเพย์"},
-		{Name: "qrcode.edit", NameTH: "จัดการ QR Code รับเงิน", NameEN: "Edit Payment QR Code", Description: "เพิ่ม แก้ไข หรืออัปโหลด QR Code พร้อมเพย์รับเงิน"},
-
-		// POS Front Desk / Cashier
-		{Name: "pos_front.view", NameTH: "ดูหน้าจอ POS", NameEN: "View POS Screen", Description: "เข้าถึงและดูหน้าจอ POS สั่งซื้อหน้าร้าน"},
-		{Name: "pos_front.edit", NameTH: "ขายหน้าร้าน POS", NameEN: "Use POS Ordering", Description: "สร้างออเดอร์ รับเงินสด สแกนพร้อมเพย์ และออกคิวหน้าร้าน"},
-
-		// Kitchen Display / Barista
-		{Name: "kitchen.view", NameTH: "ดูหน้าจอห้องครัว", NameEN: "View Kitchen Display", Description: "ดูหน้าจอบาร์น้ำ/ห้องครัว (Kitchen Display)"},
-		{Name: "kitchen.edit", NameTH: "จัดการสถานะคิวครัว", NameEN: "Edit Kitchen Status", Description: "ปรับสถานะคิวเครื่องดื่ม (กำลังทำ / พร้อมรับ / รับของแล้ว)"},
-
-		// Queue Management
-		{Name: "queue.view", NameTH: "ดูหน้าจอจัดการคิว", NameEN: "View Queue Screen", Description: "ดูหน้าจอจัดการคิวและสแกนรับสินค้า"},
-		{Name: "queue.edit", NameTH: "สแกน/ส่งมอบคิว", NameEN: "Edit Queue Pickup", Description: "สแกน QR / กรอกคิวยืนยันส่งมอบสินค้าให้ลูกค้า"},
-	}
-
-	for _, p := range permissions {
-		var existing model.Permission
-		if err := db.Where("name = ?", p.Name).First(&existing).Error; err != nil {
-			_ = db.Create(&p).Error
-		} else {
-			existing.NameTH = p.NameTH
-			existing.NameEN = p.NameEN
-			existing.Description = p.Description
-			_ = db.Save(&existing).Error
-		}
-	}
-
-	// 2. Seed Roles: superadmin, admin, accounting, cashier, barista
-	roles := []model.Role{
-		{
-			Name:        "superadmin",
-			NameTH:      "ผู้ดูแลระบบสูงสุด",
-			NameEN:      "Super Administrator",
-			Description: "ผู้ดูแลระบบสูงสุด (Super Administrator) มีสิทธิ์เข้าถึงและจัดการทุกส่วนในระบบแบบ 100%",
-		},
-		{
-			Name:        "admin",
-			NameTH:      "ผู้จัดการร้าน",
-			NameEN:      "Store Manager",
-			Description: "ผู้จัดการร้าน (Store Manager) ดูแลการทำงานทั่วไป จัดการเมนู ออเดอร์ ตรวจสอบสลิป และดูรายงาน",
-		},
-		{
-			Name:        "accounting",
-			NameTH:      "ฝ่ายบัญชีและการเงิน",
-			NameEN:      "Accounting & Finance",
-			Description: "ฝ่ายบัญชีและการเงิน (Accounting & Finance) ดูแลแดชบอร์ด รายรับ-รายจ่าย และตรวจสอบสลิป",
-		},
-		{
-			Name:        "cashier",
-			NameTH:      "พนักงานแคชเชียร์/หน้าร้าน",
-			NameEN:      "Cashier",
-			Description: "พนักงานแคชเชียร์/หน้าร้าน (Cashier) รับออเดอร์ POS รับชำระเงิน ตรวจสอบสลิป และจัดการคิว",
-		},
-		{
-			Name:        "barista",
-			NameTH:      "พนักงานบาร์น้ำ/ห้องครัว",
-			NameEN:      "Barista & Kitchen Staff",
-			Description: "พนักงานบาร์น้ำ/ห้องครัว (Barista) ดูหน้าจอครัว ทำเครื่องดื่ม และอัปเดตสถานะคิว",
-		},
-	}
-
-	for _, r := range roles {
-		var existing model.Role
-		if err := db.Where("name = ?", r.Name).First(&existing).Error; err != nil {
-			_ = db.Create(&r).Error
-		} else {
-			existing.NameTH = r.NameTH
-			existing.NameEN = r.NameEN
-			existing.Description = r.Description
-			_ = db.Save(&existing).Error
-		}
-	}
-
-	// Map permissions helper
-	assignPermissionsToRole := func(roleName string, permNames []string) {
-		var role model.Role
-		if err := db.Where("name = ?", roleName).First(&role).Error; err != nil {
-			return
-		}
-
-		var targetPerms []model.Permission
-		if len(permNames) == 0 {
-			// All permissions
-			db.Find(&targetPerms)
-		} else {
-			db.Where("name IN ?", permNames).Find(&targetPerms)
-		}
-
-		for _, perm := range targetPerms {
-			var linkCount int64
-			db.Model(&model.PermissionRole{}).Where("role_id = ? AND permission_id = ?", role.ID, perm.ID).Count(&linkCount)
-			if linkCount == 0 {
-				db.Create(&model.PermissionRole{RoleId: role.ID, PermissionId: perm.ID})
-			}
-		}
-	}
-
-	// 3. Assign Granular Permissions to Each Role
-	// superadmin: Full Access to all permissions
-	assignPermissionsToRole("superadmin", nil)
-
-	// admin: Manage all features except admin account editing
-	assignPermissionsToRole("admin", []string{
-		"dashboard.view",
-		"expense.view", "expense.edit",
-		"qrcode.view", "qrcode.edit",
-		"slip_check.view", "slip_check.edit",
-		"menu.view", "menu.edit",
-		"banner.view", "banner.edit",
-		"administrator.view",
-		"pos_front.view", "pos_front.edit",
-		"kitchen.view", "kitchen.edit",
-		"queue.view", "queue.edit",
-	})
-
-	// accounting: Financial Dashboard, Expense Management, QR Settings, and Slip Verification
-	assignPermissionsToRole("accounting", []string{
-		"dashboard.view",
-		"expense.view", "expense.edit",
-		"qrcode.view", "qrcode.edit",
-		"slip_check.view", "slip_check.edit",
-	})
-
-	// cashier: POS Order Taking, Slip Verification, and Queue Management
-	assignPermissionsToRole("cashier", []string{
-		"pos_front.view", "pos_front.edit",
-		"slip_check.view", "slip_check.edit",
-		"queue.view", "queue.edit",
-	})
-
-	// barista: Kitchen Display, Menu View, and Queue Status Updates
-	assignPermissionsToRole("barista", []string{
-		"kitchen.view", "kitchen.edit",
-		"menu.view",
-		"queue.view", "queue.edit",
-	})
-}
-
-func seedProductsAndToppings(db *gorm.DB) {
+func SeedProductsAndToppings(db *gorm.DB) {
 	intPtr := func(v int) *int { return &v }
 	strPtr := func(v string) *string { return &v }
 

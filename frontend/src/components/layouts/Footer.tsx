@@ -1,7 +1,12 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
+import useTranslation from "@/hooks/useTranslation";
 
 export default function Footer() {
+  const { t } = useTranslation();
+
   return (
     <footer
       style={{
@@ -40,7 +45,7 @@ export default function Footer() {
               </span>
               <div>
                 <span style={{ fontSize: "1.1rem", fontWeight: 800, display: "block", lineHeight: 1.1 }}>
-                  ถั่วทอง
+                  {t("footer.brand_name", "ถั่วทอง")}
                 </span>
                 <span
                   className="font-mono"
@@ -57,8 +62,8 @@ export default function Footer() {
               </div>
             </div>
 
-            <p style={{ marginTop: "0.75rem", fontSize: "0.85rem", color: "var(--ink-soft)", lineHeight: 1.5, margin: "0.75rem 0 0 0" }}>
-              น้ำเต้าหู้สดใหม่ทุกวัน<br />พร้อมท็อปปิ้งแน่นแก้ว<br />ให้จิบระหว่างเดินงาน
+            <p style={{ marginTop: "0.75rem", fontSize: "0.85rem", color: "var(--ink-soft)", lineHeight: 1.5, margin: "0.75rem 0 0 0", whiteSpace: "pre-line" }}>
+              {t("footer.brand_desc", "น้ำเต้าหู้สดใหม่ทุกวัน\nพร้อมท็อปปิ้งแน่นแก้ว\nให้จิบระหว่างเดินงาน")}
             </p>
           </div>
 
@@ -66,13 +71,12 @@ export default function Footer() {
           <div>
             <div style={{ display: "flex", alignItems: "flex-end", height: "2.25rem" }}>
               <p style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--ink)", margin: 0, lineHeight: 1.15 }}>
-                สถานที่ & เวลา
+                {t("footer.location_title", "สถานที่ & เวลา")}
               </p>
             </div>
-            <p style={{ marginTop: "0.75rem", fontSize: "0.85rem", color: "var(--ink-soft)", lineHeight: 1.5, margin: "0.75rem 0 0 0" }}>
-              เกษตรแฟร์ โซนนิสิต (M) บูธ M__<br />
-              มหาวิทยาลัยเกษตรศาสตร์<br />
-              <span style={{ color: "var(--ink)", fontWeight: 600 }}>12:00 - 21:00 น.</span>
+            <p style={{ marginTop: "0.75rem", fontSize: "0.85rem", color: "var(--ink-soft)", lineHeight: 1.5, margin: "0.75rem 0 0 0", whiteSpace: "pre-line" }}>
+              {t("footer.location_desc", "เกษตรแฟร์ โซนนิสิต (M) บูธ M__\nมหาวิทยาลัยเกษตรศาสตร์")}<br />
+              <span style={{ color: "var(--ink)", fontWeight: 600 }}>{t("footer.operating_hours", "12:00 - 21:00 น.")}</span>
             </p>
           </div>
         </div>
@@ -83,11 +87,11 @@ export default function Footer() {
         {/* Bottom copyright and about-us link */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem", fontSize: "0.75rem", color: "var(--ink-soft)" }}>
           <p style={{ margin: 0 }}>
-            © 2026 ถั่วทอง. All rights reserved. เกษตรแฟร์ 2570
+            {t("footer.copyright", "© 2026 ถั่วทอง. สงวนลิขสิทธิ์ทั้งหมด. เกษตรแฟร์ 2570")}
           </p>
           <div>
             <Link href="/about-us" style={{ color: "var(--ink-soft)", textDecoration: "none" }}>
-              เกี่ยวกับเรา
+              {t("footer.about_us", "เกี่ยวกับเรา")}
             </Link>
           </div>
         </div>

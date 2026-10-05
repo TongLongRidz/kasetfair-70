@@ -25,7 +25,7 @@ type Order struct {
 	UpdatedAt           time.Time   `gorm:"autoUpdateTime" json:"updated_at"`
 
 	// Associations
-	SlipAdmin  *Admin      `gorm:"foreignKey:SlipVerifiedBy" json:"slip_admin,omitempty"`
+	SlipAdmin  *Staff      `gorm:"foreignKey:SlipVerifiedBy" json:"slip_admin,omitempty"`
 	OrderItems []OrderItem `gorm:"foreignKey:OrderID;constraint:OnDelete:CASCADE" json:"order_items,omitempty"`
 }
 

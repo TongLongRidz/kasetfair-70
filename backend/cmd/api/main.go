@@ -79,6 +79,7 @@ func main() {
 		v1.GET("/settings", h.GetSettings)
 		v1.GET("/settings/:key", h.GetSettingByKey)
 		v1.GET("/cash-transactions", h.GetCashTransactions)
+		v1.GET("/debts", h.GetDebts)
 		v1.GET("/dashboard/stats", h.GetDashboardStats)
 
 		// Public Orders & Queue Tracking (Display screens, Customer order/receipt/queue tracking)
@@ -92,10 +93,16 @@ func main() {
 		// Protected Admin Routes (Requires valid JWT and is_activate == true)
 		if postgresDB != nil && postgresDB.DB != nil {
 			adminGroup := v1.Group("")
-			adminGroup.Use(middleware.AuthMiddleware(postgresDB.DB, cfg.JWTSecret))
+			adminGroup.Use(middleware.AuthMiddleware(postgresDB.DB, redisClient, cfg.JWTSecret))
 			{
 				adminGroup.GET("/auth/me", h.GetMe)
 				adminGroup.GET("/admin/me", h.GetMe) // alias for convenience
+				adminGroup.GET("/staffs", h.GetStaffs)
+				adminGroup.GET("/staffs/:uuid", h.GetStaffByUUID)
+				adminGroup.POST("/staffs", h.CreateStaff)
+				adminGroup.PUT("/staffs/:uuid", h.UpdateStaff)
+				adminGroup.DELETE("/staffs/:uuid", h.DeleteStaff)
+
 				adminGroup.GET("/admins", h.GetAdmins)
 				adminGroup.GET("/admins/:uuid", h.GetAdminByUUID)
 				adminGroup.POST("/admins", h.CreateAdmin)
@@ -124,10 +131,12 @@ func main() {
 				// Admin System Settings Management
 				adminGroup.PUT("/settings/:key", h.UpdateSetting)
 
-				// Admin Cash Transaction Management
+				// Admin Cash Transaction & Debt Management
 				adminGroup.POST("/cash-transactions", h.CreateCashTransaction)
 				adminGroup.PUT("/cash-transactions/:id", h.UpdateCashTransaction)
 				adminGroup.DELETE("/cash-transactions/:id", h.DeleteCashTransaction)
+				adminGroup.PUT("/debts/:id/pay", h.ToggleDebtPaidStatus)
+				adminGroup.PATCH("/debts/:id/pay", h.ToggleDebtPaidStatus)
 
 				// Uploads (Images)
 				adminGroup.DELETE("/upload", h.DeleteUpload)

@@ -12,21 +12,25 @@ import (
 )
 
 type CreateCashTransactionRequest struct {
-	Type     string  `json:"type" binding:"required"` // "income" or "expense"
-	Title    string  `json:"title" binding:"required"`
-	Category string  `json:"category" binding:"required"`
-	Amount   float64 `json:"amount" binding:"required"`
-	DateTime string  `json:"date_time"` // ISO or YYYY-MM-DD HH:mm
-	Note     string  `json:"note"`
+	Type          string  `json:"type" binding:"required"` // "income" or "expense"
+	Title         string  `json:"title" binding:"required"`
+	Category      string  `json:"category" binding:"required"`
+	Amount        float64 `json:"amount" binding:"required"`
+	DateTime      string  `json:"date_time"` // ISO or YYYY-MM-DD HH:mm
+	Note          string  `json:"note"`
+	PaidByStaffID *uint   `json:"paid_by_staff_id"` // Staff ID who paid advance
+	IsPaid        *bool   `json:"is_paid"`          // Reimbursed or not
 }
 
 type UpdateCashTransactionRequest struct {
-	Type     string  `json:"type"`
-	Title    string  `json:"title"`
-	Category string  `json:"category"`
-	Amount   float64 `json:"amount"`
-	DateTime string  `json:"date_time"`
-	Note     string  `json:"note"`
+	Type          string  `json:"type"`
+	Title         string  `json:"title"`
+	Category      string  `json:"category"`
+	Amount        float64 `json:"amount"`
+	DateTime      string  `json:"date_time"`
+	Note          string  `json:"note"`
+	PaidByStaffID *uint   `json:"paid_by_staff_id"`
+	IsPaid        *bool   `json:"is_paid"`
 }
 
 // GetCashTransactions handles GET /api/v1/cash-transactions with pagination & filtering
@@ -51,7 +55,7 @@ func (h *AppHandler) GetCashTransactions(c *gin.Context) {
 		pageSize = 10
 	}
 
-	query := h.DB.DB.Model(&model.CashTransaction{})
+	query := h.DB.DB.Model(&model.CashTransaction{}).Preload("Debt.Staff").Preload("Debt.PaidByStaff")
 
 	if typeFilter != "" && typeFilter != "all" {
 		query = query.Where("type = ?", typeFilter)
@@ -86,15 +90,20 @@ func (h *AppHandler) GetCashTransactions(c *gin.Context) {
 	h.DB.DB.Model(&model.CashTransaction{}).Where("type = ?", "income").Select("COALESCE(SUM(amount), 0)").Scan(&totalIncome)
 	h.DB.DB.Model(&model.CashTransaction{}).Where("type = ?", "expense").Select("COALESCE(SUM(amount), 0)").Scan(&totalExpense)
 
+	// Calculate total unpaid debt owed to staff
+	var totalUnpaidDebt float64
+	h.DB.DB.Model(&model.Debt{}).Where("is_paid = ?", false).Select("COALESCE(SUM(amount), 0)").Scan(&totalUnpaidDebt)
+
 	c.JSON(http.StatusOK, gin.H{
-		"data":          transactions,
-		"page":          page,
-		"page_size":     pageSize,
-		"total":         total,
-		"total_pages":   (total + int64(pageSize) - 1) / int64(pageSize),
-		"total_income":  totalIncome,
-		"total_expense": totalExpense,
-		"net_balance":   totalIncome - totalExpense,
+		"data":              transactions,
+		"page":              page,
+		"page_size":         pageSize,
+		"total":             total,
+		"total_pages":       (total + int64(pageSize) - 1) / int64(pageSize),
+		"total_income":      totalIncome,
+		"total_expense":     totalExpense,
+		"net_balance":       totalIncome - totalExpense,
+		"total_unpaid_debt": totalUnpaidDebt,
 	})
 }
 
@@ -142,6 +151,30 @@ func (h *AppHandler) CreateCashTransaction(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create transaction: " + err.Error()})
 		return
 	}
+
+	// Handle Debt table linking if type is expense & paid_by_staff_id is provided
+	if txType == "expense" && req.PaidByStaffID != nil && *req.PaidByStaffID > 0 {
+		isPaid := false
+		var paidAt *time.Time
+		if req.IsPaid != nil && *req.IsPaid {
+			isPaid = true
+			now := time.Now()
+			paidAt = &now
+		}
+
+		debt := model.Debt{
+			CashTransactionID: &tx.ID,
+			StaffID:           *req.PaidByStaffID,
+			Amount:            tx.Amount,
+			IsPaid:            isPaid,
+			PaidAt:            paidAt,
+			Note:              req.Note,
+		}
+		_ = h.DB.DB.Create(&debt).Error
+	}
+
+	// Reload with Debt & Staff info
+	h.DB.DB.Preload("Debt.Staff").Preload("Debt.PaidByStaff").First(&tx, tx.ID)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Transaction created successfully",
@@ -203,6 +236,52 @@ func (h *AppHandler) UpdateCashTransaction(c *gin.Context) {
 		return
 	}
 
+	// Update or Delete linked Debt
+	if tx.Type == "expense" && req.PaidByStaffID != nil && *req.PaidByStaffID > 0 {
+		var existingDebt model.Debt
+		err := h.DB.DB.Where("cash_transaction_id = ?", tx.ID).First(&existingDebt).Error
+		if err == nil {
+			// Update existing
+			existingDebt.StaffID = *req.PaidByStaffID
+			existingDebt.Amount = tx.Amount
+			existingDebt.Note = tx.Note
+			if req.IsPaid != nil {
+				existingDebt.IsPaid = *req.IsPaid
+				if *req.IsPaid {
+					now := time.Now()
+					existingDebt.PaidAt = &now
+				} else {
+					existingDebt.PaidAt = nil
+				}
+			}
+			_ = h.DB.DB.Save(&existingDebt).Error
+		} else {
+			// Create new
+			isPaid := false
+			var paidAt *time.Time
+			if req.IsPaid != nil && *req.IsPaid {
+				isPaid = true
+				now := time.Now()
+				paidAt = &now
+			}
+			newDebt := model.Debt{
+				CashTransactionID: &tx.ID,
+				StaffID:           *req.PaidByStaffID,
+				Amount:            tx.Amount,
+				IsPaid:            isPaid,
+				PaidAt:            paidAt,
+				Note:              tx.Note,
+			}
+			_ = h.DB.DB.Create(&newDebt).Error
+		}
+	} else if req.PaidByStaffID != nil && *req.PaidByStaffID == 0 {
+		// User un-selected staff debt
+		_ = h.DB.DB.Where("cash_transaction_id = ?", tx.ID).Delete(&model.Debt{}).Error
+	}
+
+	// Reload with Debt & Staff info
+	h.DB.DB.Preload("Debt.Staff").Preload("Debt.PaidByStaff").First(&tx, tx.ID)
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Transaction updated successfully",
 		"data":    tx,
@@ -222,6 +301,9 @@ func (h *AppHandler) DeleteCashTransaction(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid transaction ID"})
 		return
 	}
+
+	// Delete linked debt first
+	_ = h.DB.DB.Where("cash_transaction_id = ?", uint(id)).Delete(&model.Debt{}).Error
 
 	if err := h.DB.DB.Delete(&model.CashTransaction{}, uint(id)).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete transaction: " + err.Error()})

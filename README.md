@@ -24,21 +24,38 @@
 - **`/queue` (Live Queue Board)**: หน้าจอแสดงผลสถานะคิวรวมสำหรับลูกค้า (Fullscreen Mode, แยกคิวที่กำลังทำ Preparing และคิวที่เรียกรับ Ready แบบ FIFO)
 - **`/about-us`**: หน้าเกี่ยวกับร้านและช่องทางติดต่อ
 
-### 🛠️ ฝั่งแอดมินและพนักงาน (Admin Portal - `/admin`)
-- **`/admin/login`**: หน้าล็อกอินเข้าระบบผู้ดูแล (JWT Token)
-- **Management**:
-  - **`/admin/management/administrator`**: จัดการแอดมิน (เพิ่ม/แก้ไข/ลบ, กำหนด Superadmin, เปิด/ปิดสถานะ)
-  - **`/admin/management/menu`**: จัดการเมนู (เพิ่ม/ลบ/แก้ไข, ครอปรูป 1:1, สลับลำดับ Drag & Drop, เซ็ตสูตรคอมโบ `product_combo_recipe`, ร้อน/เย็น, แนะนำ/ขายหมด)
-  - **`/admin/management/toppings`**: จัดการท็อปปิ้ง (เพิ่ม/ลบ/แก้ไข, ครอปรูป 1:1, สลับลำดับ, ร้อน/เย็น, ขายหมด)
-  - **`/admin/management/slip-check`**: ตรวจสอบและอนุมัติสลิปโอนเงิน (Modal เลือกสถานะผ่าน Dropdown + ระบุเหตุผลปฏิเสธสลิป) พร้อมสวิตช์เปิด/ปิดตั้งค่าเงื่อนไขรูปภาพการชำระเงิน (`slip_upload_mode` สำหรับ PromptPay QR และ `cash_upload_mode` สำหรับ เงินสด)
-  - **`/admin/management/dashboard`**: แดชบอร์ดสรุปยอดขาย รายรับ-รายจ่าย สถิติ (กำลังพัฒนา)
-  - **`/admin/management/expense`**: บันทึกรายจ่ายและต้นทุนประจำวัน (กำลังพัฒนา)
-  - **`/admin/management/banner`**: จัดการแบนเนอร์ประชาสัมพันธ์ (กำลังพัฒนา)
-- **POS & Kitchen Bar**:
-  - **`/admin/pos/front-desk`**: หน้าจอแคชเชียร์ขายหน้าร้าน (Walk-in POS) เลือกเมนู/ท็อปปิ้ง/ความหวานลงตะกร้า
-  - **`/admin/pos/payment`**: หน้าจอชำระเงินหน้าร้าน (คำนวณเงินสด/เงินทอน, QR พร้อมเพย์, บัตรคิว, ผูกเงื่อนไข Slip Policy)
-  - **`/admin/pos/kitchen`**: หน้าจอบาร์น้ำ/ห้องครัว (Kitchen Display System - KDS) แสดงการ์ดออเดอร์ตามลำดับ FIFO, ป้าย Combo Recipe & Toppings, สรุปเวลาออเดอร์ล่าสุด
-  - **`/admin/pos/queue`**: หน้าจอจัดการคิว & ส่งมอบเครื่องดื่ม (สแกน QR Code จากใบเสร็จลูกค้าผ่านกล้องหรือเครื่องสแกนเนอร์ USB, กรอกเลขคิวค้นหา, ตรวจสอบสถานะก่อนส่งมอบ, ปุ่มกดเรียกคิว/ยืนยันส่งมอบ)
+### 🛠️ ฝั่งแอดมินและพนักงาน (Staff Portal - `/staff`)
+- **`/staff/login`**: หน้าล็อกอินเข้าระบบผู้ดูแล (เคลียร์ Session/Cookie อัตโนมัติทุกครั้งที่เข้าหน้าล็อกอิน)
+- **Management (การจัดการ)**:
+  - **`/staff/management/dashboard`**: แดชบอร์ดสรุปยอดขาย รายรับ-รายจ่าย สถิติสินค้าขายดี และกราฟเปรียบเทียบ
+  - **`/staff/management/expense`**: บันทึกรายรับ-รายจ่าย รายการหนี้ค้างชำระ และจัดการ QR Code รับเงิน
+  - **`/staff/management/slip-check`**: ตรวจสอบและอนุมัติสลิปโอนเงิน (สวิตช์เปิด/ปิด Slip Upload Mode & Cash Policy)
+  - **`/staff/management/menu`**: จัดการเมนูเครื่องดื่ม (เพิ่ม/แก้ไข/ลบ, ครอปรูป 1:1, สลับลำดับ Drag & Drop, เซ็ตสูตรคอมโบ `product_combo_recipe`)
+  - **`/staff/management/toppings`**: จัดการท็อปปิ้ง (เพิ่ม/แก้ไข/ลบ, ครอปรูป 1:1, สลับลำดับ, ขายหมด/มีของ)
+  - **`/staff/management/banner`**: จัดการแบนเนอร์ประชาสัมพันธ์
+  - **`/staff/management/roles`**: จัดการบทบาท (Role Management & Assign Permissions)
+  - **`/staff/management/permissions`**: จัดการสิทธิ์ระบบ (Permission Management)
+  - **`/staff/management/account`**: จัดการบัญชีพนักงาน (เพิ่ม/แก้ไข/เปลี่ยนรหัสผ่าน/เปิด-ปิดการใช้งาน)
+- **POS & Kitchen (ระบบขายหน้าร้านและบาร์น้ำ)**:
+  - **`/staff/pos/front-desk`**: หน้าจอแคชเชียร์ขายหน้าร้าน (Walk-in POS) เลือกเมนู/ท็อปปิ้ง/ความหวานลงตะกร้า
+  - **`/staff/pos/payment`**: หน้าจอชำระเงินหน้าร้าน (คำนวณเงินสด/เงินทอน, QR พร้อมเพย์, บัตรคิว, ผูกเงื่อนไข Slip Policy)
+  - **`/staff/pos/kitchen`**: หน้าจอบาร์น้ำ/ห้องครัว (Kitchen Display System - KDS) แสดงการ์ดออเดอร์ตามลำดับ FIFO พร้อมสูตรผสม
+  - **`/staff/pos/queue`**: หน้าจอจัดการคิว & ส่งมอบเครื่องดื่ม (สแกน QR Code จากใบเสร็จ, ค้นหาคิว, เรียกคิว/ยืนยันส่งมอบ)
+
+---
+
+## 🛡️ บทบาทและสิทธิ์การเข้าถึง (Roles & Granular Permissions)
+
+ระบบมีระบบ **RBAC (Role-Based Access Control)** แบบ Granular Permission (แยก View / Edit ชัดเจน):
+
+| Role | Key | สิทธิ์และหน้าที่ (Allowed Pages & Actions) |
+| :--- | :--- | :--- |
+| **Super Admin** | `super_admin` | เข้าถึงได้ทุกหน้าและทุกฟังก์ชันในระบบอย่างสมบูรณ์ (Full Unrestricted Access) |
+| **Admin** | `admin` | สิทธิ์เทียบเท่า Super Admin ในการจัดการและตรวจสอบระบบทั้งหมด |
+| **Accounting (การเงิน)** | `accounting` | ดูแดชบอร์ด, จัดการรายรับ-รายจ่าย (View + Edit), ตรวจสลิป (View + Edit), จัดการ QR Code (View + Edit), ดูและแก้ไขเมนู/ท็อปปิ้ง |
+| **Barista (บาร์น้ำ)** | `barista` | จัดการครัว (KDS), จัดการคิว, ดูและแก้ไขเมนูเครื่องดื่ม/ท็อปปิ้ง, ดูแดชบอร์ดและรายจ่าย (View only) |
+| **Cashier (แคชเชียร์)** | `cashier` | ใช้งาน POS หน้าร้าน, จัดการคิว, ดูแดชบอร์ด/รายจ่าย/เมนู/ท็อปปิ้ง (View only) |
+| **Public Relations (ประชาสัมพันธ์)** | `public_relations` | จัดการแบนเนอร์ประชาสัมพันธ์ (View + Edit), ดูแดชบอร์ด/รายจ่าย/เมนู/ท็อปปิ้ง (View only) |
 
 ---
 
@@ -48,13 +65,14 @@
 .
 ├── backend/
 │   ├── cmd/
-│   │   └── api/
-│   │       └── main.go           # Go API Entrypoint, Routing & CORS setup
+│   │   ├── api/                  # Go API Entrypoint, Routing & CORS setup
+│   │   └── seed/
+│   │       ├── main/             # Main Database Seeder (Roles, Permissions, Settings, Menu)
+│   │       └── test/             # Test Accounts Seeder สำหรับทดสอบทุก Role
 │   ├── internal/
-│   │   ├── config/config.go      # .env loader & config struct
-│   │   ├── database/
-│   │   │   └── postgres.go       # PostgreSQL GORM connection & Auto Migration
-│   │   ├── handler/              # API Handlers (admin, product, topping, order, setting, etc.)
+│   │   ├── config/               # .env loader & config struct
+│   │   ├── database/             # PostgreSQL GORM connection & Auto Migration
+│   │   ├── handler/              # API Handlers (staff, product, topping, order, expense, banner, etc.)
 │   │   ├── middleware/           # JWT Auth & Security Middlewares
 │   │   ├── model/                # GORM Database Models
 │   │   └── repository/           # Database Queries & Business Logic
@@ -67,11 +85,13 @@
 │   ├── src/
 │   │   ├── app/
 │   │   │   ├── (storefront)/     # Customer routes: /, /order, /order/[uuid], /payment/[uuid], /queue, /about-us
-│   │   │   └── admin/            # Admin routes: /admin/login, /admin/management/*, /admin/pos/*
-│   │   ├── components/           # UI Components (Navbar, AdminSidebar, Modals, Forms, Receipt, etc.)
-│   │   ├── lib/                  # Utilities, API client, Hooks
+│   │   │   └── staff/            # Staff routes: /staff/login, /staff/management/*, /staff/pos/*
+│   │   ├── components/           # UI Components (AdminSidebar, AuthGuard, Modals, Forms, Receipt, etc.)
+│   │   │   └── ui/modals/        # Modular UI Modals (SettingsModal, ImageCropModal, OrderProductModal)
+│   │   ├── lib/                  # Utilities, auth.ts (RBAC Permission helpers, session storage), API client
+│   │   ├── hooks/                # Custom hooks (useTranslation, useDateTimeFormatter)
 │   │   ├── layout.tsx
-│   │   └── globals.css           # Modern styling & Glassmorphic UI
+│   │   └── globals.css           # Modern styling, responsive tokens, glassmorphism
 │   ├── .env.example
 │   ├── .env.local
 │   ├── Dockerfile                # Multi-stage Next.js production build
@@ -123,9 +143,26 @@ make db-down    # หยุดการทำงานของ PostgreSQL datab
 make db-reset   # หยุดการทำงานและล้างข้อมูล database (docker compose down -v)
 make backend    # รัน Go Backend API (พอร์ต 8585)
 make frontend   # รัน Next.js Frontend dev server (พอร์ต 3050)
+make seed       # รัน Main Database Seeder (Roles, Permissions, Settings, Menu, Initial Superadmin) -> cmd/seed/main
+make seed-test  # รัน Test Accounts Seeder สำหรับทดสอบทุก Role -> cmd/seed/test
 make build      # Build ทั้ง backend binary และ frontend
 make lint       # ตรวจสอบ code style และ linting ของ frontend
 ```
+
+---
+
+## 🧪 ข้อมูลบัญชีผู้ใช้สำหรับทดสอบ (Test Accounts via `make seed-test`)
+
+เมื่อรันคำสั่ง `make seed-test` ระบบจะสร้าง/อัปเดตบัญชีทดสอบในแต่ละบทบาท โดยมีรหัสผ่านเริ่มต้นเป็น **`Hello123`**:
+
+| Username | ชื่อ (Display Name) | Role (Key) | บทบาท | รหัสผ่าน |
+| :--- | :--- | :--- | :--- | :--- |
+| `test_superadmin` | ผู้ดูแลระบบสูงสุด | `super_admin` | ผู้ดูแลระบบสูงสุด (Full Access) | `Hello123` |
+| `test_admin` | แอดมิน | `admin` | ผู้ดูแลระบบทั่วไป | `Hello123` |
+| `test_accounting` | บัญชี | `accounting` | ฝ่ายบัญชีและการเงิน | `Hello123` |
+| `test_cashier` | แคชเชียร์ | `cashier` | พนักงานแคชเชียร์ | `Hello123` |
+| `test_barista` | บาริสต้า | `barista` | พนักงานบาร์น้ำ | `Hello123` |
+| `test_pr` | ประชาสัมพันธ์ | `public_relations` | ฝ่ายประชาสัมพันธ์ | `Hello123` |
 
 ---
 

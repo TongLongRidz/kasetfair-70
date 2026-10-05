@@ -35,5 +35,14 @@
             "switch_language": "Change Language",
             "more_options": "More Options"
         }
+    },
+    "footer": {
+        "brand_name": "Thuathong",
+        "brand_desc": "Fresh soy milk made daily\nloaded with toppings\nto enjoy while walking the fair.",
+        "location_title": "Location & Hours",
+        "location_desc": "Kaset Fair Nisit Zone (M) Booth M__\nKasetsart University",
+        "operating_hours": "12:00 PM - 9:00 PM",
+        "copyright": "© 2026 Thuathong. All rights reserved. Kaset Fair 2027",
+        "about_us": "About Us"
     }
 }

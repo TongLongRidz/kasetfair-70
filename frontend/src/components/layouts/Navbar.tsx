@@ -5,10 +5,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CupSoda, Coins, TicketPercent, Layers } from "lucide-react";
 
+import useTranslation from "@/hooks/useTranslation";
+
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [lang, setLang] = React.useState<"th" | "en">("th");
+  const { lang, setLang } = useTranslation();
   const [isOpen, setIsOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 

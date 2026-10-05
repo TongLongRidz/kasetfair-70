@@ -11,15 +11,19 @@ export const metadata: Metadata = {
   },
 };
 
+import { cookies } from "next/headers";
 import { ToastProvider } from "@/components/ui/toast";
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  const lang = cookieStore.get("kaset_app_lang")?.value || "th";
+
   return (
-    <html lang="th">
+    <html lang={lang}>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

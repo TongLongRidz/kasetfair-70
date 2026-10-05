@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -7,14 +9,12 @@ import {
   ChefHat,
   Coffee,
   Candy,
-  Users,
   ImageIcon,
   ShoppingBag,
   LogOut,
   ChevronDown,
   ChevronRight,
   FolderCog,
-  Tag,
   MonitorCheck,
   PanelLeftClose,
   PanelLeftOpen,
@@ -24,8 +24,11 @@ import {
   Menu,
   X,
   Wallet,
+  Settings,
+  User,
 } from "lucide-react";
-import { getStoredUser, clearAuthSession, AdminUser } from "@/lib/auth";
+import { getStoredUser, setStoredUser, getStoredToken, clearAuthSession, AdminUser, canAccessPath } from "@/lib/auth";
+import SettingsModal from "@/components/ui/modals/SettingsModal";
 
 interface MenuItem {
   label: string;
@@ -35,35 +38,46 @@ interface MenuItem {
 }
 
 const managementSubItems: MenuItem[] = [
-  { label: "แดชบอร์ด", path: "/admin/management/dashboard", icon: LayoutDashboard },
-  { label: "บันทึกรายรับ-รายจ่าย", path: "/admin/management/expense", icon: Wallet },
-  { label: "ตรวจสอบการชำระเงิน", path: "/admin/management/slip-check", icon: Receipt },
-  { label: "จัดการเมนูเครื่องดื่ม", path: "/admin/management/menu", icon: Coffee },
-  { label: "จัดการท็อปปิ้ง", path: "/admin/management/toppings", icon: Candy },
-  { label: "จัดการแบนเนอร์", path: "/admin/management/banner", icon: ImageIcon },
-  { label: "จัดการบทบาท (Roles)", path: "/admin/management/roles", icon: Shield },
-  { label: "จัดการสิทธิ์ (Permissions)", path: "/admin/management/permissions", icon: ShieldCheck },
-  { label: "จัดการบัญชีแอดมิน", path: "/admin/management/administrator", icon: UserCog },
+  { label: "แดชบอร์ด", path: "/staff/management/dashboard", icon: LayoutDashboard },
+  { label: "บันทึกรายรับ-รายจ่าย", path: "/staff/management/expense", icon: Wallet },
+  { label: "ตรวจสอบการชำระเงิน", path: "/staff/management/slip-check", icon: Receipt },
+  { label: "จัดการเมนูเครื่องดื่ม", path: "/staff/management/menu", icon: Coffee },
+  { label: "จัดการท็อปปิ้ง", path: "/staff/management/toppings", icon: Candy },
+  { label: "จัดการแบนเนอร์", path: "/staff/management/banner", icon: ImageIcon },
+  { label: "จัดการบทบาท", path: "/staff/management/roles", icon: Shield },
+  { label: "จัดการสิทธิ์", path: "/staff/management/permissions", icon: ShieldCheck },
+  { label: "จัดการบัญชีพนักงาน", path: "/staff/management/account", icon: UserCog },
 ];
 
 const posSubItems: MenuItem[] = [
-  { label: "หน้าร้าน", path: "/admin/pos/front-desk", icon: ShoppingBag },
-  { label: "ครัว", path: "/admin/pos/kitchen", icon: ChefHat },
-  { label: "คิว", path: "/admin/pos/queue", icon: MonitorCheck },
+  { label: "หน้าร้าน", path: "/staff/pos/front-desk", icon: ShoppingBag },
+  { label: "ครัว", path: "/staff/pos/kitchen", icon: ChefHat },
+  { label: "คิว", path: "/staff/pos/queue", icon: MonitorCheck },
 ];
 
-// Module-level persistent state across client-side page transitions
-let cachedManagementOpen: boolean | null = null;
-let cachedPosOpen: boolean | null = null;
-let cachedCollapsed: boolean | null = null;
+function getSidebarCookie(name: string): boolean | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
+  if (match && match[2]) {
+    return match[2] === "true";
+  }
+  return null;
+}
+
+function setSidebarCookie(name: string, value: boolean) {
+  if (typeof document === "undefined") return;
+  document.cookie = `${name}=${value}; path=/; max-age=31536000; SameSite=Lax`;
+}
 
 export default function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const isManagementActive = pathname.startsWith("/admin/management");
-  const isPosActive = pathname.startsWith("/admin/pos");
 
-  const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
+  const isManagementActive = pathname.startsWith("/staff/management");
+  const isPosActive = pathname.startsWith("/staff/pos");
+
+  const [currentUser, setCurrentUser] = useState<AdminUser | null>(() => getStoredUser());
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
   // Mobile Top Navbar drawer toggle & closing animation
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -88,7 +102,6 @@ export default function AdminSidebar() {
     }
   };
 
-  // Smoothly wait for the drawer closing animation to complete before changing route
   const handleNavigateWithAnimation = (e: React.MouseEvent, path: string) => {
     e.preventDefault();
     if (pathname === path) {
@@ -105,13 +118,11 @@ export default function AdminSidebar() {
     }
   };
 
-  // Close mobile drawer on route change
   useEffect(() => {
     setIsMobileMenuOpen(false);
     setIsClosingMobile(false);
   }, [pathname]);
 
-  // Click outside to close mobile drawer
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
       if (
@@ -132,28 +143,72 @@ export default function AdminSidebar() {
     };
   }, [isMobileMenuOpen, isClosingMobile]);
 
-  // SSR-safe default state (matches initial server render)
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => cachedCollapsed ?? false);
-  const [isManagementOpen, setIsManagementOpen] = useState<boolean>(() => cachedManagementOpen ?? isManagementActive);
-  const [isPosOpen, setIsPosOpen] = useState<boolean>(() => cachedPosOpen ?? isPosActive);
+  // Sidebar Open states stored in cookies
+  // is_sidebar_open: true = expanded sidebar, false = collapsed (72px)
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    const cookieVal = getSidebarCookie("is_sidebar_open");
+    if (cookieVal !== null) return !cookieVal;
+    return false;
+  });
 
-  // Hydrate client-stored preferences after mount to prevent hydration mismatch
+  const [isManagementOpen, setIsManagementOpen] = useState<boolean>(() => {
+    const cookieVal = getSidebarCookie("is_sidebar_management_open");
+    if (cookieVal !== null) return cookieVal;
+    return true;
+  });
+
+  const [isPosOpen, setIsPosOpen] = useState<boolean>(() => {
+    const cookieVal = getSidebarCookie("is_sidebar_pos_open");
+    if (cookieVal !== null) return cookieVal;
+    return true;
+  });
+
   useEffect(() => {
-    setCurrentUser(getStoredUser());
-  }, []);
+    const user = getStoredUser();
+    if (user) {
+      setCurrentUser(user);
+    } else {
+      const token = getStoredToken();
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8585";
+      fetch(`${apiUrl}/api/v1/auth/me`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "include",
+      })
+        .then((res) => {
+          if (res.ok) return res.json();
+          return null;
+        })
+        .then((data) => {
+          if (data) {
+            setStoredUser(data);
+            setCurrentUser(data);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [pathname]);
+
+  const visibleManagementItems = managementSubItems.filter((item) =>
+    currentUser ? canAccessPath(item.path, currentUser) : true
+  );
+
+  const visiblePosItems = posSubItems.filter((item) =>
+    currentUser ? canAccessPath(item.path, currentUser) : true
+  );
 
   const toggleCollapsed = () => {
     setIsCollapsed((prev) => {
-      const next = !prev;
-      cachedCollapsed = next;
-      return next;
+      const nextCollapsed = !prev;
+      const isSidebarOpen = !nextCollapsed;
+      setSidebarCookie("is_sidebar_open", isSidebarOpen);
+      return nextCollapsed;
     });
   };
 
   const toggleManagement = () => {
     setIsManagementOpen((prev) => {
       const next = !prev;
-      cachedManagementOpen = next;
+      setSidebarCookie("is_sidebar_management_open", next);
       return next;
     });
   };
@@ -161,20 +216,15 @@ export default function AdminSidebar() {
   const togglePos = () => {
     setIsPosOpen((prev) => {
       const next = !prev;
-      cachedPosOpen = next;
+      setSidebarCookie("is_sidebar_pos_open", next);
       return next;
     });
   };
 
   const handleLogout = () => {
     clearAuthSession();
-    window.location.href = "/admin/login";
+    window.location.href = "/staff/login";
   };
-
-  // Find active label for current route title in mobile topbar
-  const currentMenuItem =
-    managementSubItems.find((m) => m.path === pathname) ||
-    posSubItems.find((p) => p.path === pathname);
 
   return (
     <>
@@ -208,19 +258,21 @@ export default function AdminSidebar() {
             fontFamily: "'Kanit', sans-serif",
             zIndex: 50,
             transition: "width 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+            userSelect: "none",
+            WebkitUserSelect: "none",
           }}
         >
-        {/* Brand Header + Collapse/Expand Toggle Button */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: isCollapsed ? "center" : "space-between",
-            paddingBottom: "1.25rem",
-            borderBottom: "1px solid rgba(50, 55, 65, 0.08)",
-            flexShrink: 0,
-          }}
-        >
+          {/* Brand Header + Collapse/Expand Toggle Button */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: isCollapsed ? "center" : "space-between",
+              paddingBottom: "1.25rem",
+              borderBottom: "1px solid rgba(50, 55, 65, 0.08)",
+              flexShrink: 0,
+            }}
+          >
             {!isCollapsed && (
               <div
                 style={{
@@ -263,11 +315,10 @@ export default function AdminSidebar() {
               </div>
             )}
 
-            {/* Toggle Collapse/Expand Button */}
             <button
               type="button"
               onClick={toggleCollapsed}
-              title={isCollapsed ? "กาง Sidebar ออก (PanelLeftOpen)" : "หุบ Sidebar เข้า (PanelLeftClose)"}
+              title={isCollapsed ? "กาง Sidebar ออก" : "หุบ Sidebar เข้า"}
               style={{
                 display: "grid",
                 placeItems: "center",
@@ -285,7 +336,7 @@ export default function AdminSidebar() {
             </button>
           </div>
 
-          {/* Scrollable Navigation List with Stable Gutter */}
+          {/* Scrollable Navigation List */}
           <div
             className="admin-sidebar-scroll-container"
             style={{
@@ -296,249 +347,411 @@ export default function AdminSidebar() {
             }}
           >
             <nav style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-            {/* Collapsed Compact View */}
-            {isCollapsed ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", alignItems: "center" }}>
-                {managementSubItems.map((sub) => {
-                  const isActive = pathname === sub.path;
-                  const Icon = sub.icon;
-                  return (
-                    <Link
-                      key={sub.path}
-                      href={sub.path}
-                      title={sub.label}
-                      style={{
-                        width: "2.5rem",
-                        height: "2.5rem",
-                        display: "grid",
-                        placeItems: "center",
-                        borderRadius: "0.6rem",
-                        backgroundColor: isActive ? "var(--cream)" : "transparent",
-                        color: isActive ? "var(--teal)" : "var(--ink-soft)",
-                        border: isActive ? "1px solid rgba(75, 155, 140, 0.4)" : "1px solid transparent",
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      <Icon size={18} />
-                    </Link>
-                  );
-                })}
+              {isCollapsed ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", alignItems: "center" }}>
+                  {visibleManagementItems.map((sub) => {
+                    const isActive = pathname === sub.path;
+                    const Icon = sub.icon;
+                    return (
+                      <Link
+                        key={sub.path}
+                        href={sub.path}
+                        title={sub.label}
+                        style={{
+                          width: "2.5rem",
+                          height: "2.5rem",
+                          display: "grid",
+                          placeItems: "center",
+                          borderRadius: "0.6rem",
+                          backgroundColor: isActive ? "var(--cream)" : "transparent",
+                          color: isActive ? "var(--teal)" : "var(--ink-soft)",
+                          border: isActive ? "1px solid rgba(75, 155, 140, 0.4)" : "1px solid transparent",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <Icon size={18} />
+                      </Link>
+                    );
+                  })}
 
-                <div style={{ width: "80%", height: "1px", backgroundColor: "rgba(50, 55, 65, 0.08)", margin: "0.4rem 0" }} />
+                  {visibleManagementItems.length > 0 && visiblePosItems.length > 0 && (
+                    <div style={{ width: "80%", height: "1px", backgroundColor: "rgba(50, 55, 65, 0.08)", margin: "0.4rem 0" }} />
+                  )}
 
-                <p style={{ fontSize: "9px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                  POS
-                </p>
-                {posSubItems.map((sub) => {
-                  const isActive = pathname === sub.path;
-                  const Icon = sub.icon;
-                  return (
-                    <Link
-                      key={sub.path}
-                      href={sub.path}
-                      title={sub.label}
-                      style={{
-                        width: "2.5rem",
-                        height: "2.5rem",
-                        display: "grid",
-                        placeItems: "center",
-                        borderRadius: "0.6rem",
-                        backgroundColor: isActive ? "var(--cream)" : "transparent",
-                        color: isActive ? "var(--teal)" : "var(--ink-soft)",
-                        border: isActive ? "1px solid rgba(75, 155, 140, 0.4)" : "1px solid transparent",
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      <Icon size={18} />
-                    </Link>
-                  );
-                })}
-              </div>
-            ) : (
-              /* Expanded Normal View */
-              <>
-                {/* Group 1: Management (Expandable / Sub-items) */}
-                <div>
-                  <button
-                    type="button"
-                    onClick={toggleManagement}
-                    style={{
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "0.65rem 0.75rem",
-                      borderRadius: "0.75rem",
-                      fontSize: "0.875rem",
-                      fontWeight: 600,
-                      fontFamily: "'Kanit', sans-serif",
-                      border: "none",
-                      cursor: "pointer",
-                      backgroundColor: isManagementActive ? "rgba(75, 155, 140, 0.12)" : "transparent",
-                      color: isManagementActive ? "var(--teal)" : "var(--ink)",
-                      transition: "all 0.15s ease",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
-                      <FolderCog size={18} />
-                      <span style={{ fontFamily: "'Kanit', sans-serif" }}>การจัดการ</span>
-                    </div>
-                    {isManagementOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                  </button>
+                  {visiblePosItems.length > 0 && (
+                    <p style={{ fontSize: "9px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                      POS
+                    </p>
+                  )}
+                  {visiblePosItems.map((sub) => {
+                    const isActive = pathname === sub.path;
+                    const Icon = sub.icon;
+                    return (
+                      <Link
+                        key={sub.path}
+                        href={sub.path}
+                        title={sub.label}
+                        style={{
+                          width: "2.5rem",
+                          height: "2.5rem",
+                          display: "grid",
+                          placeItems: "center",
+                          borderRadius: "0.6rem",
+                          backgroundColor: isActive ? "var(--cream)" : "transparent",
+                          color: isActive ? "var(--teal)" : "var(--ink-soft)",
+                          border: isActive ? "1px solid rgba(75, 155, 140, 0.4)" : "1px solid transparent",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <Icon size={18} />
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : (
+                <>
+                  {/* Group 1: Management */}
+                  {visibleManagementItems.length > 0 && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={toggleManagement}
+                        style={{
+                          width: "100%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "0.65rem 0.75rem",
+                          borderRadius: "0.75rem",
+                          fontSize: "0.875rem",
+                          fontWeight: 600,
+                          fontFamily: "'Kanit', sans-serif",
+                          border: "none",
+                          cursor: "pointer",
+                          backgroundColor: isManagementActive ? "rgba(75, 155, 140, 0.12)" : "transparent",
+                          color: isManagementActive ? "var(--teal)" : "var(--ink)",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
+                          <FolderCog size={18} />
+                          <span>การจัดการ</span>
+                        </div>
+                        {isManagementOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      </button>
 
-                  {/* Sub Items */}
-                  {isManagementOpen && (
-                    <div
-                      style={{
-                        marginTop: "0.25rem",
-                        marginLeft: "0.75rem",
-                        paddingLeft: "0.75rem",
-                        borderLeft: "2px solid rgba(75, 155, 140, 0.25)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "0.2rem",
-                      }}
-                    >
-                      {managementSubItems.map((sub) => {
-                        const isActive = pathname === sub.path;
-                        const Icon = sub.icon;
-                        return (
-                          <Link
-                            key={sub.path}
-                            href={sub.path}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.6rem",
-                              padding: "0.5rem 0.75rem",
-                              borderRadius: "0.6rem",
-                              fontSize: "0.875rem",
-                              fontWeight: isActive ? 600 : 400,
-                              fontFamily: "'Kanit', sans-serif",
-                              textDecoration: "none",
-                              backgroundColor: isActive ? "var(--cream)" : "transparent",
-                              color: isActive ? "var(--ink)" : "var(--ink-soft)",
-                              border: isActive ? "1px solid rgba(75, 155, 140, 0.35)" : "1px solid transparent",
-                              transition: "all 0.15s ease",
-                            }}
-                          >
-                            <Icon size={16} color={isActive ? "var(--teal)" : "currentColor"} />
-                            <span>{sub.label}</span>
-                          </Link>
-                        );
-                      })}
+                      {isManagementOpen && (
+                        <div
+                          style={{
+                            marginTop: "0.25rem",
+                            marginLeft: "0.75rem",
+                            paddingLeft: "0.75rem",
+                            borderLeft: "2px solid rgba(75, 155, 140, 0.25)",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "0.2rem",
+                          }}
+                        >
+                          {visibleManagementItems.map((sub) => {
+                            const isActive = pathname === sub.path;
+                            const Icon = sub.icon;
+                            return (
+                              <Link
+                                key={sub.path}
+                                href={sub.path}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "0.6rem",
+                                  padding: "0.5rem 0.75rem",
+                                  borderRadius: "0.6rem",
+                                  fontSize: "0.875rem",
+                                  fontWeight: isActive ? 600 : 400,
+                                  textDecoration: "none",
+                                  backgroundColor: isActive ? "var(--cream)" : "transparent",
+                                  color: isActive ? "var(--ink)" : "var(--ink-soft)",
+                                  border: isActive ? "1px solid rgba(75, 155, 140, 0.35)" : "1px solid transparent",
+                                  transition: "all 0.15s ease",
+                                }}
+                              >
+                                <Icon size={16} color={isActive ? "var(--teal)" : "currentColor"} />
+                                <span>{sub.label}</span>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
 
-                {/* Group 2: POS & Kitchen (Expandable / Sub-items) */}
-                <div style={{ marginTop: "0.5rem" }}>
-                  <button
-                    type="button"
-                    onClick={togglePos}
-                    style={{
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "0.65rem 0.75rem",
-                      borderRadius: "0.75rem",
-                      fontSize: "0.875rem",
-                      fontWeight: 600,
-                      fontFamily: "'Kanit', sans-serif",
-                      border: "none",
-                      cursor: "pointer",
-                      backgroundColor: isPosActive ? "rgba(75, 155, 140, 0.12)" : "transparent",
-                      color: isPosActive ? "var(--teal)" : "var(--ink)",
-                      transition: "all 0.15s ease",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
-                      <MonitorCheck size={18} />
-                      <span style={{ fontFamily: "'Kanit', sans-serif" }}>POS</span>
-                    </div>
-                    {isPosOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                  </button>
+                  {/* Group 2: POS */}
+                  {visiblePosItems.length > 0 && (
+                    <div style={{ marginTop: "0.5rem" }}>
+                      <button
+                        type="button"
+                        onClick={togglePos}
+                        style={{
+                          width: "100%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "0.65rem 0.75rem",
+                          borderRadius: "0.75rem",
+                          fontSize: "0.875rem",
+                          fontWeight: 600,
+                          fontFamily: "'Kanit', sans-serif",
+                          border: "none",
+                          cursor: "pointer",
+                          backgroundColor: isPosActive ? "rgba(75, 155, 140, 0.12)" : "transparent",
+                          color: isPosActive ? "var(--teal)" : "var(--ink)",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
+                          <MonitorCheck size={18} />
+                          <span>POS</span>
+                        </div>
+                        {isPosOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      </button>
 
-                  {/* POS Sub Items */}
-                  {isPosOpen && (
-                    <div
-                      style={{
-                        marginTop: "0.25rem",
-                        marginLeft: "0.75rem",
-                        paddingLeft: "0.75rem",
-                        borderLeft: "2px solid rgba(75, 155, 140, 0.25)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "0.2rem",
-                      }}
-                    >
-                      {posSubItems.map((sub) => {
-                        const isActive = pathname === sub.path;
-                        const Icon = sub.icon;
-                        return (
-                          <Link
-                            key={sub.path}
-                            href={sub.path}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.6rem",
-                              padding: "0.5rem 0.75rem",
-                              borderRadius: "0.6rem",
-                              fontSize: "0.875rem",
-                              fontWeight: isActive ? 600 : 400,
-                              fontFamily: "'Kanit', sans-serif",
-                              textDecoration: "none",
-                              backgroundColor: isActive ? "var(--cream)" : "transparent",
-                              color: isActive ? "var(--ink)" : "var(--ink-soft)",
-                              border: isActive ? "1px solid rgba(75, 155, 140, 0.35)" : "1px solid transparent",
-                              transition: "all 0.15s ease",
-                            }}
-                          >
-                            <Icon size={16} color={isActive ? "var(--teal)" : "currentColor"} />
-                            <span>{sub.label}</span>
-                          </Link>
-                        );
-                      })}
+                      {isPosOpen && (
+                        <div
+                          style={{
+                            marginTop: "0.25rem",
+                            marginLeft: "0.75rem",
+                            paddingLeft: "0.75rem",
+                            borderLeft: "2px solid rgba(75, 155, 140, 0.25)",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "0.2rem",
+                          }}
+                        >
+                          {visiblePosItems.map((sub) => {
+                            const isActive = pathname === sub.path;
+                            const Icon = sub.icon;
+                            return (
+                              <Link
+                                key={sub.path}
+                                href={sub.path}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "0.6rem",
+                                  padding: "0.5rem 0.75rem",
+                                  borderRadius: "0.6rem",
+                                  fontSize: "0.875rem",
+                                  fontWeight: isActive ? 600 : 400,
+                                  textDecoration: "none",
+                                  backgroundColor: isActive ? "var(--cream)" : "transparent",
+                                  color: isActive ? "var(--ink)" : "var(--ink-soft)",
+                                  border: isActive ? "1px solid rgba(75, 155, 140, 0.35)" : "1px solid transparent",
+                                  transition: "all 0.15s ease",
+                                }}
+                              >
+                                <Icon size={16} color={isActive ? "var(--teal)" : "currentColor"} />
+                                <span>{sub.label}</span>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
-              </>
-            )}
-          </nav>
-        </div>
+                </>
+              )}
+            </nav>
+          </div>
 
-        {/* Bottom Profile & Logout CTA */}
-        <div style={{ paddingTop: "0.75rem", borderTop: "1px solid rgba(50, 55, 65, 0.08)" }}>
-          <button
-            type="button"
-            onClick={handleLogout}
-            title={isCollapsed ? "ออกจากระบบ" : undefined}
+          {/* Bottom Profile, Settings & Logout CTA */}
+          <div
             style={{
+              paddingTop: "0.75rem",
+              borderTop: "1px solid rgba(50, 55, 65, 0.08)",
               display: "flex",
-              alignItems: "center",
-              justifyContent: isCollapsed ? "center" : "flex-start",
-              gap: "0.65rem",
-              padding: isCollapsed ? "0.65rem 0" : "0.65rem 0.85rem",
-              borderRadius: "0.75rem",
-              fontSize: "0.875rem",
-              fontWeight: 600,
-              color: "var(--ink-soft)",
-              backgroundColor: "var(--cream)",
-              border: "1px solid rgba(50, 55, 65, 0.1)",
-              cursor: "pointer",
-              width: "100%",
-              fontFamily: "'Kanit', sans-serif",
-              transition: "all 0.15s ease",
+              flexDirection: "column",
+              gap: "0.5rem",
             }}
           >
-            <LogOut size={16} />
-            {!isCollapsed && <span>ออกจากระบบ</span>}
-          </button>
-        </div>
-      </aside>
-    </div>
+            {/* User Profile Card with Settings Icon on the right */}
+            {currentUser ? (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: isCollapsed ? "center" : "space-between",
+                  gap: "0.5rem",
+                  padding: isCollapsed ? "0.4rem 0" : "0.45rem 0.65rem",
+                  borderRadius: "0.75rem",
+                  backgroundColor: "var(--cream)",
+                  border: "1px solid rgba(50, 55, 65, 0.08)",
+                  overflow: "hidden",
+                }}
+                title={
+                  isCollapsed
+                    ? `${currentUser.name || currentUser.username} (${currentUser.role?.name_th || currentUser.role?.name_en || currentUser.role?.key || "Staff"})`
+                    : undefined
+                }
+              >
+                {/* Left: Avatar + User Info (or only Settings when collapsed) */}
+                {isCollapsed ? (
+                  /* When collapsed, clicking user area or icon opens settings */
+                  <button
+                    type="button"
+                    onClick={() => setIsSettingsOpen(true)}
+                    title={`ตั้งค่า (@${currentUser.username || currentUser.name})`}
+                    aria-label="Settings"
+                    style={{
+                      width: "2.35rem",
+                      height: "2.35rem",
+                      borderRadius: "0.6rem",
+                      backgroundColor: "rgba(75, 155, 140, 0.15)",
+                      color: "var(--teal)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      border: "none",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <Settings size={18} />
+                  </button>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", minWidth: 0, flex: 1 }}>
+                      <div
+                        style={{
+                          width: "2.1rem",
+                          height: "2.1rem",
+                          borderRadius: "0.6rem",
+                          backgroundColor: "rgba(75, 155, 140, 0.15)",
+                          color: "var(--teal)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          fontWeight: 700,
+                          fontSize: "0.85rem",
+                        }}
+                      >
+                        <User size={16} />
+                      </div>
+                      <div style={{ minWidth: 0, flex: 1, lineHeight: 1.25 }}>
+                        <div
+                          style={{
+                            fontSize: "0.85rem",
+                            fontWeight: 700,
+                            color: "var(--ink)",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          @{currentUser.username || currentUser.name}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "0.725rem",
+                            color: "var(--teal)",
+                            fontWeight: 600,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            marginTop: "1px",
+                          }}
+                        >
+                          {currentUser.role?.name_th || currentUser.role?.name_en || currentUser.role?.key || "Staff"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Settings Button on the right inside User Card */}
+                    <button
+                      type="button"
+                      onClick={() => setIsSettingsOpen(true)}
+                      title="ตั้งค่า (Settings)"
+                      aria-label="Settings"
+                      style={{
+                        display: "grid",
+                        placeItems: "center",
+                        width: "2rem",
+                        height: "2rem",
+                        borderRadius: "0.5rem",
+                        color: "var(--ink-soft)",
+                        backgroundColor: "transparent",
+                        border: "1px solid transparent",
+                        cursor: "pointer",
+                        flexShrink: 0,
+                        transition: "all 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "rgba(75, 155, 140, 0.15)";
+                        e.currentTarget.style.color = "var(--teal)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                        e.currentTarget.style.color = "var(--ink-soft)";
+                      }}
+                    >
+                      <Settings size={16} />
+                    </button>
+                  </>
+                )}
+              </div>
+            ) : isCollapsed && (
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(true)}
+                title="ตั้งค่า (Settings)"
+                aria-label="Settings"
+                style={{
+                  display: "grid",
+                  placeItems: "center",
+                  width: "100%",
+                  height: "2.4rem",
+                  borderRadius: "0.75rem",
+                  color: "var(--teal)",
+                  backgroundColor: "var(--cream)",
+                  border: "1px solid rgba(50, 55, 65, 0.12)",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <Settings size={17} />
+              </button>
+            )}
+
+            {/* Logout Button */}
+            <button
+              type="button"
+              onClick={handleLogout}
+              title="ออกจากระบบ"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.45rem",
+                width: "100%",
+                height: "2.4rem",
+                padding: isCollapsed ? "0" : "0 0.75rem",
+                borderRadius: "0.75rem",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                color: "#dc2626",
+                backgroundColor: "rgba(220, 38, 38, 0.06)",
+                border: "1px solid rgba(220, 38, 38, 0.15)",
+                cursor: "pointer",
+                fontFamily: "'Kanit', sans-serif",
+                transition: "all 0.15s ease",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <LogOut size={16} />
+              {!isCollapsed && <span>ออกจากระบบ</span>}
+            </button>
+          </div>
+        </aside>
+      </div>
 
       {/* ------------------------------------------------------------- */}
       {/* 2. MOBILE TOP NAVBAR (Visible on <= 768px screens)            */}
@@ -555,13 +768,14 @@ export default function AdminSidebar() {
           backgroundColor: "var(--card)",
           borderBottom: "1px solid rgba(50, 55, 65, 0.12)",
           padding: "0.65rem 1rem",
-          display: "none", // overridden to flex in globals.css on <= 768px
+          display: "none",
           flexDirection: "column",
           zIndex: 90,
           boxShadow: "0 2px 10px rgba(0,0,0,0.03)",
+          userSelect: "none",
+          WebkitUserSelect: "none",
         }}
       >
-        {/* Top bar header row */}
         <div
           style={{
             display: "flex",
@@ -572,8 +786,8 @@ export default function AdminSidebar() {
         >
           {/* Brand Logo & Name */}
           <Link
-            href="/admin/management/dashboard"
-            onClick={(e) => handleNavigateWithAnimation(e, "/admin/management/dashboard")}
+            href="/staff/management/dashboard"
+            onClick={(e) => handleNavigateWithAnimation(e, "/staff/management/dashboard")}
             style={{
               display: "flex",
               alignItems: "center",
@@ -617,8 +831,31 @@ export default function AdminSidebar() {
             </span>
           </Link>
 
-          {/* Right Action: Hamburger Menu Button */}
-          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          {/* Right Actions: Settings Button (Left of Menu Button) & Hamburger Menu Button */}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            {/* Quick Settings Button on the left of Menu button */}
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(true)}
+              aria-label="Settings"
+              title="ตั้งค่า (Settings)"
+              style={{
+                display: "grid",
+                placeItems: "center",
+                width: "2.35rem",
+                height: "2.35rem",
+                borderRadius: "0.6rem",
+                backgroundColor: "var(--cream)",
+                color: "var(--teal)",
+                border: "1px solid rgba(50, 55, 65, 0.12)",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <Settings size={19} />
+            </button>
+
+            {/* Hamburger Menu Button */}
             <button
               type="button"
               onClick={toggleMobileMenu}
@@ -641,7 +878,7 @@ export default function AdminSidebar() {
           </div>
         </div>
 
-        {/* Mobile Dropdown Drawer Menu (Smooth CSS Grid Accordion Overlay) */}
+        {/* Mobile Dropdown Drawer Menu */}
         <div className={`admin-mobile-drawer-wrapper ${isMobileMenuOpen ? "is-open" : ""}`}>
           <div className="admin-mobile-drawer-inner">
             <div
@@ -655,112 +892,202 @@ export default function AdminSidebar() {
               }}
             >
               {/* Group 1: Management */}
-              <div>
-                <p
-                  style={{
-                    fontSize: "0.75rem",
-                    fontWeight: 700,
-                    color: "var(--teal)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                    marginBottom: "0.35rem",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.35rem",
-                  }}
-                >
-                  <FolderCog size={14} />
-                  การจัดการ
-                </p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.25rem" }}>
-                  {managementSubItems.map((sub) => {
-                    const isActive = pathname === sub.path;
-                    const Icon = sub.icon;
-                    return (
-                      <Link
-                        key={sub.path}
-                        href={sub.path}
-                        onClick={(e) => handleNavigateWithAnimation(e, sub.path)}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "0.65rem",
-                          padding: "0.6rem 0.75rem",
-                          borderRadius: "0.6rem",
-                          fontSize: "0.85rem",
-                          fontWeight: isActive ? 600 : 400,
-                          textDecoration: "none",
-                          backgroundColor: isActive ? "var(--cream)" : "transparent",
-                          color: isActive ? "var(--teal)" : "var(--ink)",
-                          border: isActive ? "1px solid rgba(75, 155, 140, 0.35)" : "1px solid transparent",
-                        }}
-                      >
-                        <Icon size={16} color={isActive ? "var(--teal)" : "var(--ink-soft)"} />
-                        <span>{sub.label}</span>
-                      </Link>
-                    );
-                  })}
+              {visibleManagementItems.length > 0 && (
+                <div>
+                  <p
+                    style={{
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                      color: "var(--teal)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      marginBottom: "0.35rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.35rem",
+                    }}
+                  >
+                    <FolderCog size={14} />
+                    การจัดการ
+                  </p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.25rem" }}>
+                    {visibleManagementItems.map((sub) => {
+                      const isActive = pathname === sub.path;
+                      const Icon = sub.icon;
+                      return (
+                        <Link
+                          key={sub.path}
+                          href={sub.path}
+                          onClick={(e) => handleNavigateWithAnimation(e, sub.path)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.65rem",
+                            padding: "0.6rem 0.75rem",
+                            borderRadius: "0.6rem",
+                            fontSize: "0.85rem",
+                            fontWeight: isActive ? 600 : 400,
+                            textDecoration: "none",
+                            backgroundColor: isActive ? "var(--cream)" : "transparent",
+                            color: isActive ? "var(--teal)" : "var(--ink)",
+                            border: isActive ? "1px solid rgba(75, 155, 140, 0.35)" : "1px solid transparent",
+                          }}
+                        >
+                          <Icon size={16} color={isActive ? "var(--teal)" : "var(--ink-soft)"} />
+                          <span>{sub.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Group 2: POS & Kitchen */}
-              <div>
-                <p
+              {visiblePosItems.length > 0 && (
+                <div>
+                  <p
+                    style={{
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                      color: "var(--teal)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      marginBottom: "0.35rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.35rem",
+                    }}
+                  >
+                    <MonitorCheck size={14} />
+                    ระบบขาย
+                  </p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.25rem" }}>
+                    {visiblePosItems.map((sub) => {
+                      const isActive = pathname === sub.path;
+                      const Icon = sub.icon;
+                      return (
+                        <Link
+                          key={sub.path}
+                          href={sub.path}
+                          onClick={(e) => handleNavigateWithAnimation(e, sub.path)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.65rem",
+                            padding: "0.6rem 0.75rem",
+                            borderRadius: "0.6rem",
+                            fontSize: "0.85rem",
+                            fontWeight: isActive ? 600 : 400,
+                            textDecoration: "none",
+                            backgroundColor: isActive ? "var(--cream)" : "transparent",
+                            color: isActive ? "var(--teal)" : "var(--ink)",
+                            border: isActive ? "1px solid rgba(75, 155, 140, 0.35)" : "1px solid transparent",
+                          }}
+                        >
+                          <Icon size={16} color={isActive ? "var(--teal)" : "var(--ink-soft)"} />
+                          <span>{sub.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* User Profile Info Card (Mobile Drawer) */}
+              {currentUser && (
+                <div
                   style={{
-                    fontSize: "0.75rem",
-                    fontWeight: 700,
-                    color: "var(--teal)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                    marginBottom: "0.35rem",
                     display: "flex",
                     alignItems: "center",
-                    gap: "0.35rem",
+                    justifyContent: "space-between",
+                    gap: "0.5rem",
+                    padding: "0.55rem 0.75rem",
+                    borderRadius: "0.75rem",
+                    backgroundColor: "rgba(75, 155, 140, 0.08)",
+                    border: "1px solid rgba(75, 155, 140, 0.2)",
+                    marginTop: "0.5rem",
                   }}
                 >
-                  <MonitorCheck size={14} />
-                  ระบบขาย
-                </p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.25rem" }}>
-                  {posSubItems.map((sub) => {
-                    const isActive = pathname === sub.path;
-                    const Icon = sub.icon;
-                    return (
-                      <Link
-                        key={sub.path}
-                        href={sub.path}
-                        onClick={(e) => handleNavigateWithAnimation(e, sub.path)}
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", minWidth: 0, flex: 1 }}>
+                    <div
+                      style={{
+                        width: "2.2rem",
+                        height: "2.2rem",
+                        borderRadius: "50%",
+                        backgroundColor: "var(--teal)",
+                        color: "#fff",
+                        display: "grid",
+                        placeItems: "center",
+                        fontSize: "0.85rem",
+                        fontWeight: 700,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <User size={15} />
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "0.65rem",
-                          padding: "0.6rem 0.75rem",
-                          borderRadius: "0.6rem",
                           fontSize: "0.85rem",
-                          fontWeight: isActive ? 600 : 400,
-                          textDecoration: "none",
-                          backgroundColor: isActive ? "var(--cream)" : "transparent",
-                          color: isActive ? "var(--teal)" : "var(--ink)",
-                          border: isActive ? "1px solid rgba(75, 155, 140, 0.35)" : "1px solid transparent",
+                          fontWeight: 700,
+                          color: "var(--ink)",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
                         }}
                       >
-                        <Icon size={16} color={isActive ? "var(--teal)" : "var(--ink-soft)"} />
-                        <span>{sub.label}</span>
-                      </Link>
-                    );
-                  })}
+                        @{currentUser.username || currentUser.name}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "0.725rem",
+                          color: "var(--teal)",
+                          fontWeight: 600,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          marginTop: "1px",
+                        }}
+                      >
+                        {currentUser.role?.name_th || currentUser.role?.name_en || currentUser.role?.key || "Staff"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Settings Icon on right of user card in mobile drawer */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeMobileMenu();
+                      setIsSettingsOpen(true);
+                    }}
+                    title="ตั้งค่า (Settings)"
+                    aria-label="Settings"
+                    style={{
+                      display: "grid",
+                      placeItems: "center",
+                      width: "2.1rem",
+                      height: "2.1rem",
+                      borderRadius: "0.5rem",
+                      color: "var(--teal)",
+                      backgroundColor: "rgba(75, 155, 140, 0.15)",
+                      border: "none",
+                      cursor: "pointer",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Settings size={17} />
+                  </button>
                 </div>
-              </div>
+              )}
 
               {/* Logout Button */}
               <div
                 style={{
-                  marginTop: "0.5rem",
-                  paddingTop: "0.75rem",
-                  borderTop: "1px solid rgba(50, 55, 65, 0.08)",
+                  marginTop: "0.25rem",
+                  paddingTop: "0.35rem",
                   display: "flex",
-                  flexDirection: "column",
-                  gap: "0.5rem",
+                  alignItems: "center",
                   paddingBottom: "0.5rem",
                 }}
               >
@@ -771,11 +1098,13 @@ export default function AdminSidebar() {
                     handleLogout();
                   }}
                   style={{
+                    width: "100%",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     gap: "0.5rem",
-                    padding: "0.65rem",
+                    height: "2.5rem",
+                    padding: "0 0.75rem",
                     borderRadius: "0.6rem",
                     fontSize: "0.85rem",
                     fontWeight: 600,
@@ -783,7 +1112,6 @@ export default function AdminSidebar() {
                     backgroundColor: "rgba(220, 38, 38, 0.08)",
                     border: "1px solid rgba(220, 38, 38, 0.2)",
                     cursor: "pointer",
-                    width: "100%",
                   }}
                 >
                   <LogOut size={16} />
@@ -794,8 +1122,11 @@ export default function AdminSidebar() {
           </div>
         </div>
       </header>
+
+      {/* ------------------------------------------------------------- */}
+      {/* 3. SETTINGS MODAL DIALOG (From @/components/ui/modals)         */}
+      {/* ------------------------------------------------------------- */}
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </>
   );
 }
-
-

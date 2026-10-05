@@ -446,7 +446,7 @@ func (h *AppHandler) VerifyOrderSlip(c *gin.Context) {
 	}
 	var adminID *uint
 	if exists {
-		if currentAdmin, ok := adminVal.(*model.Admin); ok && currentAdmin != nil {
+		if currentAdmin, ok := adminVal.(*model.Staff); ok && currentAdmin != nil {
 			adminID = &currentAdmin.ID
 		}
 	}

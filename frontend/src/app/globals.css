@@ -147,10 +147,13 @@
 }
 
 button,
+html,
+body,
 input,
+button,
 select,
 textarea {
-  font-family: inherit;
+  font-family: 'Kanit', sans-serif;
 }
 
 html {
@@ -622,6 +625,10 @@ html.lock-scroll {
 /* Admin Responsive Layout (Desktop Sidebar vs Mobile Top Navbar) */
 .admin-sidebar-desktop-wrapper {
   display: block;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 .admin-sidebar-desktop {
@@ -632,10 +639,34 @@ html.lock-scroll {
   bottom: 0 !important;
   height: 100vh !important;
   z-index: 50 !important;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.admin-sidebar-desktop * {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -webkit-user-drag: none;
 }
 
 .admin-topbar-mobile {
   display: none !important;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.admin-topbar-mobile * {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -webkit-user-drag: none;
 }
 
 /* Butter-smooth accordion overlay transition using pure CSS Grid height (No opacity) */
@@ -788,7 +819,7 @@ html.lock-scroll {
   }
 }
 
-/* Responsive Menu Products Grid (Max 3 items per row) */
+/* Responsive Menu Products Grid (Max 4 items per row) */
 .menu-products-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -814,9 +845,9 @@ html.lock-scroll {
   }
 }
 
-@media (min-width: 640px) {
+@media (min-width: 768px) {
   .menu-products-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 1rem;
   }
 }
@@ -830,12 +861,12 @@ html.lock-scroll {
 
 @media (min-width: 1280px) {
   .menu-products-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 1.15rem;
   }
 }
 
-/* Responsive Toppings Grid (Max 3 items per row) */
+/* Responsive Toppings Grid (Max 4 items per row) */
 .toppings-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -861,9 +892,9 @@ html.lock-scroll {
   }
 }
 
-@media (min-width: 640px) {
+@media (min-width: 768px) {
   .toppings-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 1rem;
   }
 }
@@ -877,14 +908,14 @@ html.lock-scroll {
 
 @media (min-width: 1280px) {
   .toppings-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 1.15rem;
   }
 }
 
 @media (min-width: 1536px) {
   .toppings-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 1.2rem;
   }
 }

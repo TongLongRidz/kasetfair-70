@@ -4,13 +4,13 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
-        source: "/admin",
-        destination: "/admin/login",
+        source: "/staff",
+        destination: "/staff/login",
         permanent: false,
       },
       {
-        source: "/admin/management",
-        destination: "/admin/management/dashboard",
+        source: "/staff/management",
+        destination: "/staff/management/dashboard",
         permanent: false,
       },
     ];

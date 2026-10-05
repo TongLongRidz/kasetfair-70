@@ -180,55 +180,7 @@ export default function QueuePage() {
       {/* Hide Navbar completely when in Fullscreen Mode */}
       {!isFullscreen && <Navbar />}
 
-      {/* Subtle / Clean Fullscreen Toggle Button */}
-      <button
-        type="button"
-        onClick={toggleFullscreen}
-        aria-label={isFullscreen ? "ออกจากโหมดเต็มจอ" : "แสดงผลเต็มจอ"}
-        style={{
-          position: "fixed",
-          top: isFullscreen ? "1rem" : "5rem",
-          right: "1.25rem",
-          zIndex: 50,
-          display: "flex",
-          alignItems: "center",
-          gap: "0.35rem",
-          padding: "0.45rem 0.75rem",
-          borderRadius: "9999px",
-          border: "1px solid rgba(50, 55, 65, 0.15)",
-          backgroundColor: isFullscreen ? "rgba(255, 255, 255, 0.85)" : "var(--card)",
-          backdropFilter: "blur(8px)",
-          color: "var(--ink-soft)",
-          fontSize: "0.75rem",
-          fontWeight: 600,
-          cursor: "pointer",
-          boxShadow: "0 2px 10px rgba(0, 0, 0, 0.06)",
-          transition: "all 0.2s ease",
-          opacity: isFullscreen ? 0.45 : 0.8,
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.opacity = "1";
-          e.currentTarget.style.color = "var(--ink)";
-          e.currentTarget.style.transform = "scale(1.04)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.opacity = isFullscreen ? "0.45" : "0.8";
-          e.currentTarget.style.color = "var(--ink-soft)";
-          e.currentTarget.style.transform = "scale(1)";
-        }}
-      >
-        {isFullscreen ? (
-          <>
-            <Minimize2 size={14} />
-            <span>ย่อจอ</span>
-          </>
-        ) : (
-          <>
-            <Maximize2 size={14} />
-            <span>เต็มจอ</span>
-          </>
-        )}
-      </button>
+
 
       <main
         style={{

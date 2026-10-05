@@ -110,3 +110,91 @@ func (r *RedisClient) ResetLoginAttempts(ctx context.Context, username string) e
 
 	return r.Client.Del(ctx, attemptsKey, lockKey).Err()
 }
+
+// -----------------------------------------------------------------------------
+// Redis Session Management System
+// -----------------------------------------------------------------------------
+
+// CreateSession stores a session token linked to an admin UUID with an expiration duration
+func (r *RedisClient) CreateSession(ctx context.Context, sessionID string, adminUUID string, duration time.Duration) error {
+	if r == nil || r.Client == nil {
+		return nil
+	}
+
+	sessionKey := fmt.Sprintf("session:%s", sessionID)
+	userSessionsKey := fmt.Sprintf("user_sessions:%s", adminUUID)
+
+	pipe := r.Client.Pipeline()
+	pipe.Set(ctx, sessionKey, adminUUID, duration)
+	pipe.SAdd(ctx, userSessionsKey, sessionID)
+	pipe.Expire(ctx, userSessionsKey, duration)
+
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+// ValidateSession verifies if a sessionID exists and is still valid
+func (r *RedisClient) ValidateSession(ctx context.Context, sessionID string) (string, bool, error) {
+	if r == nil || r.Client == nil {
+		// Fallback: If Redis is offline/not initialized, allow fallback
+		return "", true, nil
+	}
+
+	sessionKey := fmt.Sprintf("session:%s", sessionID)
+	adminUUID, err := r.Client.Get(ctx, sessionKey).Result()
+	if err == redis.Nil {
+		return "", false, nil // Invalid/expired session
+	} else if err != nil {
+		return "", false, err
+	}
+
+	return adminUUID, true, nil
+}
+
+// DestroySession revokes a single active session
+func (r *RedisClient) DestroySession(ctx context.Context, sessionID string) error {
+	if r == nil || r.Client == nil {
+		return nil
+	}
+
+	sessionKey := fmt.Sprintf("session:%s", sessionID)
+	adminUUID, err := r.Client.Get(ctx, sessionKey).Result()
+	if err != nil && err != redis.Nil {
+		return err
+	}
+
+	pipe := r.Client.Pipeline()
+	pipe.Del(ctx, sessionKey)
+	if adminUUID != "" {
+		userSessionsKey := fmt.Sprintf("user_sessions:%s", adminUUID)
+		pipe.SRem(ctx, userSessionsKey, sessionID)
+	}
+
+	_, err = pipe.Exec(ctx)
+	return err
+}
+
+// DestroyAllUserSessions revokes all sessions for a specific admin user (e.g. password change / force logout)
+func (r *RedisClient) DestroyAllUserSessions(ctx context.Context, adminUUID string) error {
+	if r == nil || r.Client == nil {
+		return nil
+	}
+
+	userSessionsKey := fmt.Sprintf("user_sessions:%s", adminUUID)
+	sessionIDs, err := r.Client.SMembers(ctx, userSessionsKey).Result()
+	if err != nil && err != redis.Nil {
+		return err
+	}
+
+	if len(sessionIDs) > 0 {
+		pipe := r.Client.Pipeline()
+		for _, sID := range sessionIDs {
+			pipe.Del(ctx, fmt.Sprintf("session:%s", sID))
+		}
+		pipe.Del(ctx, userSessionsKey)
+		_, err = pipe.Exec(ctx)
+		return err
+	}
+
+	return nil
+}
